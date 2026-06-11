@@ -5,7 +5,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 
 ## Architecture
 - `screener/data.py` — ccxt : `build_universe()` (top paires USDT par volume),
-  `fetch_ohlcv()` avec cache parquet. Import ccxt paresseux (tests hors-ligne).
+  `fetch_ohlcv()` avec cache parquet. `get_exchange("binance")` route les endpoints
+  publics vers le miroir `data-api.binance.vision` (spot, non géo-restreint).
+  `fetch_open_interest()` — historique d'OI (perp) via **OKX** (`fapi` Binance bloqué),
+  tolérant aux pannes (None si indispo). Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
@@ -30,11 +33,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   signe/test). Complète `events.py` qui ne réagit qu'aux bornes sur les `buffer` dernières
   barres. Chaque `WindowEvent` porte `why` (justification volume+spread) et `theory`.
   Détection (ordre interne) : climax → **AR** (rebond réflexe *immédiat*, horizon court,
-  on s'arrête dès que l'extrême cale ; validé seulement si volume EN REPLI <1× — un rebond
-  volumique est un SOS, pas un AR) → **SOS/SOW** (1ʳᵉ poussée large+volumique = *jump across
+  on s'arrête dès que l'extrême cale ; validé seulement si volume EN REPLI <1× **et OI en
+  repli** si dispo — un rebond volumique/à OI montant est un SOS, pas un AR) → **SOS/SOW**
+  (1ʳᵉ poussée large+volumique = *jump across
   the creek* ; détecté avant l'ST/Spring pour les borner en Phase B) → **ST** & **SPRING/
   UTAD** (entre AR et signe) → **LPS/LPSY** (back-up à volume sec après le signe, tenant le
-  bon côté de la borne). Événements triés par horodatage avant rendu.
+  bon côté de la borne). Événements triés par horodatage avant rendu. `detect_window_structure`
+  accepte un `oi` (Open Interest) réaligné sur les barres : confirme l'AR (débouclage → OI
+  en repli) et annote `WindowEvent.oi_chg` (ΔOI % sur ~3 barres). `--no-oi` pour désactiver.
 - `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure. Dessine les
   bougies sur une **TF inférieure** que l'analyse (`FINER_TF` : H4→H1, H1→15m, 15m→5m).
   Bornes : **plancher = climax (SC), plafond = AR** (c'est l'AR qui le définit), miroir
@@ -46,10 +52,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
-- `screener/theory_table.py` — `build_theory_html` : mémo « rappel théorie » (HTML
-  cliquable) listant, pour accumulation ET distribution, le rôle de chaque événement
-  et ses seuils de validité (vol×, spread ATR, clôture). Seuils lus depuis `Thresholds`
-  (jamais en dur). `run_window` le régénère à chaque analyse (`tableau_rappel_theorie.html`).
+- `screener/theory_table.py` — `build_theory_image` : mémo « mémo théorie » (**image PNG
+  cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
+  ses seuils de validité (vol×, spread ATR, clôture) **+ le comportement d'OI attendu**.
+  Données via `theory_rows(bias, th)` (seuils lus depuis `Thresholds`, jamais en dur).
+  `run_window` le régénère à chaque analyse (`memo_theorie.png`).
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
@@ -69,9 +76,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     test ≤ ×test_vol, SOS/SOW ≥ ×sos_vol, spread vs wide_spread_atr). Texte généré par
     `window._theory(bias, name, th)` à partir des `Thresholds` courants — but : développer
     des automatismes de lecture event par event.
-  - **Tableau rappel théorie** : à *chaque* demande d'analyse, livrer dans le fil le
-    mémo HTML cliquable (`theory_table.build_theory_html` → `tableau_rappel_theorie.html`)
-    — rôle + seuils de validité (vol×, ATR) de chaque événement, accumulation et
+  - **Mémo théorie** : à *chaque* demande d'analyse, livrer dans le fil l'**image PNG
+    cliquable** (`theory_table.build_theory_image` → `memo_theorie.png`) — rôle + seuils de
+    validité (vol×, ATR, clôture) + OI attendu de chaque événement, accumulation et
     distribution, pour mémoriser ce qui rend un événement valide ou non. À la **fin** de
     chaque analyse, proposer explicitement à Gauthier de pouvoir y référer.
 

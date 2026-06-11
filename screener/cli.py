@@ -111,17 +111,18 @@ def run_window(cfg: dict) -> pd.DataFrame:
     th = Thresholds(**cfg.get("thresholds", {}))
     lookback = cfg.get("window", 60)
 
-    # Mémo « rappel théorie » (cliquable) régénéré à chaque analyse, sur les seuils courants.
-    from .theory_table import build_theory_html
-    memo = build_theory_html(th)
-    print(f"→ tableau rappel théorie : {memo}", file=sys.stderr)
+    # Mémo théorie (image cliquable) régénéré à chaque analyse, sur les seuils courants.
+    from .theory_table import build_theory_image
+    memo = build_theory_image(th)
+    print(f"→ mémo théorie : {memo}", file=sys.stderr)
 
     rows: list[dict] = []
     for sym in universe:
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
-            struct = detect_window_structure(df, lookback=lookback, th=th)
+            oi = data_mod.fetch_open_interest(sym, cfg["timeframe"], cfg["limit"]) if cfg.get("oi", True) else None
+            struct = detect_window_structure(df, lookback=lookback, th=th, oi=oi)
             if not struct.is_valid:
                 continue
             for e in struct.events:
@@ -130,6 +131,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
                     "time": (e.ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh"),
                     "price": round(e.price, 2), "vol_x": round(e.vol_ratio, 2),
                     "spread_atr": round(e.spread_atr, 2), "clv": round(e.clv, 2),
+                    "oi_3h_%": "—" if pd.isna(e.oi_chg) else round(e.oi_chg, 2),
                     "volume/spread → thèse": e.why, "théorie": e.theory,
                 })
             if cfg.get("chart"):
@@ -154,7 +156,7 @@ def main() -> None:
         "exchange": "binance", "quote": "USDT", "timeframe": "1h", "top": 60,
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
-        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60,
+        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
     }
     cfg.update(load_config())
 
@@ -170,12 +172,13 @@ def main() -> None:
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
+    p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+               use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi)
     if args.window is not None:
         cfg["window"] = args.window
 

@@ -1,99 +1,118 @@
 """
-theory_table.py — Mémo « rappel théorie » : rôle et seuils de validité de chaque
-événement Wyckoff, en accumulation ET en distribution.
+theory_table.py — Mémo « mémo théorie » : rôle et seuils de validité de chaque
+événement Wyckoff, en accumulation ET en distribution, **plus le comportement de
+l'Open Interest** attendu à chaque étape.
 
 But (préférence Gauthier) : un récap mémorisable, event par event, pour ancrer ce
-qui rend un événement *valide ou non* — surtout en termes de volume (vol×) et de
-spread (en ATR). Les seuils sont lus depuis les `Thresholds` courants pour rester
-synchronisés avec la config / l'optimiseur ; aucune valeur en dur.
+qui rend un événement *valide ou non* — volume (vol×), spread (ATR), clôture, et OI.
+Les seuils sont lus depuis les `Thresholds` courants (jamais en dur).
 
-Sortie : un fichier HTML autonome (table cliquable, lisible dans le navigateur).
+Sortie : une **image PNG cliquable** (`memo_theorie.png`).
 """
 from __future__ import annotations
 
-import html
+import textwrap
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from .events import Thresholds
 
-# Ordre canonique des séquences.
 _SEQ = {
-    "accumulation": ["SC", "AR", "ST", "SOS"],
-    "distribution": ["BC", "AR", "ST", "SOW"],
+    "accumulation": ["SC", "AR", "ST", "SPRING", "SOS", "LPS"],
+    "distribution": ["BC", "AR", "ST", "UTAD", "SOW", "LPSY"],
 }
 
-_FULLNAME = {
-    "SC": "Selling Climax", "AR_acc": "Automatic Rally", "ST": "Secondary Test",
-    "SOS": "Sign of Strength", "BC": "Buying Climax", "AR_dist": "Automatic Reaction",
-    "SOW": "Sign of Weakness",
+# Comportement d'OI attendu (texte mémo) par schéma + type d'événement.
+_OI = {
+    ("accumulation", "climax"): "↑ puis purge (shorts agressifs, longs liquidés)",
+    ("accumulation", "ar"): "↓ short covering (rebond SANS engagement)",
+    ("accumulation", "st"): "plat / ↓ (offre tarie)",
+    ("accumulation", "spring"): "↑ sur la mèche puis ↓ (shorts piégés → squeeze)",
+    ("accumulation", "sign"): "↑ avec le prix (longs neufs = markup réel)",
+    ("accumulation", "lp"): "plat (back-up sain)",
+    ("distribution", "climax"): "↑ puis purge (FOMO longs, puis liquidés)",
+    ("distribution", "ar"): "↓ longs liquidés (repli SANS engagement)",
+    ("distribution", "st"): "plat / ↓ (demande tarie)",
+    ("distribution", "spring"): "↑ au-dessus puis ↓ (longs piégés → squeeze)",
+    ("distribution", "sign"): "↑ avec la baisse (shorts neufs = markdown réel)",
+    ("distribution", "lp"): "plat (rebond faible)",
 }
 
 
-def _rows(bias: str, th: Thresholds) -> list[dict]:
-    """Construit les lignes du tableau pour un schéma, à partir des seuils courants."""
+def theory_rows(bias: str, th: Thresholds) -> list[dict]:
+    """Lignes du mémo pour un schéma, à partir des seuils courants (incluant l'OI)."""
     acc = bias == "accumulation"
     borne_climax = "plancher" if acc else "plafond"
-    borne_ar = "plafond" if acc else "plancher"
     cloture = "haute" if acc else "basse"
     clv_dir = "≥ 0.6 (haute)" if acc else "≤ 0.4 (basse)"
     test_creux = "creux idéalement plus haut" if acc else "sommet idéalement plus bas"
     climax_name = "SC" if acc else "BC"
     signe = "SOS" if acc else "SOW"
 
+    def oi(kind):
+        return _OI[(bias, kind)]
+
     return [
         {
             "ev": climax_name,
-            "nom": _FULLNAME[climax_name],
-            "role": f"Apogée du mouvement : la pression {'vendeuse' if acc else 'acheteuse'} "
-                    f"euphorique est absorbée par les mains fortes. Fixe le {borne_climax}.",
-            "volx": f"≥ ×{th.climax_vol} (climactique, le + fort de la séquence)",
-            "spread": f"≥ {th.wide_spread_atr} ATR (large)",
-            "cloture": f"{cloture} (rejet → absorption)",
-            "valide": f"volume climactique + spread large + clôture {cloture}",
-            "invalide": "volume non climactique, ou clôture du mauvais côté (pas de rejet)",
+            "nom": "Selling Climax" if acc else "Buying Climax",
+            "role": f"Apogée du mouvement : pression {'vendeuse' if acc else 'acheteuse'} "
+                    f"absorbée par les mains fortes. Fixe le {borne_climax}.",
+            "volx": f"≥ ×{th.climax_vol} (climactique)",
+            "spread": f"≥ {th.wide_spread_atr} ATR",
+            "oi": oi("climax"),
+            "cloture": f"{cloture} (rejet)",
+            "valide": f"vol climactique + spread large + clôture {cloture}",
+            "invalide": "vol non climactique / clôture du mauvais côté",
         },
         {
             "ev": "AR",
-            "nom": _FULLNAME["AR_acc"] if acc else _FULLNAME["AR_dist"],
-            "role": f"Mouvement réflexe une fois la partie épuisée. Fixe le {borne_ar} : "
-                    "les deux bornes de la plage sont posées.",
-            "volx": "EN NETTE BAISSE (idéalement < moyenne, ×< 1)",
-            "spread": "indifférent (souvent en repli)",
+            "nom": "Automatic Rally" if acc else "Automatic Reaction",
+            "role": "Mouvement réflexe (débouclage). Fixe l'autre borne : la plage est posée.",
+            "volx": "EN REPLI (< ×1)",
+            "spread": "indifférent",
+            "oi": oi("ar"),
             "cloture": "indifférente",
-            "valide": "volume qui retombe (confirme l'épuisement)",
-            "invalide": "AR à FORT volume → épuisement non confirmé, structure douteuse",
+            "valide": "volume EN REPLI **et** OI EN REPLI (débouclage)",
+            "invalide": "AR à fort volume OU OI en hausse → engagement neuf",
         },
         {
             "ev": "ST",
-            "nom": _FULLNAME["ST"],
-            "role": f"Retour sonder le {borne_climax} pour vérifier que la pression s'est "
-                    f"tarie : {test_creux}.",
-            "volx": f"SEC ≤ ×{th.test_vol} (et < climax)",
+            "nom": "Secondary Test",
+            "role": f"Retour sonder le {borne_climax} : {test_creux}.",
+            "volx": f"SEC ≤ ×{th.test_vol}",
             "spread": f"ÉTROIT < {th.wide_spread_atr} ATR",
-            "cloture": "neutre (peu importe, pas de débordement)",
-            "valide": "volume sec + borne tenue (pas de nouveau débordement franc)",
-            "invalide": f"volume élevé (> ×{th.test_vol}) ou cassure nette de la borne",
+            "oi": oi("st"),
+            "cloture": "neutre",
+            "valide": "volume sec + borne tenue",
+            "invalide": f"volume élevé (> ×{th.test_vol}) / cassure nette",
         },
         {
             "ev": "SPRING" if acc else "UTAD",
-            "nom": "Spring" if acc else "Upthrust After Distribution",
+            "nom": "Spring" if acc else "Upthrust After Distrib.",
             "role": f"Phase C — fausse cassure {'sous le plancher' if acc else 'au-dessus du plafond'} "
-                    f"(shakeout) puis rejet : déloge les mains faibles avant le signe directionnel.",
-            "volx": "modéré (la cassure ne tient pas)",
+                    f"(shakeout) puis rejet.",
+            "volx": "modéré (cassure non tenue)",
             "spread": "pic bref possible",
-            "cloture": f"revient DANS la plage (clv {'≥ 0.5' if acc else '≤ 0.5'} = rejet)",
-            "valide": f"pénétration brève ≈ {th.pen_atr} ATR hors borne + clôture rentrée",
-            "invalide": "clôture HORS de la plage = vraie cassure (pas un piège)",
+            "oi": oi("spring"),
+            "cloture": f"revient DANS la plage (clv {'≥ 0.5' if acc else '≤ 0.5'})",
+            "valide": f"pénétration ≈ {th.pen_atr} ATR hors borne + clôture rentrée",
+            "invalide": "clôture HORS plage = vraie cassure",
         },
         {
             "ev": signe,
-            "nom": _FULLNAME[signe],
-            "role": f"La {'demande' if acc else 'offre'} prend le contrôle : "
-                    f"prélude à la phase de {'hausse (markup)' if acc else 'baisse (markdown)'}.",
+            "nom": "Sign of Strength" if acc else "Sign of Weakness",
+            "role": f"La {'demande' if acc else 'offre'} prend le contrôle : prélude au "
+                    f"{'markup' if acc else 'markdown'}.",
             "volx": f"SOUTENU ≥ ×{th.sos_vol}",
-            "spread": f"≥ {th.wide_spread_atr} ATR (large)",
+            "spread": f"≥ {th.wide_spread_atr} ATR",
+            "oi": oi("sign"),
             "cloture": f"{cloture} — clv {clv_dir}",
-            "valide": f"volume soutenu + spread large + clôture {cloture}",
-            "invalide": "volume faible ou clôture molle (clv au mauvais bout)",
+            "valide": f"vol soutenu + spread large + clôture {cloture} + OI ↑",
+            "invalide": "vol faible / clôture molle / OI plat (short squeeze)",
         },
         {
             "ev": "LPS" if acc else "LPSY",
@@ -101,83 +120,97 @@ def _rows(bias: str, th: Thresholds) -> list[dict]:
             "role": f"Phase D — back-up après le signe : dernier "
                     f"{'appui' if acc else 'rebond'} avant le {'markup' if acc else 'markdown'}.",
             "volx": f"SEC ≤ ×{th.test_vol}",
-            "spread": "étroit (réaction sans engagement)",
+            "spread": "étroit",
+            "oi": oi("lp"),
             "cloture": f"{'creux plus HAUT' if acc else 'sommet plus BAS'} que le climax",
-            "valide": f"réaction sèche + {'creux qui tient le support' if acc else 'sommet qui tient la résistance'}",
-            "invalide": f"volume lourd ou {'nouveau plus-bas sous le plancher' if acc else 'nouveau plus-haut au-dessus du plafond'}",
+            "valide": f"réaction sèche + {'creux' if acc else 'sommet'} qui tient la borne",
+            "invalide": f"volume lourd / {'nouveau plus-bas' if acc else 'nouveau plus-haut'}",
         },
     ]
 
 
-def _table_html(bias: str, th: Thresholds) -> str:
-    acc = bias == "accumulation"
-    accent = "#1b6b1b" if acc else "#a11"
-    seq = " → ".join(_SEQ[bias])
-    head = (f'<h2 style="color:{accent};margin:18px 0 6px">'
-            f'{"📈" if acc else "📉"} {bias.upper()} <span style="font-weight:400;'
-            f'font-size:.7em;color:#555">({seq})</span></h2>')
-    cols = ["Évén.", "Rôle dans la séquence", "Volume (vol×)", "Spread (ATR)",
-            "Clôture", "✅ Validé si", "❌ Invalidé si"]
-    th_html = "".join(f"<th>{c}</th>" for c in cols)
-    body = ""
-    for r in _rows(bias, th):
-        cells = [
-            f'<td class="ev" style="color:{accent}"><b>{r["ev"]}</b><br>'
-            f'<span class="full">{html.escape(r["nom"])}</span></td>',
-            f'<td>{html.escape(r["role"])}</td>',
-            f'<td class="num">{html.escape(r["volx"])}</td>',
-            f'<td class="num">{html.escape(r["spread"])}</td>',
-            f'<td>{html.escape(r["cloture"])}</td>',
-            f'<td class="ok">{html.escape(r["valide"])}</td>',
-            f'<td class="ko">{html.escape(r["invalide"])}</td>',
-        ]
-        body += "<tr>" + "".join(cells) + "</tr>"
-    return f'{head}<table><thead><tr>{th_html}</tr></thead><tbody>{body}</tbody></table>'
+# Colonnes du mémo : (titre, largeur fraction). Somme ≈ 1.
+_COLS = [("Évén.", 0.10), ("Rôle", 0.23), ("Vol×", 0.10), ("Spread", 0.07),
+         ("OI attendu", 0.16), ("Clôture", 0.11), ("✓ Validé  /  ✗ Invalidé", 0.23)]
+_ACCENT = {"accumulation": "#1b6b1b", "distribution": "#a11"}
 
 
-def build_theory_html(th: Thresholds | None = None,
-                      out_path: str = "tableau_rappel_theorie.html") -> str:
-    """Écrit le mémo HTML (accumulation + distribution) et renvoie le chemin."""
+def _wrap(text: str, frac: float, total_chars: int) -> list[str]:
+    width = max(6, int(frac * total_chars))
+    out: list[str] = []
+    for part in str(text).replace("**", "").split("\n"):
+        out += textwrap.wrap(part, width) or [""]
+    return out
+
+
+def build_theory_image(th: Thresholds | None = None,
+                       out_path: str = "memo_theorie.png") -> str:
+    """Rend le mémo (accumulation + distribution + OI) en PNG et renvoie le chemin."""
     th = th or Thresholds()
-    style = """
-    <style>
-      body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-           margin:24px;color:#222;background:#fff}
-      h1{font-size:1.4em;margin:0 0 4px}
-      .sub{color:#666;margin:0 0 14px;font-size:.9em}
-      table{border-collapse:collapse;width:100%;margin-bottom:10px;font-size:.86em}
-      th,td{border:1px solid #ddd;padding:7px 9px;vertical-align:top;text-align:left}
-      th{background:#f4f4f4;font-weight:600}
-      td.ev{white-space:nowrap}
-      td.ev .full{font-size:.8em;color:#666;font-weight:400}
-      td.num{font-variant-numeric:tabular-nums;background:#fafafa}
-      td.ok{color:#1b6b1b}
-      td.ko{color:#a11}
-      tr:nth-child(even) td{background:#fcfcfc}
-      .legend{margin-top:8px;font-size:.82em;color:#555}
-    </style>"""
-    seuils = (f"climax_vol=×{th.climax_vol} · sos_vol=×{th.sos_vol} · "
-              f"test_vol=×{th.test_vol} · wide_spread_atr={th.wide_spread_atr} ATR · "
-              f"narrow_spread_atr={th.narrow_spread_atr} ATR")
-    doc = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
-    <title>Tableau rappel théorie — Wyckoff</title>{style}</head><body>
-    <h1>Tableau rappel théorie — Wyckoff</h1>
-    <p class="sub">Rôle et seuils de validité de chaque événement. Seuils courants :
-    {html.escape(seuils)}</p>
-    {_table_html("accumulation", th)}
-    {_table_html("distribution", th)}
-    <p class="legend">Mémo : <b>climax</b> = volume le plus fort + spread large + clôture
-    de rejet (pose une borne). <b>AR</b> = réflexe à volume qui retombe (pose l'autre
-    borne) ; un AR volumique invalide l'épuisement. <b>ST</b> = re-test à volume sec,
-    borne tenue. <b>SOS/SOW</b> = signe directionnel à volume soutenu + spread large,
-    clôture du bon côté → déclencheur.</p>
-    </body></html>"""
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(doc)
+    total_chars = 150  # densité de caractères sur toute la largeur (réglage du wrap)
+
+    # 1) Pré-calcule les lignes et la hauteur (en "lignes de texte") de chaque bloc.
+    blocks: list[tuple] = [("header",)]
+    for bias in ("accumulation", "distribution"):
+        blocks.append(("section", bias))
+        for r in theory_rows(bias, th):
+            cells = [f"{r['ev']} · {r['nom']}", r["role"], r["volx"], r["spread"],
+                     r["oi"], r["cloture"], f"✓ {r['valide']}\n✗ {r['invalide']}"]
+            wrapped = [_wrap(c, _COLS[i][1], total_chars) for i, c in enumerate(cells)]
+            blocks.append(("row", bias, wrapped, max(len(w) for w in wrapped)))
+
+    unit = []  # hauteur de chaque bloc en lignes
+    for b in blocks:
+        unit.append(1.4 if b[0] == "header" else 1.3 if b[0] == "section" else b[3] + 0.8)
+    total = sum(unit)
+
+    # 2) Rendu.
+    fig = plt.figure(figsize=(15.5, max(6.0, total * 0.34)))
+    ax = fig.add_axes([0.006, 0.01, 0.988, 0.93]); ax.axis("off")
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    xs, x = [], 0.0
+    for _, frac in _COLS:
+        xs.append(x); x += frac
+
+    y, H = 1.0, 1.0 / total
+    for b, u in zip(blocks, unit):
+        h = u * H
+        ytop, ymid, ybot = y, y - 0.5 * (u * H), y - h
+        if b[0] == "header":
+            ax.add_patch(plt.Rectangle((0, ybot), 1, h, color="#f2f2f2"))
+            for i, (name, _) in enumerate(_COLS):
+                ax.text(xs[i] + 0.004, ymid, name, va="center", ha="left",
+                        fontsize=8.5, weight="bold", color="#333")
+            ax.axhline(ybot, color="#444", lw=1.0)
+        elif b[0] == "section":
+            bias = b[1]
+            ax.add_patch(plt.Rectangle((0, ybot), 1, h, color=_ACCENT[bias], alpha=0.12))
+            seq = " → ".join(_SEQ[bias])
+            ax.text(0.006, ymid, f"{bias.upper()}   ({seq})", va="center", ha="left",
+                    fontsize=9.5, weight="bold", color=_ACCENT[bias])
+        else:
+            bias, wrapped = b[1], b[2]
+            for i, _ in enumerate(_COLS):
+                col = _ACCENT[bias] if i == 0 else "#222"
+                weight = "bold" if i == 0 else "normal"
+                ax.text(xs[i] + 0.004, ymid, "\n".join(wrapped[i]), va="center", ha="left",
+                        fontsize=7.2, color=col, weight=weight, linespacing=1.15)
+            ax.axhline(ybot, color="#e2e2e2", lw=0.5)
+        y = ybot
+
+    for x0 in xs[1:]:
+        ax.axvline(x0, color="#ededed", lw=0.5)
+    seuils = (f"Seuils : climax ×{th.climax_vol} · sos ×{th.sos_vol} · test ×{th.test_vol} · "
+              f"spread large {th.wide_spread_atr} ATR · pénétration {th.pen_atr} ATR. "
+              f"OI = Open Interest (perp).")
+    fig.suptitle("Mémo théorie — Wyckoff + Open Interest", fontsize=13.5, weight="bold", y=0.995)
+    fig.text(0.006, 0.965, seuils, fontsize=7.5, color="#666")
+    fig.savefig(out_path, dpi=140, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
     return out_path
 
 
 if __name__ == "__main__":
     import sys
-    out = sys.argv[1] if len(sys.argv) > 1 else "tableau_rappel_theorie.html"
-    print(build_theory_html(out_path=out))
+    out = sys.argv[1] if len(sys.argv) > 1 else "memo_theorie.png"
+    print(build_theory_image(out_path=out))

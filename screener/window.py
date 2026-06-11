@@ -100,6 +100,7 @@ class WindowEvent:
     strength: float
     why: str             # justification volume + spread, calculée sur la barre
     theory: str          # rappel théorique
+    oi_chg: float = np.nan  # variation d'Open Interest sur ~3 barres (%), si disponible
 
 
 @dataclass
@@ -183,7 +184,18 @@ def _mk(df, i, name, bias, th) -> WindowEvent:
 # --------------------------------------------------------------------------- #
 # Recherche d'un schéma pour un biais donné
 # --------------------------------------------------------------------------- #
-def _scan(df: pd.DataFrame, lookback: int, th: Thresholds, bias: str) -> WindowStructure:
+def _oi_pct(oi_aligned, gi: int, k: int = 3) -> float:
+    """Variation d'OI (%) sur `k` barres se terminant à l'index global `gi`. NaN si indispo."""
+    if oi_aligned is None or gi - k < 0:
+        return np.nan
+    a, b = float(oi_aligned.iloc[gi]), float(oi_aligned.iloc[gi - k])
+    if np.isnan(a) or np.isnan(b) or b == 0:
+        return np.nan
+    return (a / b - 1.0) * 100.0
+
+
+def _scan(df: pd.DataFrame, lookback: int, th: Thresholds, bias: str,
+          oi_aligned=None) -> WindowStructure:
     win = df.iloc[-lookback:]
     n = len(win)
     if n < 8:
@@ -225,7 +237,14 @@ def _scan(df: pd.DataFrame, lookback: int, th: Thresholds, bias: str) -> WindowS
         else:
             break  # le rebond cale : pic réflexe atteint
     ar_vr = float(win.iloc[apos]["vol_ratio"]) if not np.isnan(win.iloc[apos]["vol_ratio"]) else 1.0
-    if apos > cpos and ar_vr < 1.0:
+    # Confirmation OI : un AR authentique est un rebond de débouclage (short covering en
+    # acc / liquidation de longs en dist) → OI en REPLI. Si l'OI est dispo et MONTE, on
+    # refuse l'AR (comme un AR à fort volume). Indispo → on retombe sur le seul volume.
+    ar_oi_ok = True
+    ar_oi_d = _oi_pct(oi_aligned, g(apos), 3)
+    if not np.isnan(ar_oi_d):
+        ar_oi_ok = ar_oi_d < 0
+    if apos > cpos and ar_vr < 1.0 and ar_oi_ok:
         events.append(_mk(df, g(apos), "AR", bias, th))
 
     # 3) SOS / SOW : PREMIÈRE poussée large et volumique dans le sens du biais après l'AR
@@ -296,21 +315,32 @@ def _scan(df: pd.DataFrame, lookback: int, th: Thresholds, bias: str) -> WindowS
         if lps_pos is not None:
             events.append(_mk(df, g(lps_pos), "LPS" if acc else "LPSY", bias, th))
 
+    if oi_aligned is not None:
+        for e in events:
+            e.oi_chg = _oi_pct(oi_aligned, df.index.get_loc(e.ts), 3)
+
     events.sort(key=lambda e: e.ts)
     score = float(sum(e.strength for e in events))
     return WindowStructure(bias, lo, hi, events, score)
 
 
 def detect_window_structure(
-    df: pd.DataFrame, lookback: int = 30, th: Thresholds | None = None
+    df: pd.DataFrame, lookback: int = 30, th: Thresholds | None = None, oi=None
 ) -> WindowStructure:
     """Renvoie le schéma (accumulation/distribution) dominant sur la fenêtre récente.
 
     `df` doit déjà porter les features (add_features). On évalue les deux biais et on
     retient celui dont la séquence est la plus complète/forte ; neutre si aucun.
+    `oi` (DataFrame/Series d'Open Interest, optionnel) est réaligné sur l'index des barres
+    et sert à confirmer l'AR (rebond de débouclage → OI en repli) et à annoter ΔOI.
     """
     th = th or Thresholds()
-    cand = [_scan(df, lookback, th, "accumulation"), _scan(df, lookback, th, "distribution")]
+    oi_aligned = None
+    if oi is not None and len(oi):
+        s = oi["oi"] if isinstance(oi, pd.DataFrame) else oi
+        oi_aligned = s.reindex(df.index, method="nearest")
+    cand = [_scan(df, lookback, th, "accumulation", oi_aligned),
+            _scan(df, lookback, th, "distribution", oi_aligned)]
     cand = [c for c in cand if c.is_valid]
     if not cand:
         return WindowStructure("neutral", np.nan, np.nan)

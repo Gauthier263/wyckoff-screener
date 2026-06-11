@@ -89,6 +89,29 @@ def test_accumulation_spring_and_lps():
     assert ar.vol_ratio < 1.0
 
 
+def test_ar_gated_by_open_interest():
+    """L'AR n'est validé que si l'OI est EN REPLI (débouclage), en plus du volume."""
+    rows = _drift(40, 100.0, seed=1)
+    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]          # SC
+    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]           # AR (volume en repli)
+    rows += _drift(4, 102.0, vol=600.0, seed=2)
+    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]             # ST
+    rows += _drift(3, 97.5, vol=600.0, seed=3)
+    rows += [[98.0, 104.5, 97.8, 104.2, 2600.0]]          # SOS
+    rows += _drift(2, 104.0, vol=700.0, seed=4)
+    df = _df(rows)
+    n = len(df)
+    rising = pd.DataFrame({"oi": np.linspace(1000, 2000, n)}, index=df.index)
+    falling = pd.DataFrame({"oi": np.linspace(2000, 1000, n)}, index=df.index)
+
+    up = detect_window_structure(df, lookback=20, oi=rising)
+    dn = detect_window_structure(df, lookback=20, oi=falling)
+    assert "AR" not in [e.name for e in up.events]        # OI en hausse → AR refusé
+    assert "AR" in [e.name for e in dn.events]            # OI en repli → AR validé
+    ar = next(e for e in dn.events if e.name == "AR")
+    assert ar.oi_chg < 0                                   # ΔOI annoté (négatif)
+
+
 def test_distribution_sequence():
     rows = _drift(40, 100.0, seed=5)
     # BC : grosse barre acheteuse qui fait un plus-haut et clôture bas, volume x3

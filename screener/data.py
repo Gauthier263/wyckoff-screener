@@ -71,3 +71,29 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
         except Exception:
             pass  # parquet optionnel ; le screener fonctionne sans cache disque
     return df
+
+
+def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
+                        exchange: str = "okx") -> "pd.DataFrame | None":
+    """Historique d'Open Interest (perp) aligné sur les barres, indexé ts UTC (col `oi`).
+
+    L'OI est une donnée *futures* : Binance `fapi` est géo-restreint dans certains
+    environnements, donc source par défaut = OKX (perp `BASE/QUOTE:QUOTE`). Tolérant
+    aux pannes : renvoie None si indisponible — l'analyse fonctionne alors sans OI.
+    """
+    try:
+        import ccxt  # import paresseux
+
+        ex = getattr(ccxt, exchange)({"enableRateLimit": True})
+        ex.load_markets()
+        base, quote = symbol.split("/")
+        perp = f"{base}/{quote}:{quote}"          # ex. BTC/USDT -> BTC/USDT:USDT
+        if perp not in ex.markets:
+            return None
+        hist = ex.fetch_open_interest_history(perp, timeframe, limit=limit)
+        rows = [(pd.to_datetime(h["timestamp"], unit="ms", utc=True),
+                 h.get("openInterestValue") or h.get("openInterestAmount")) for h in hist]
+        oi = pd.DataFrame(rows, columns=["ts", "oi"]).dropna().set_index("ts").sort_index()
+        return oi if len(oi) else None
+    except Exception:
+        return None
