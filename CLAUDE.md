@@ -42,6 +42,34 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
 
+## Screener multi-cours (`python -m screener.scan`)
+Couche de *présélection* par-dessus le moteur Wyckoff : balaie un univers fixe
+(crypto + actions + matières premières) et remonte les cours dont une formation
+acc/dist est **déjà validée par de premiers événements**, propice à une prise de
+position. Aide discrétionnaire, pas d'exécution.
+- `screener/universe.py` — univers (données seules) : 46 cryptos, 90 actions, 8 MP.
+  Tickers selon la source : ccxt `BASE/USDT` (crypto) / Yahoo (`-USD`, parfois suffixé
+  d'un id numérique ; actions ; futures MP `=F`). `TF_BY_CLASS` : crypto **4h×1h**,
+  actions/MP **1D×4h** (Wyckoff actions = daily ; sessions 6h30 + gaps faussent l'intraday).
+  `EXCLUDED` liste les demandés écartés (OpenAI/Infleqtion non cotés, microcaps absents).
+- `screener/sources.py` — couche données multi-sources (réutilise `data.py`, n'y touche
+  pas). Route crypto→ccxt, actions/MP→Yahoo. Yahoo n'a pas de 4h natif → `resample_ohlcv`
+  (1h→4h). `get_spot_exchange` rend **Binance joignable depuis le cloud** : endpoints
+  publics routés vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
+  géo-bloqué), `session.trust_env=True` (sinon SSLError : la CA du proxy TLS est dans le
+  bundle système, pas dans certifi), marchés **spot only** (fapi/dapi restent 451).
+- `screener/scan.py` — orchestration MTF + ranking. Validité minimale = **Climax+AR+ST**
+  (plus strict que `window.is_valid`). `_volume_ok` écarte les actifs à trop de barres
+  volume=0 (Yahoo crypto intraday ≈50 % de zéros → VSA inexploitable, d'où ccxt obligatoire
+  pour le crypto). Fiabilité = (w_climax·climax + w_test·test + w_complétude) × récence ×
+  confluence MTF (1.5/1.25/1.0/0.5). Phase B→C (entrée spring) vs D (entrée LPS/LPSY).
+  Pas de R:R pour l'instant (TODO). Tests : `tests/test_scan.py`.
+  ```bash
+  python -m screener.scan                       # univers complet (crypto ccxt + actions/MP Yahoo)
+  python -m screener.scan --classes crypto      # crypto seul, 4h×1h, vrais volumes Binance
+  python -m screener.scan --bias accumulation --source yahoo
+  ```
+
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
 - Heuristiques transparentes et ajustables, jamais de boîte noire.
