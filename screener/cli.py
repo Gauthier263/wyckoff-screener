@@ -111,9 +111,9 @@ def run_window(cfg: dict) -> pd.DataFrame:
     th = Thresholds(**cfg.get("thresholds", {}))
     lookback = cfg.get("window", 60)
 
-    # Mémo théorie (image cliquable) régénéré à chaque analyse, sur les seuils courants.
-    from .theory_table import build_theory_image
-    memo = build_theory_image(th)
+    # Mémo théorie (HTML cliquable) régénéré à chaque analyse, sur les seuils courants.
+    from .theory_table import build_theory_html
+    memo = build_theory_html(th)
     print(f"→ mémo théorie : {memo}", file=sys.stderr)
 
     rows: list[dict] = []
