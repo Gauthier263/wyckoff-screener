@@ -16,7 +16,21 @@ def get_exchange(name: str = "binance"):
     import ccxt  # import paresseux : pas requis pour les tests hors-ligne
 
     klass = getattr(ccxt, name)
-    ex = klass({"enableRateLimit": True})
+    opts = {"enableRateLimit": True}
+    if name == "binance":
+        # Le screener ne lit que des données publiques (OHLCV/tickers, jamais d'ordre) :
+        # on limite aux marchés spot pour éviter les endpoints futures (fapi, parfois
+        # géo-bloqués) qui n'apportent rien ici.
+        opts["options"] = {"fetchMarkets": ["spot"]}
+    ex = klass(opts)
+    if name == "binance":
+        # Route les endpoints publics vers le miroir officiel data-only de Binance :
+        # mêmes données et mêmes volumes, sans clé API, et non géo-restreint —
+        # api.binance.com renvoie 451 dans certaines régions (ex. cet environnement).
+        # Surchargeable via BINANCE_PUBLIC_URL si le miroir est indisponible.
+        ex.urls["api"]["public"] = os.environ.get(
+            "BINANCE_PUBLIC_URL", "https://data-api.binance.vision/api/v3"
+        )
     ex.load_markets()
     return ex
 
