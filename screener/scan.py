@@ -100,6 +100,8 @@ class PatternReport:
     last_bars_ago: int
     price: float
     sequence: str = field(default="")
+    struct: object = field(default=None, repr=False)   # WindowStructure (pour le tracé)
+    asset: object = field(default=None, repr=False)     # Asset (pour les bougies fines)
 
     def index_row(self) -> dict:
         return {
@@ -287,7 +289,19 @@ def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
         events=checks, verdict=verdict, comment=comment,
         last_bars_ago=last.bars_ago, price=_round_price(last.price),
         sequence=" → ".join(c.name for c in checks),
+        struct=struct, asset=asset,
     )
+
+
+def plot_report(r: PatternReport, cfg: dict, out_path: str) -> str:
+    """Trace la structure d'un PatternReport (bougies en TF inférieure), source-aware :
+    bougies fines via ccxt (crypto) ou Yahoo (actions/MP)."""
+    from .plot import FINER_TF, plot_window_structure
+    fine_tf = FINER_TF.get(r.tf, r.tf)
+    fine = sources.fetch(r.asset, fine_tf, 1500, mode=cfg["source"],
+                         ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
+    return plot_window_structure(r.name, r.tf, r.struct, out_path,
+                                 ex=cfg.get("_ex"), fine_df=fine)
 
 
 def run_scan(cfg: dict) -> list[PatternReport]:

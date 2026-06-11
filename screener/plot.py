@@ -56,12 +56,19 @@ def _candles(ax, df, width):
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
+    fine_df: pd.DataFrame | None = None,
 ) -> str:
     """Dessine la structure `struct` (détectée en `analysis_tf`) avec des bougies en
-    TF inférieure, sur l'intervalle couvert par les événements."""
+    TF inférieure, sur l'intervalle couvert par les événements.
+
+    Les bougies fines peuvent être fournies via `fine_df` (cas multi-sources : actions
+    Yahoo) ; sinon elles sont récupérées via ccxt (`ex`)."""
     fine_tf = FINER_TF.get(analysis_tf, analysis_tf)
-    ex = ex or data_mod.get_exchange("binance")
-    fine = data_mod.fetch_ohlcv(ex, symbol, fine_tf, limit, use_cache=False)
+    if fine_df is not None:
+        fine = fine_df
+    else:
+        ex = ex or data_mod.get_exchange("binance")
+        fine = data_mod.fetch_ohlcv(ex, symbol, fine_tf, limit, use_cache=False)
 
     # bornes temporelles : du climax au dernier événement, avec un peu de marge
     ts = [e.ts for e in struct.events]
