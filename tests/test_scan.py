@@ -155,6 +155,39 @@ def test_tf_set_per_class():
     assert TF_SET_BY_CLASS["commodity"] == ("4h", "1d")
 
 
+def test_non_us_equities_daily_only():
+    # KR/JP : volume intraday Yahoo lacunaire → D1 uniquement.
+    samsung = Asset("Samsung", "equity", "005930.KS")
+    tokyo = Asset("Tokyo Electron", "equity", "8035.T")
+    aapl = Asset("Apple", "equity", "AAPL")
+    assert samsung.timeframes() == ("1d",)
+    assert tokyo.timeframes() == ("1d",)
+    assert aapl.timeframes() == ("4h", "1d")
+
+
+def test_resample_session_aligns_on_open():
+    # Séance type actions US : 7 barres 1h démarrant à 9h30 locale, sur 2 jours.
+    import datetime as dt
+    idx = []
+    for day in (1, 2):
+        start = pd.Timestamp(f"2024-07-0{day} 09:30", tz="America/New_York")
+        idx += [start + pd.Timedelta(hours=h) for h in range(7)]
+    rows = [[100 + i, 101 + i, 99 + i, 100.5 + i, 1000] for i in range(len(idx))]
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"],
+                      index=pd.DatetimeIndex(idx))
+    out = sources.resample_session_ohlcv(df, 4)
+    # 2 blocs par séance : 4 barres (9h30→13h30) puis 3 barres (13h30→clôture)
+    assert len(out) == 4
+    first = out.iloc[0]
+    assert first.name.hour == 9 and first.name.minute == 30   # aligné sur l'ouverture
+    assert first["volume"] == 4000                            # 4 barres pleines
+    assert out.iloc[1]["volume"] == 3000                      # fin de séance : 3 barres
+    assert out.iloc[1].name.hour == 13                        # second bloc à 13h30
+    # OHLC du bloc : open de la 1re barre, extrêmes du bloc, close de la dernière
+    assert first["open"] == 100 and first["close"] == 103.5
+    assert first["high"] == 104 and first["low"] == 99
+
+
 def test_build_assets_count():
     assert len(build_assets(("crypto",))) == 46
     assert len(build_assets()) == 46 + 90 + 8

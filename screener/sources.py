@@ -67,12 +67,45 @@ _YH_PERIOD_4H = "360d"  # 1h ré-échantillonné en 4h
 
 
 def resample_ohlcv(df: pd.DataFrame, rule: str = "4h") -> pd.DataFrame:
-    """Agrège des barres fines en barres plus larges (OHLCV correct)."""
+    """Agrège des barres fines en barres plus larges (OHLCV correct).
+
+    Blocs *calendaires* — adapté aux marchés continus (crypto). Pour les actions,
+    utiliser `resample_session_ohlcv` qui aligne sur l'ouverture de séance."""
     out = df.resample(rule, label="left", closed="left").agg(_AGG).dropna()
     return out
 
 
-def _yahoo_history(ticker: str, interval: str, period: str) -> pd.DataFrame:
+def resample_session_ohlcv(df: pd.DataFrame, bars_per_bucket: int = 4) -> pd.DataFrame:
+    """Agrège des barres 1h en blocs de `bars_per_bucket` barres **depuis l'ouverture
+    de chaque séance** (convention TradingView pour les actions : 4h = 9h30→13h30,
+    13h30→clôture).
+
+    Les blocs calendaires UTC découpent la séance n'importe comment (barres « 4h »
+    de 2h30 puis 4h selon le titre) → spread et volume non comparables entre barres,
+    ce qui fausse la VSA. Ici chaque bloc démarre à l'ouverture : mêmes bornes que
+    les plateformes de référence. `df` doit être indexé dans le fuseau de la bourse
+    (pas encore converti UTC) pour que le groupement par jour de séance soit correct."""
+    if df.empty:
+        return df
+    rows = []
+    for _, day in df.groupby(df.index.date, sort=True):
+        for i in range(0, len(day), bars_per_bucket):
+            blk = day.iloc[i: i + bars_per_bucket]
+            rows.append({
+                "ts": blk.index[0],
+                "open": float(blk["open"].iloc[0]),
+                "high": float(blk["high"].max()),
+                "low": float(blk["low"].min()),
+                "close": float(blk["close"].iloc[-1]),
+                "volume": float(blk["volume"].sum()),
+            })
+    out = pd.DataFrame(rows).set_index("ts")
+    out.index.name = "ts"
+    return out
+
+
+def _yahoo_history(ticker: str, interval: str, period: str,
+                   keep_tz: bool = False) -> pd.DataFrame:
     import yfinance as yf  # import paresseux (tests hors-ligne)
 
     raw = yf.Ticker(ticker).history(period=period, interval=interval, auto_adjust=False)
@@ -80,7 +113,8 @@ def _yahoo_history(ticker: str, interval: str, period: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
     raw = raw.rename(columns=str.lower)
     df = raw[["open", "high", "low", "close", "volume"]].copy()
-    df.index = pd.to_datetime(df.index, utc=True)
+    if not keep_tz:  # keep_tz : garder le fuseau de la bourse (resample par séance)
+        df.index = pd.to_datetime(df.index, utc=True)
     df.index.name = "ts"
     return df
 
@@ -90,8 +124,9 @@ def _yahoo_fetch(ticker: str, timeframe: str, limit: int) -> pd.DataFrame:
     if tf in ("1h", "60m"):
         df = _yahoo_history(ticker, "60m", _YH_PERIOD["60m"])
     elif tf == "4h":
-        base = _yahoo_history(ticker, "60m", _YH_PERIOD_4H)
-        df = resample_ohlcv(base, "4h")
+        base = _yahoo_history(ticker, "60m", _YH_PERIOD_4H, keep_tz=True)
+        df = resample_session_ohlcv(base, 4)
+        df.index = pd.to_datetime(df.index, utc=True)
     elif tf in ("1d", "1day", "d"):
         df = _yahoo_history(ticker, "1d", _YH_PERIOD["1d"])
     elif tf in ("1w", "1wk", "1week"):

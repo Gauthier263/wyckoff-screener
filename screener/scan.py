@@ -34,7 +34,7 @@ import pandas as pd
 from . import sources
 from .events import Thresholds
 from .features import add_features
-from .universe import TF_SET_BY_CLASS, Asset, EXCLUDED, build_assets
+from .universe import Asset, EXCLUDED, build_assets
 from .window import WindowEvent, WindowStructure, detect_window_structure
 
 # Fenêtres d'analyse balayées par timeframe (on garde la meilleure structure trouvée).
@@ -316,7 +316,7 @@ def run_scan(cfg: dict) -> list[PatternReport]:
     print(f"Univers : {len(assets)} actifs", file=sys.stderr)
     reports: list[PatternReport] = []
     for i, a in enumerate(assets, 1):
-        for tf in TF_SET_BY_CLASS[a.cls]:
+        for tf in a.timeframes():
             try:
                 r = analyze_tf(a, tf, cfg)
                 if r is not None:

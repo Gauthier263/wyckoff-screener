@@ -29,6 +29,10 @@ TF_SET_BY_CLASS: dict[str, tuple[str, ...]] = {
     "commodity": ("4h", "1d"),
 }
 
+# Suffixes Yahoo des places dont l'intraday est inexploitable (volume lacunaire :
+# Tokyo Σ1h/1d ≈ 0.5, Corée ≈ 0.7 avec barres nulles) → analyse D1 uniquement.
+_NO_INTRADAY_SUFFIXES = (".KS", ".T")
+
 
 @dataclass(frozen=True)
 class Asset:
@@ -36,6 +40,14 @@ class Asset:
     cls: str             # crypto | equity | commodity
     yahoo: str           # ticker Yahoo Finance
     ccxt: str | None = None  # symbole ccxt (crypto uniquement), ex. BTC/USDT
+
+    def timeframes(self) -> tuple[str, ...]:
+        """TF analysés pour cet actif : le jeu de sa classe, moins l'intraday quand
+        la place ne fournit pas de volume horaire fiable (KR/JP → D1 seul)."""
+        tfs = TF_SET_BY_CLASS[self.cls]
+        if self.cls == "equity" and self.yahoo.endswith(_NO_INTRADAY_SUFFIXES):
+            return tuple(tf for tf in tfs if tf in ("1d", "1wk"))
+        return tfs
 
 
 # --------------------------------------------------------------------------- #
