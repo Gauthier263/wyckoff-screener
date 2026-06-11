@@ -140,7 +140,6 @@ def plot_window_structure(
         col = _EVENT_COLOR.get(name, "#555")
         up = _wanted_extreme(name, acc) == "high"
         y = price + (gap if up else -gap)
-        axp.scatter([xe], [y], s=150, facecolor="none", edgecolor=col, lw=1.2, zorder=6)
         dy = 30 if up else -38
         axp.annotate(name, (xe, y), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
