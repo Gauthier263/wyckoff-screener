@@ -1,38 +1,32 @@
 """
-scan.py — Screener multi-cours par-dessus le moteur Wyckoff existant.
+scan.py — Screener multi-cours Wyckoff (crypto + actions + matières premières).
 
-Objectif : balayer une centaine de cours (crypto + actions + matières premières) et
-présélectionner ceux dont une formation d'**accumulation** ou de **distribution** est
-*déjà validée par de premiers événements* — donc propice à une prise de position.
+Balaie l'univers et, pour chaque actif, analyse **chaque timeframe séparément**
+(crypto : H1 et H4 ; actions/MP : H4 et D1) en variant aussi la fenêtre, afin de ne
+pas passer à côté d'une structure visible sur une échelle et pas sur l'autre. Aucune
+confluence, aucun score de fiabilité : le but est de **fournir les éléments de décision**.
 
-Définition retenue (cf. discussion avec Gauthier) :
-  - Validité minimale d'un schéma = **Climax + AR + ST** présents sur la fenêtre récente
-    du timeframe déclencheur (LTF). En-dessous, on ne retient pas.
-  - Confluence MTF : le contexte HTF doit idéalement pointer le même biais (réutilise la
-    logique de `mtf.py`, multiplicateur 1.5 / 1.25 / 1.0 / 0.5).
-  - Phase / timing d'entrée :
-        B→C  (Climax+AR+ST, pas encore de signe directionnel) → entrée au *spring/test*.
-        D    (SOS/SOW déjà imprimé)                            → entrée au *LPS/LPSY*.
-  - Pas de calcul d'entrée/stop/objectif/R:R pour l'instant (feature ultérieure).
+Pour chaque schéma valide (Climax + AR + ST au minimum) on rend :
+  - le **contexte** : une accumulation suit toujours un *markdown* stoppé par un climax,
+    une distribution un *markup* — prérequis Wyckoff vérifié explicitement ;
+  - la **validation événement par événement** : vol×, spread/ATR, clv confrontés aux
+    seuils attendus, avec emojis ✅ / ⚠️ / ❌ ;
+  - un **commentaire critique** qui pèse forces et faiblesses, à charge pour l'opérateur
+    de trancher.
 
-Score de **fiabilité** (transparent, pondérations ajustables ci-dessous) :
-    fiabilité = (w_climax·qualité_climax + w_test·qualité_test + w_complétude·complétude)
-                × récence × confluence_MTF
-
-Aucune modification du code existant : ce module s'ajoute par-dessus `window.py`,
-`features.py`, `mtf.py` et la couche `sources.py`.
+Réutilise la couche données/API (`sources.py`, ccxt via mirror Binance + Yahoo) et le
+moteur de détection de séquence (`window.py`). N'écrit rien d'automatique.
 
 Usage :
-    python -m screener.scan                        # tout l'univers, source Yahoo
-    python -m screener.scan --classes crypto       # crypto seul
-    python -m screener.scan --source ccxt           # crypto via exchange, reste Yahoo
+    python -m screener.scan                       # tout l'univers
+    python -m screener.scan --classes crypto      # crypto seul (H1 + H4)
     python -m screener.scan --bias accumulation
 """
 from __future__ import annotations
 
 import argparse
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -40,249 +34,329 @@ import pandas as pd
 from . import sources
 from .events import Thresholds
 from .features import add_features
-from .universe import TF_BY_CLASS, Asset, EXCLUDED, build_assets
-from .window import WindowStructure, detect_window_structure
+from .universe import TF_SET_BY_CLASS, Asset, EXCLUDED, build_assets
+from .window import WindowEvent, WindowStructure, detect_window_structure
 
-# Pondérations du score de fiabilité (ajustables — heuristiques transparentes).
-W_CLIMAX = 0.4
-W_TEST = 0.3
-W_COMPLETE = 0.3
-RECENCY_HALFLIFE = 6.0  # barres : demi-vie de la décote de récence
-# Multiplicateurs de confluence MTF (mêmes valeurs que mtf.py).
-CONFL_TRIGGER = 1.5   # HTF aligné + signe directionnel LTF
-CONFL_ALIGNED = 1.25  # HTF aligné, sans signe directionnel
-CONFL_NEUTRAL = 1.0   # HTF sans contexte net
-CONFL_CONFLICT = 0.5  # HTF en conflit avec LTF
-# Garde-fou qualité : fraction max de barres à volume nul tolérée sur la fenêtre.
-# (Yahoo renvoie ~50 % de barres horaires crypto à volume 0 → VSA inexploitable ;
-# le crypto doit donc passer par ccxt/Binance. Cf. sources.get_spot_exchange.)
+# Fenêtres d'analyse balayées par timeframe (on garde la meilleure structure trouvée).
+WINDOWS = (30, 45, 60)
+# Garde-fou qualité : fraction max de barres à volume nul tolérée (Yahoo crypto intraday
+# ≈50 % de zéros → VSA inexploitable ; le crypto passe donc par ccxt/Binance).
 MAX_ZERO_VOL_FRAC = 0.35
-# Contexte HTF de repli (quand la séquence Wyckoff complète n'est pas détectée sur le HTF,
-# typiquement le 4h crypto où le volume du climax est trop lissé). On lit alors un *biais
-# de contexte* léger — tendance + position dans la plage — fidèle au prérequis Wyckoff :
-# une distribution est précédée d'une hausse (prix perché), une accumulation d'une baisse.
-HTF_CTX_LOOKBACK = 40   # barres HTF pour juger tendance + position
-HTF_CTX_POS_HI = 0.55   # position ≥ → haut de plage (favorable distribution en B→C)
-HTF_CTX_POS_LO = 0.45   # position ≤ → bas de plage (favorable accumulation en B→C)
-HTF_CTX_TREND = 0.03    # |variation nette| mini sur la fenêtre pour trancher une tendance
+# Contexte : amplitude mini du markdown/markup *précédant* le climax (prérequis Wyckoff).
+CTX_LOOKBACK = 25       # barres examinées avant le climax
+CTX_TREND_MIN = 0.05    # |variation| mini (5 %) pour valider un markdown / markup
 
 
-def _volume_ok(df: pd.DataFrame, window: int) -> bool:
-    """Écarte les actifs dont trop de barres récentes ont un volume nul/absent."""
-    v = df["volume"].iloc[-window:]
-    if len(v) == 0:
-        return False
-    zero_frac = float((v.fillna(0) <= 0).mean())
-    return zero_frac <= MAX_ZERO_VOL_FRAC
+# --------------------------------------------------------------------------- #
+# Helpers de validation (emojis)
+# --------------------------------------------------------------------------- #
+def _ge(val: float, thr: float, tol: float = 0.15) -> str:
+    """✅ si val ≥ seuil, ⚠️ si proche, ❌ sinon."""
+    if val >= thr:
+        return "✅"
+    return "⚠️" if val >= thr * (1 - tol) else "❌"
+
+
+def _le(val: float, thr: float, tol: float = 0.15) -> str:
+    """✅ si val ≤ seuil, ⚠️ si proche, ❌ sinon."""
+    if val <= thr:
+        return "✅"
+    return "⚠️" if val <= thr * (1 + tol) else "❌"
 
 
 def _round_price(p: float) -> float:
-    """Arrondi à ~5 chiffres significatifs (lisible pour BTC comme pour SHIB)."""
     if p == 0 or np.isnan(p):
         return 0.0
     return float(f"{p:.5g}")
 
 
+# --------------------------------------------------------------------------- #
+# Modèle de rendu
+# --------------------------------------------------------------------------- #
 @dataclass
-class ScanResult:
+class EventCheck:
+    name: str
+    bars_ago: int
+    vol_ratio: float
+    spread_atr: float
+    clv: float
+    flags: list[str]      # ex. ["vol ×2.8 ✅", "spread 1.6 ATR ✅", "clv 0.72 ✅"]
+    why: str              # justification volume/spread → thèse (issue de window.py)
+
+
+@dataclass
+class PatternReport:
     name: str
     cls: str
-    tf: str              # couple HTF×LTF utilisé pour l'analyse
-    schema: str          # accumulation | distribution
-    phase: str           # B→C (spring) | D (LPS)
-    reliability: float
-    confluence: float
-    htf_bias: str
-    events: str          # séquence détectée, ordonnée
-    climax_x: float      # volume du climax (×moyenne)
-    test_x: float        # volume du test (×moyenne, sec)
-    last_event: str
-    bars_ago: int        # récence du dernier événement (barres LTF)
+    tf: str
+    window: int
+    schema: str
+    phase: str
+    context_emoji: str
+    context_text: str
+    events: list[EventCheck]
+    verdict: str          # ✅ solide | ⚠️ à surveiller | ❌ douteux
+    comment: str
+    last_bars_ago: int
     price: float
+    sequence: str = field(default="")
 
-    def as_row(self) -> dict:
+    def index_row(self) -> dict:
         return {
             "actif": self.name,
             "classe": self.cls,
             "tf": self.tf,
-            "schéma": self.schema,
-            "phase": self.phase,
-            "fiab.": round(self.reliability, 3),
-            "confl.": self.confluence,
-            "htf": self.htf_bias,
-            "séquence": self.events,
-            "climax_×": round(self.climax_x, 2),
-            "test_×": round(self.test_x, 2),
-            "dernier": self.last_event,
-            "il y a (barres)": self.bars_ago,
-            "prix": self.price,
+            "win": self.window,
+            "schéma": ("🟢 acc" if self.schema == "accumulation" else "🔴 dist"),
+            "phase": self.phase.split(" ")[0],
+            "contexte": self.context_emoji,
+            "séquence": self.sequence,
+            "récence": f"il y a {self.last_bars_ago}",
+            "verdict": self.verdict,
         }
 
 
 def has_min_sequence(struct: WindowStructure) -> bool:
     """Schéma minimal exploitable : Climax + AR + ST présents."""
     names = {e.name for e in struct.events}
-    climax = bool({"SC", "BC"} & names)
-    return climax and "AR" in names and "ST" in names
+    return bool({"SC", "BC"} & names) and "AR" in names and "ST" in names
 
 
-def _is_phase_d(struct: WindowStructure) -> bool:
-    """Phase D = signe directionnel imprimé (SOS/SOW) → markup/markdown en cours."""
-    return bool({"SOS", "SOW"} & {e.name for e in struct.events})
+def _volume_ok(df: pd.DataFrame, window: int) -> bool:
+    v = df["volume"].iloc[-window:]
+    if len(v) == 0:
+        return False
+    return float((v.fillna(0) <= 0).mean()) <= MAX_ZERO_VOL_FRAC
 
 
 def _phase(struct: WindowStructure) -> str:
-    if _is_phase_d(struct):
+    names = {e.name for e in struct.events}
+    if {"SOS", "SOW"} & names:
         side = "LPS" if struct.bias == "accumulation" else "LPSY"
-        return f"D (signe imprimé — entrée {side})"
-    return "B→C (test validé — entrée spring/test)"
+        return f"D — signe imprimé, entrée {side}"
+    return "B→C — test validé, entrée spring/test"
 
 
-def htf_context_bias(df: pd.DataFrame, ltf_bias: str, phase_d: bool,
-                     lookback: int = HTF_CTX_LOOKBACK) -> str:
-    """Biais de *contexte* HTF léger, en repli de la séquence Wyckoff complète.
-
-    Lit la tendance nette et la position dans la plage sur la fenêtre HTF, et tranche
-    selon la phase du déclencheur LTF :
-      - phase D (markdown/markup lancé) : la tendance HTF récente doit *confirmer* la
-        direction (HTF qui baisse → distribution, qui monte → accumulation) ;
-      - phase B→C (retournement en formation) : on exige une position extrême + une
-        tendance préalable cohérente (perché après une hausse → distribution ; tassé
-        après une baisse → accumulation).
-    Renvoie 'accumulation' | 'distribution' | 'neutral'. `ltf_bias` n'est pas utilisé
-    directement (le contexte reste indépendant) mais documente l'intention d'appel.
-    """
-    win = df.iloc[-lookback:]
-    lo, hi = float(win["low"].min()), float(win["high"].max())
-    rng = hi - lo
-    if rng <= 0 or len(win) < 6:
-        return "neutral"
-    last = float(win["close"].iloc[-1])
-    pos = (last - lo) / rng
-    early = float(win["close"].iloc[: max(3, lookback // 3)].mean())
-    prior = (last - early) / early if early else 0.0
-
-    if phase_d:
-        if prior <= -HTF_CTX_TREND:
-            return "distribution"
-        if prior >= HTF_CTX_TREND:
-            return "accumulation"
-        return "neutral"
-    if prior >= HTF_CTX_TREND and pos >= HTF_CTX_POS_HI:
-        return "distribution"
-    if prior <= -HTF_CTX_TREND and pos <= HTF_CTX_POS_LO:
-        return "accumulation"
-    return "neutral"
+# --------------------------------------------------------------------------- #
+# Contexte Wyckoff : markdown avant accumulation / markup avant distribution
+# --------------------------------------------------------------------------- #
+def _context(df: pd.DataFrame, struct: WindowStructure) -> tuple[str, str, bool]:
+    """Vérifie le mouvement *précédant* le climax. Renvoie (emoji, texte, ok)."""
+    climax = next((e for e in struct.events if e.name in ("SC", "BC")), None)
+    if climax is None:
+        return "❔", "climax introuvable", False
+    idx = len(df) - 1 - climax.bars_ago
+    start = max(0, idx - CTX_LOOKBACK)
+    if idx - start < 8:
+        return "❔", "historique insuffisant avant le climax", False
+    c0 = float(df["close"].iloc[start])
+    c1 = float(df["close"].iloc[idx])
+    move = (c1 - c0) / c0 if c0 else 0.0
+    n = idx - start
+    acc = struct.bias == "accumulation"
+    if acc:
+        if move <= -CTX_TREND_MIN:
+            return "✅", f"markdown préalable {move*100:+.1f}% sur {n} barres → climax d'arrêt cohérent", True
+        return "❌", f"pas de markdown net avant le SC ({move*100:+.1f}%) → prérequis d'accumulation non rempli", False
+    else:
+        if move >= CTX_TREND_MIN:
+            return "✅", f"markup préalable {move*100:+.1f}% sur {n} barres → climax d'arrêt cohérent", True
+        return "❌", f"pas de markup net avant le BC ({move*100:+.1f}%) → prérequis de distribution non rempli", False
 
 
-def _confluence(htf_bias: str, ltf: WindowStructure) -> tuple[float, str]:
-    """Multiplicateur de confluence à partir du biais HTF (séquence ou contexte) ×
-    déclencheur LTF (réutilise l'échelle de mtf.combine_mtf)."""
-    has_signal = bool({"SOS", "SOW"} & {e.name for e in ltf.events})
-    if htf_bias in ("accumulation", "distribution"):
-        if htf_bias == ltf.bias:
-            return (CONFL_TRIGGER if has_signal else CONFL_ALIGNED), htf_bias
-        return CONFL_CONFLICT, htf_bias
-    return CONFL_NEUTRAL, "—"
+# --------------------------------------------------------------------------- #
+# Validation événement par événement
+# --------------------------------------------------------------------------- #
+def _check_event(e: WindowEvent, acc: bool, th: Thresholds) -> EventCheck:
+    flags: list[str] = []
+    vr, sa, clv = e.vol_ratio, e.spread_atr, e.clv
+    if e.name in ("SC", "BC"):
+        flags.append(f"vol ×{vr:.2f} {_ge(vr, th.climax_vol)} (climax ≥{th.climax_vol})")
+        flags.append(f"spread {sa:.2f} ATR {_ge(sa, th.wide_spread_atr)} (large)")
+        flags.append(f"clv {clv:.2f} {('✅' if (clv >= 0.5) == acc else '⚠️')} "
+                     f"({'clôture haute' if acc else 'clôture basse'})")
+    elif e.name == "AR":
+        flags.append(f"vol ×{vr:.2f} {_le(vr, 1.2)} (en repli)")
+    elif e.name == "ST":
+        flags.append(f"vol ×{vr:.2f} {_le(vr, th.test_vol)} (sec ≤{th.test_vol})")
+        flags.append(f"spread {sa:.2f} ATR {_le(sa, th.wide_spread_atr)} (étroit)")
+    elif e.name in ("SOS", "SOW"):
+        flags.append(f"vol ×{vr:.2f} {_ge(vr, th.sos_vol)} (signe ≥{th.sos_vol})")
+        flags.append(f"spread {sa:.2f} ATR {_ge(sa, th.wide_spread_atr)} (large)")
+        ok_dir = (clv >= 0.6) if acc else (clv <= 0.4)
+        flags.append(f"clv {clv:.2f} {'✅' if ok_dir else '⚠️'} ({'haute' if acc else 'basse'})")
+    return EventCheck(e.name, e.bars_ago, vr, sa, clv, flags, e.why)
 
 
-def _recency(struct: WindowStructure) -> float:
-    """Décote exponentielle sur la récence du dernier événement de la séquence."""
-    if not struct.events:
-        return 0.0
-    bars_ago = min(e.bars_ago for e in struct.events)
-    return float(0.5 ** (bars_ago / RECENCY_HALFLIFE))
+def _verdict_and_comment(struct: WindowStructure, ctx_ok: bool, ctx_text: str,
+                         checks: list[EventCheck], th: Thresholds) -> tuple[str, str]:
+    acc = struct.bias == "accumulation"
+    by = {c.name: c for c in checks}
+    climax = by.get("SC") or by.get("BC")
+    test = by.get("ST")
+    has_signal = bool({"SOS", "SOW"} & set(by))
+    last_ba = min(c.bars_ago for c in checks)
+
+    bullets: list[str] = []
+    weak = 0
+    # Contexte = prérequis dur
+    if not ctx_ok:
+        bullets.append("contexte manquant (" + ctx_text.split(" → ")[0] + ")")
+        weak += 2
+    # Climax
+    if climax:
+        if climax.vol_ratio >= th.climax_vol and climax.spread_atr >= th.wide_spread_atr:
+            bullets.append(f"climax franc (vol ×{climax.vol_ratio:.1f}, spread large)")
+        else:
+            bullets.append(f"climax peu convaincant (vol ×{climax.vol_ratio:.1f})")
+            weak += 1
+    # Test
+    if test:
+        if test.vol_ratio <= th.test_vol:
+            bullets.append(f"test bien sec (vol ×{test.vol_ratio:.2f}) → {'offre' if acc else 'demande'} tarie")
+        else:
+            bullets.append(f"test à volume élevé (×{test.vol_ratio:.2f}) → "
+                           f"{'offre' if acc else 'demande'} encore présente, test peu probant")
+            weak += 1
+    # Complétude / phase
+    if has_signal:
+        bullets.append(f"{'SOS' if acc else 'SOW'} imprimé → {'markup' if acc else 'markdown'} amorcé (phase D)")
+    else:
+        bullets.append("pas encore de signe directionnel → structure jeune, attendre la cassure")
+    # Récence
+    if last_ba > 12:
+        bullets.append(f"déclencheur ancien (il y a {last_ba} barres) → possiblement périmé")
+        weak += 1
+    else:
+        bullets.append(f"déclencheur récent (il y a {last_ba} barres)")
+
+    if not ctx_ok:
+        verdict = "❌ douteux"
+    elif weak == 0:
+        verdict = "✅ solide"
+    else:
+        verdict = "⚠️ à surveiller"
+    return verdict, " ; ".join(bullets) + "."
 
 
-def _reliability(struct: WindowStructure, confl_mult: float) -> tuple[float, dict]:
-    by_name = {e.name: e for e in struct.events}
-    climax = by_name.get("SC") or by_name.get("BC")
-    test = by_name.get("ST")
-    climax_q = climax.strength if climax else 0.0
-    test_q = test.strength if test else 0.0
-    has_ar = "AR" in by_name
-    has_signal = bool({"SOS", "SOW"} & set(by_name))
-    completeness = 0.6 + 0.2 * has_ar + 0.2 * has_signal
-    base = W_CLIMAX * climax_q + W_TEST * test_q + W_COMPLETE * completeness
-    score = base * _recency(struct) * confl_mult
-    meta = {
-        "climax_x": climax.vol_ratio if climax else float("nan"),
-        "test_x": test.vol_ratio if test else float("nan"),
-    }
-    return float(score), meta
+# --------------------------------------------------------------------------- #
+# Analyse d'un (actif, timeframe)
+# --------------------------------------------------------------------------- #
+def _best_structure(df: pd.DataFrame, th: Thresholds) -> tuple[WindowStructure, int] | None:
+    """Balaie les fenêtres et retourne la meilleure structure valide (la plus complète,
+    puis la plus récente). None si aucune."""
+    best = None
+    for w in WINDOWS:
+        if len(df) < w + 5:
+            continue
+        s = detect_window_structure(df, lookback=w, th=th)
+        if not has_min_sequence(s):
+            continue
+        last_ba = min(e.bars_ago for e in s.events)
+        key = (len(s.events), -last_ba)
+        if best is None or key > best[0]:
+            best = (key, s, w)
+    if best is None:
+        return None
+    return best[1], best[2]
 
 
-def analyze_asset(asset: Asset, cfg: dict) -> ScanResult | None:
-    htf_tf, ltf_tf = TF_BY_CLASS[asset.cls]
+def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
     th = Thresholds(**cfg.get("thresholds", {}))
-    window = cfg.get("window", 30)
-    need = window + cfg["vol_ma"] + 5
-
-    df_l = sources.fetch(asset, ltf_tf, cfg["limit"], mode=cfg["source"],
-                         ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
-    if df_l is None or len(df_l) < need or not _volume_ok(df_l, window):
+    need = max(WINDOWS) + cfg["vol_ma"] + 5
+    df = sources.fetch(asset, tf, cfg["limit"], mode=cfg["source"],
+                       ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
+    if df is None or len(df) < min(WINDOWS) + cfg["vol_ma"] + 5 or not _volume_ok(df, min(WINDOWS)):
         return None
-    df_l = add_features(df_l, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
-    struct_l = detect_window_structure(df_l, lookback=window, th=th)
-    if not has_min_sequence(struct_l):
+    df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+    found = _best_structure(df, th)
+    if found is None:
         return None
+    struct, window = found
 
-    # Contexte HTF (best-effort : son absence ne disqualifie pas, confluence neutre).
-    # On tente d'abord la séquence Wyckoff complète ; si elle est neutre (cas du 4h crypto,
-    # climax trop lissé), on retombe sur le biais de contexte léger (tendance + position).
-    htf_bias_ctx = "neutral"
-    df_h = sources.fetch(asset, htf_tf, cfg["limit"], mode=cfg["source"],
-                         ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
-    if df_h is not None and len(df_h) >= need:
-        df_h = add_features(df_h, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
-        struct_h = detect_window_structure(df_h, lookback=window, th=th)
-        htf_bias_ctx = struct_h.bias
-        if htf_bias_ctx == "neutral":
-            htf_bias_ctx = htf_context_bias(df_h, struct_l.bias, _is_phase_d(struct_l))
+    acc = struct.bias == "accumulation"
+    ctx_emoji, ctx_text, ctx_ok = _context(df, struct)
+    ordered = sorted(struct.events, key=lambda e: e.bars_ago, reverse=True)
+    checks = [_check_event(e, acc, th) for e in ordered]
+    verdict, comment = _verdict_and_comment(struct, ctx_ok, ctx_text, checks, th)
+    last = min(struct.events, key=lambda e: e.bars_ago)
 
-    confl_mult, htf_bias = _confluence(htf_bias_ctx, struct_l)
-    reliability, meta = _reliability(struct_l, confl_mult)
-
-    ordered = sorted(struct_l.events, key=lambda e: e.bars_ago, reverse=True)
-    seq = " → ".join(e.name for e in ordered)
-    last = min(struct_l.events, key=lambda e: e.bars_ago)
-
-    return ScanResult(
-        name=asset.name, cls=asset.cls, tf=f"{htf_tf}×{ltf_tf}",
-        schema=struct_l.bias, phase=_phase(struct_l),
-        reliability=reliability, confluence=confl_mult, htf_bias=htf_bias, events=seq,
-        climax_x=meta["climax_x"], test_x=meta["test_x"],
-        last_event=last.name, bars_ago=last.bars_ago, price=_round_price(last.price),
+    return PatternReport(
+        name=asset.name, cls=asset.cls, tf=tf, window=window, schema=struct.bias,
+        phase=_phase(struct), context_emoji=ctx_emoji, context_text=ctx_text,
+        events=checks, verdict=verdict, comment=comment,
+        last_bars_ago=last.bars_ago, price=_round_price(last.price),
+        sequence=" → ".join(c.name for c in checks),
     )
 
 
-def run_scan(cfg: dict) -> pd.DataFrame:
+def run_scan(cfg: dict) -> list[PatternReport]:
     assets = build_assets(cfg.get("classes"))
     if cfg["source"] in ("ccxt", "auto") and any(a.cls == "crypto" for a in assets):
         try:
             cfg["_ex"] = sources.get_spot_exchange(cfg.get("exchange", "binance"))
         except Exception as e:
-            print(f"  [ccxt indisponible : {e} — crypto intraday écarté (volume Yahoo "
-                  f"inexploitable)]", file=sys.stderr)
+            print(f"  [ccxt indisponible : {e} — crypto écarté]", file=sys.stderr)
             cfg["source"] = "yahoo"
 
-    print(f"Univers : {len(assets)} actifs — source {cfg['source']}", file=sys.stderr)
-    results: list[ScanResult] = []
+    print(f"Univers : {len(assets)} actifs", file=sys.stderr)
+    reports: list[PatternReport] = []
     for i, a in enumerate(assets, 1):
-        try:
-            r = analyze_asset(a, cfg)
-            if r and r.reliability > 0:
-                results.append(r)
-        except Exception as e:  # un actif qui échoue ne casse pas le scan
-            print(f"  [skip] {a.name} ({a.yahoo}): {e}", file=sys.stderr)
+        for tf in TF_SET_BY_CLASS[a.cls]:
+            try:
+                r = analyze_tf(a, tf, cfg)
+                if r is not None:
+                    reports.append(r)
+            except Exception as e:
+                print(f"  [skip] {a.name} {tf} ({a.yahoo}): {e}", file=sys.stderr)
         if i % 20 == 0:
             print(f"  ...{i}/{len(assets)}", file=sys.stderr)
 
     if cfg.get("bias") and cfg["bias"] != "both":
-        results = [r for r in results if r.schema == cfg["bias"]]
-    results.sort(key=lambda r: r.reliability, reverse=True)
-    results = results[: cfg["max_results"]]
-    return pd.DataFrame([r.as_row() for r in results])
+        reports = [r for r in reports if r.schema == cfg["bias"]]
+    # Tri : verdict (solide → douteux), puis récence.
+    order = {"✅ solide": 0, "⚠️ à surveiller": 1, "❌ douteux": 2}
+    reports.sort(key=lambda r: (order.get(r.verdict, 3), r.last_bars_ago))
+    return reports
+
+
+# --------------------------------------------------------------------------- #
+# Rendu
+# --------------------------------------------------------------------------- #
+def render_index(reports: list[PatternReport]) -> pd.DataFrame:
+    return pd.DataFrame([r.index_row() for r in reports])
+
+
+def render_detail(r: PatternReport) -> str:
+    head = "🟢 ACCUMULATION" if r.schema == "accumulation" else "🔴 DISTRIBUTION"
+    lines = [
+        f"### {head} — {r.name} ({r.cls}) · {r.tf} · fenêtre {r.window} · {r.verdict}",
+        f"- **Phase** : {r.phase}",
+        f"- **Contexte** {r.context_emoji} : {r.context_text}",
+        f"- **Séquence** (du + ancien au + récent) :",
+    ]
+    for c in r.events:
+        flags = " · ".join(c.flags)
+        lines.append(f"    - `{c.name}` il y a {c.bars_ago} barres — {flags}")
+        lines.append(f"        ↳ {c.why}")
+    lines.append(f"- 💬 **Critique** : {r.comment}")
+    return "\n".join(lines)
+
+
+def render_report(reports: list[PatternReport]) -> str:
+    out = ["# Présélection Wyckoff — patterns en cours\n"]
+    n_acc = sum(r.schema == "accumulation" for r in reports)
+    n_dist = len(reports) - n_acc
+    out.append(f"{len(reports)} formations validées (Climax+AR+ST) — "
+               f"🟢 {n_acc} accumulation · 🔴 {n_dist} distribution.\n")
+    out.append("## Index\n")
+    idx = render_index(reports)
+    out.append(idx.to_string(index=False) if not idx.empty else "_(vide)_")
+    out.append("\n\n## Détail par formation\n")
+    for r in reports:
+        out.append(render_detail(r))
+        out.append("")
+    return "\n".join(out)
 
 
 def main() -> None:
@@ -294,9 +368,9 @@ def main() -> None:
 
     from .cli import load_config
     cfg = {
-        "exchange": "binance", "limit": 300, "vol_ma": 20, "atr_period": 14,
-        "max_results": 30, "use_cache": True, "bias": "both", "window": 30,
-        "thresholds": {}, "source": "ccxt", "classes": None,
+        "exchange": "binance", "limit": 400, "vol_ma": 20, "atr_period": 14,
+        "use_cache": True, "bias": "both", "thresholds": {}, "source": "ccxt",
+        "classes": None,
     }
     file_cfg = load_config()
     cfg["vol_ma"] = file_cfg.get("vol_ma", cfg["vol_ma"])
@@ -305,35 +379,31 @@ def main() -> None:
     cfg["exchange"] = file_cfg.get("exchange", cfg["exchange"])
 
     p = argparse.ArgumentParser(
-        description="Screener Wyckoff multi-cours (crypto + actions + matières premières)")
-    p.add_argument("--classes", nargs="*", choices=["crypto", "equity", "commodity"],
-                   default=None, help="classes à scanner (toutes par défaut)")
-    p.add_argument("--source", choices=["yahoo", "ccxt", "auto"], default="ccxt",
-                   help="ccxt = crypto via Binance (volumes réels) + actions/MP via Yahoo ; "
-                        "yahoo = tout via Yahoo (crypto intraday non fiable)")
+        description="Screener Wyckoff multi-cours — analyse par timeframe, éléments de décision")
+    p.add_argument("--classes", nargs="*", choices=["crypto", "equity", "commodity"], default=None)
+    p.add_argument("--source", choices=["yahoo", "ccxt", "auto"], default="ccxt")
     p.add_argument("--bias", choices=["accumulation", "distribution", "both"], default="both")
-    p.add_argument("--window", type=int, default=cfg["window"], help="fenêtre d'analyse (barres)")
     p.add_argument("--limit", type=int, default=cfg["limit"])
-    p.add_argument("--max-results", type=int, default=cfg["max_results"])
     p.add_argument("--no-cache", action="store_true")
-    p.add_argument("--csv", default="screener.csv")
+    p.add_argument("--md", default="rapport_wyckoff.md", help="fichier rapport markdown")
     args = p.parse_args()
 
-    cfg.update(source=args.source, bias=args.bias, window=args.window, limit=args.limit,
-               max_results=args.max_results, use_cache=not args.no_cache,
+    cfg.update(source=args.source, bias=args.bias, limit=args.limit,
+               use_cache=not args.no_cache,
                classes=tuple(args.classes) if args.classes else None)
 
-    table = run_scan(cfg)
+    reports = run_scan(cfg)
     if EXCLUDED:
         skipped = ", ".join(f"{k} ({v})" for k, v in EXCLUDED.items())
         print(f"\nÉcartés de l'univers : {skipped}", file=sys.stderr)
-    if table.empty:
+    if not reports:
         print("Aucune formation validée (Climax+AR+ST) avec les seuils actuels.")
         return
-    with pd.option_context("display.max_rows", None, "display.width", 240):
-        print(table.to_string(index=False))
-    table.to_csv(args.csv, index=False)
-    print(f"\n→ Présélection écrite dans {args.csv}", file=sys.stderr)
+    report = render_report(reports)
+    print(report)
+    with open(args.md, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(f"\n→ Rapport écrit dans {args.md}", file=sys.stderr)
 
 
 if __name__ == "__main__":

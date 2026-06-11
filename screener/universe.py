@@ -19,11 +19,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Couple (HTF contexte, LTF déclencheur) par classe d'actif.
-TF_BY_CLASS: dict[str, tuple[str, str]] = {
-    "crypto": ("4h", "1h"),
-    "equity": ("1d", "4h"),
-    "commodity": ("1d", "4h"),
+# Timeframes analysés *séparément* par classe (pas de confluence : on varie les TF pour
+# ne pas passer à côté d'une structure visible sur l'une et pas l'autre).
+#   crypto       : H1 et H4 (marché 24/7, l'intraday est fiable via ccxt).
+#   action / MP  : H4 et D1 (Wyckoff actions = daily ; le H4 capte les structures plus fines).
+TF_SET_BY_CLASS: dict[str, tuple[str, ...]] = {
+    "crypto": ("1h", "4h"),
+    "equity": ("4h", "1d"),
+    "commodity": ("4h", "1d"),
 }
 
 

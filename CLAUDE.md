@@ -44,35 +44,36 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 
 ## Screener multi-cours (`python -m screener.scan`)
 Couche de *présélection* par-dessus le moteur Wyckoff : balaie un univers fixe
-(crypto + actions + matières premières) et remonte les cours dont une formation
-acc/dist est **déjà validée par de premiers événements**, propice à une prise de
-position. Aide discrétionnaire, pas d'exécution.
+(crypto + actions + matières premières) et remonte les formations acc/dist validées.
+**Pas de confluence ni de score de fiabilité** : chaque timeframe est analysé
+*séparément* (on varie TF + fenêtres pour ne pas manquer une structure), et le rendu
+donne les **éléments de décision** à l'opérateur. Aide discrétionnaire, pas d'exécution.
 - `screener/universe.py` — univers (données seules) : 46 cryptos, 90 actions, 8 MP.
   Tickers selon la source : ccxt `BASE/USDT` (crypto) / Yahoo (`-USD`, parfois suffixé
-  d'un id numérique ; actions ; futures MP `=F`). `TF_BY_CLASS` : crypto **4h×1h**,
-  actions/MP **1D×4h** (Wyckoff actions = daily ; sessions 6h30 + gaps faussent l'intraday).
-  `EXCLUDED` liste les demandés écartés (OpenAI/Infleqtion non cotés, microcaps absents).
+  d'un id numérique ; actions ; futures MP `=F`). `TF_SET_BY_CLASS` : crypto **H1 et H4**,
+  actions/MP **H4 et D1** — analysés indépendamment. `EXCLUDED` liste les demandés écartés
+  (OpenAI/Infleqtion non cotés, microcaps absents).
 - `screener/sources.py` — couche données multi-sources (réutilise `data.py`, n'y touche
   pas). Route crypto→ccxt, actions/MP→Yahoo. Yahoo n'a pas de 4h natif → `resample_ohlcv`
   (1h→4h). `get_spot_exchange` rend **Binance joignable depuis le cloud** : endpoints
   publics routés vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
   géo-bloqué), `session.trust_env=True` (sinon SSLError : la CA du proxy TLS est dans le
   bundle système, pas dans certifi), marchés **spot only** (fapi/dapi restent 451).
-- `screener/scan.py` — orchestration MTF + ranking. Validité minimale = **Climax+AR+ST**
-  (plus strict que `window.is_valid`). `_volume_ok` écarte les actifs à trop de barres
-  volume=0 (Yahoo crypto intraday ≈50 % de zéros → VSA inexploitable, d'où ccxt obligatoire
-  pour le crypto). Fiabilité = (w_climax·climax + w_test·test + w_complétude) × récence ×
-  confluence MTF (1.5/1.25/1.0/0.5). Confluence : on tente la séquence Wyckoff complète sur
-  le HTF, et si elle est neutre (4h crypto, climax trop lissé) on retombe sur
-  `htf_context_bias` — biais de contexte léger **phase-aware** (tendance + position dans la
-  plage) : en B→C il faut une position extrême + tendance préalable (perché après hausse →
-  distribution), en D la tendance HTF doit confirmer le markdown/markup en cours.
-  Phase B→C (entrée spring) vs D (entrée LPS/LPSY). Pas de R:R pour l'instant (TODO).
-  Tests : `tests/test_scan.py`.
+- `screener/scan.py` — pour chaque (actif, TF) : balaie `WINDOWS` (30/45/60) et garde la
+  meilleure séquence valide (**Climax+AR+ST** mini ; `_volume_ok` écarte les séries à trop
+  de barres volume=0 → ccxt obligatoire pour le crypto). Rend trois choses :
+  (1) **contexte** `_context` — une accumulation suit un *markdown* stoppé par le climax,
+  une distribution un *markup* (prérequis Wyckoff vérifié sur les `CTX_LOOKBACK` barres
+  *avant* le climax) ; (2) **validation événementielle** `_check_event` — vol×, spread/ATR,
+  clv confrontés aux `Thresholds`, emojis ✅/⚠️/❌, + la justification `why` de `window.py` ;
+  (3) **verdict + commentaire critique** `_verdict_and_comment` (✅ solide / ⚠️ à surveiller /
+  ❌ douteux ; contexte manquant = disqualifiant). Sortie : index + fiches détaillées en
+  markdown (`rapport_wyckoff.md`). Phase B→C (entrée spring) vs D (LPS/LPSY). Tests :
+  `tests/test_scan.py`.
   ```bash
   python -m screener.scan                       # univers complet (crypto ccxt + actions/MP Yahoo)
-  python -m screener.scan --classes crypto      # crypto seul, 4h×1h, vrais volumes Binance
-  python -m screener.scan --bias accumulation --source yahoo
+  python -m screener.scan --classes crypto      # crypto seul, H1 + H4, vrais volumes Binance
+  python -m screener.scan --bias accumulation
   ```
 
 ## Conventions

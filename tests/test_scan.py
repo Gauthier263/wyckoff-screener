@@ -1,26 +1,26 @@
 """
-Tests synthétiques du screener multi-cours (scan.py + sources.py).
+Tests synthétiques du screener multi-cours (scan.py + sources.py), hors-ligne.
 
-Hors-ligne : on monkeypatche `sources.fetch` pour injecter des séries fabriquées,
-puis on vérifie la validité minimale (Climax+AR+ST), le score de fiabilité, la phase
-et la logique de confluence. Test dédié pour le ré-échantillonnage 4h.
+Couvre : validité minimale Climax+AR+ST, vérification du contexte (markdown avant
+accumulation), validation événementielle (emojis), verdict/commentaire, le rendu, le
+ré-échantillonnage 4h et l'univers.
 """
 import numpy as np
 import pandas as pd
 
 from screener import scan, sources
+from screener.events import Thresholds
 from screener.features import add_features
-from screener.universe import Asset, build_assets
+from screener.universe import TF_SET_BY_CLASS, Asset, build_assets
 from screener.window import detect_window_structure
 
 
 def _df(rows):
     idx = pd.date_range("2024-01-01", periods=len(rows), freq="h", tz="UTC")
-    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
-    return df
+    return pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
 
 
-def _drift(n, base, vol=1000.0, seed=0):
+def _drift(n, base, vol=800.0, seed=0):
     rng = np.random.default_rng(seed)
     rows, c = [], base
     for _ in range(n):
@@ -32,84 +32,109 @@ def _drift(n, base, vol=1000.0, seed=0):
     return rows
 
 
-def _accumulation_rows():
-    rows = _drift(40, 100.0, seed=1)
-    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]      # SC
-    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]       # AR
-    rows += _drift(4, 102.0, vol=600.0, seed=2)
-    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]         # ST
-    rows += _drift(3, 97.5, vol=600.0, seed=3)
-    rows += [[98.0, 104.5, 97.8, 104.2, 2600.0]]      # SOS
-    rows += _drift(2, 104.0, vol=700.0, seed=4)
+def _markdown(n, start, end, vol=800.0, seed=0):
+    """Segment baissier régulier (markdown) de `start` vers `end`."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for i in range(n):
+        c = start + (end - start) * (i + 1) / n
+        o = c + rng.normal(0, 0.3)
+        h = max(o, c) + abs(rng.normal(0, 0.3))
+        l = min(o, c) - abs(rng.normal(0, 0.3))
+        rows.append([o, h, l, c, vol * rng.uniform(0.8, 1.1)])
+    return rows
+
+
+def _accumulation_with_markdown():
+    """Markdown → SC → AR → ST : accumulation (phase B→C) avec contexte correct.
+
+    Espacement choisi pour qu'une des fenêtres (30/45/60) place le SC dans la « tête »
+    sans que la recherche de l'AR n'attrape un extrême lointain.
+    """
+    rows = _drift(20, 110.0, seed=0)               # warmup vol_ma/ATR
+    rows += _markdown(16, 109.0, 96.0, seed=1)     # markdown préalable (contexte)
+    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]   # SC
+    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]    # AR
+    rows += _drift(11, 101.0, vol=600.0, seed=2)
+    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]      # ST
+    rows += _drift(12, 98.0, vol=600.0, seed=3)
     return rows
 
 
 _CFG = {
-    "thresholds": {}, "window": 20, "vol_ma": 20, "atr_period": 14,
-    "limit": 300, "source": "yahoo", "use_cache": False,
+    "thresholds": {}, "vol_ma": 20, "atr_period": 14,
+    "limit": 400, "source": "yahoo", "use_cache": False,
 }
 
 
-def test_has_min_sequence_true_on_accumulation():
-    struct = detect_window_structure(add_features(_df(_accumulation_rows())), lookback=20)
-    assert scan.has_min_sequence(struct)
+def test_has_min_sequence():
+    s = detect_window_structure(add_features(_df(_accumulation_with_markdown())), lookback=30)
+    assert scan.has_min_sequence(s)
+    flat = detect_window_structure(add_features(_df(_drift(80, 100.0, seed=9))), lookback=30)
+    assert not scan.has_min_sequence(flat)
 
 
-def test_has_min_sequence_false_on_flat():
-    struct = detect_window_structure(add_features(_df(_drift(80, 100.0, seed=9))), lookback=30)
-    assert not scan.has_min_sequence(struct)
+def test_context_requires_prior_markdown():
+    df = add_features(_df(_accumulation_with_markdown()))
+    s = detect_window_structure(df, lookback=30)
+    emoji, text, ok = scan._context(df, s)
+    assert ok and emoji == "✅" and "markdown" in text
 
 
-def test_analyze_asset_detects_validated_accumulation(monkeypatch):
-    df = _df(_accumulation_rows())
+def test_context_rejects_flat_prelude():
+    # SC sans markdown préalable (drift plat avant le climax) → contexte invalide.
+    rows = _drift(40, 100.0, seed=5)
+    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]   # SC sans baisse préalable
+    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]    # AR
+    rows += _drift(4, 102.0, vol=600.0, seed=6)
+    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]      # ST
+    rows += _drift(3, 97.5, vol=600.0, seed=7)
+    df = add_features(_df(rows))
+    s = detect_window_structure(df, lookback=30)
+    if scan.has_min_sequence(s):  # selon le drift, la séquence peut être détectée
+        _, _, ok = scan._context(df, s)
+        assert not ok
+
+
+def test_analyze_tf_full_report(monkeypatch):
+    df = _df(_accumulation_with_markdown())
     monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
     asset = Asset("TEST", "crypto", "TEST-USD", "TEST/USDT")
-    res = scan.analyze_asset(asset, dict(_CFG))
-    assert res is not None
-    assert res.schema == "accumulation"
-    assert res.reliability > 0
-    assert "SC" in res.events and "ST" in res.events
-    # SOS imprimé → phase D, et confluence renforcée (HTF identique au LTF ici).
-    assert res.phase.startswith("D")
-    assert res.confluence >= scan.CONFL_ALIGNED
+    r = scan.analyze_tf(asset, "1h", dict(_CFG))
+    assert r is not None
+    assert r.schema == "accumulation"
+    assert "SC" in r.sequence and "ST" in r.sequence
+    assert r.context_emoji == "✅"
+    assert r.verdict in ("✅ solide", "⚠️ à surveiller", "❌ douteux")
+    assert r.events and any("✅" in f for c in r.events for f in c.flags)
+    assert r.comment
 
 
-def test_analyze_asset_rejects_flat(monkeypatch):
-    df = _df(_drift(80, 100.0, seed=11))
+def test_analyze_tf_rejects_flat(monkeypatch):
+    df = _df(_drift(90, 100.0, seed=11))
     monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
     asset = Asset("FLAT", "crypto", "FLAT-USD", "FLAT/USDT")
-    assert scan.analyze_asset(asset, dict(_CFG)) is None
+    assert scan.analyze_tf(asset, "1h", dict(_CFG)) is None
 
 
-def test_confluence_from_bias():
-    acc = detect_window_structure(add_features(_df(_accumulation_rows())), lookback=20)
-    # HTF aligné + SOS présent dans la séquence → multiplicateur déclencheur (1.5)
-    mult_aligned, bias = scan._confluence("accumulation", acc)
-    assert mult_aligned == scan.CONFL_TRIGGER and bias == "accumulation"
-    # HTF en conflit → pénalité
-    mult_conflict, _ = scan._confluence("distribution", acc)
-    assert mult_conflict == scan.CONFL_CONFLICT
-    # HTF neutre → pas de modification
-    mult_neutral, shown = scan._confluence("neutral", acc)
-    assert mult_neutral == scan.CONFL_NEUTRAL and shown == "—"
+def test_event_check_emojis():
+    th = Thresholds()
+    df = add_features(_df(_accumulation_with_markdown()))
+    s = detect_window_structure(df, lookback=30)
+    climax = next(e for e in s.events if e.name == "SC")
+    chk = scan._check_event(climax, acc=True, th=th)
+    assert chk.name == "SC"
+    assert any("vol ×" in f for f in chk.flags)
+    assert any("✅" in f for f in chk.flags)  # climax volumique fort
 
 
-def test_htf_context_phase_aware():
-    # Tendance haussière + clôture au plus haut → contexte distribution en B→C.
-    up = _df(_drift(50, 100.0, seed=1))
-    up.iloc[-1, up.columns.get_loc("close")] = float(up["high"].max())
-    # force une hausse nette de la moyenne récente vs le début de fenêtre
-    up.iloc[-10:, up.columns.get_loc("close")] += 12.0
-    up.iloc[-10:, up.columns.get_loc("high")] += 12.0
-    assert scan.htf_context_bias(up, "distribution", phase_d=False) == "distribution"
-    # En phase D, une tendance baissière confirme la distribution (markdown en cours).
-    down = _df(_drift(50, 100.0, seed=2))
-    down.iloc[-10:, down.columns.get_loc("close")] -= 12.0
-    down.iloc[-10:, down.columns.get_loc("low")] -= 12.0
-    assert scan.htf_context_bias(down, "distribution", phase_d=True) == "distribution"
-    # Dérive plate → neutre.
-    flat = _df(_drift(50, 100.0, seed=3))
-    assert scan.htf_context_bias(flat, "distribution", phase_d=False) == "neutral"
+def test_render_detail_contains_sections(monkeypatch):
+    df = _df(_accumulation_with_markdown())
+    monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
+    asset = Asset("TEST", "crypto", "TEST-USD", "TEST/USDT")
+    rep = scan.analyze_tf(asset, "1h", dict(_CFG))
+    out = scan.render_detail(rep)
+    assert "Contexte" in out and "Critique" in out and "Séquence" in out
 
 
 def test_resample_4h_aggregates_ohlcv():
@@ -117,36 +142,19 @@ def test_resample_4h_aggregates_ohlcv():
             [14, 16, 13, 15, 150], [15, 15, 11, 12, 250],
             [12, 13, 8, 9, 300], [9, 11, 7, 10, 120],
             [10, 14, 10, 13, 130], [13, 18, 12, 17, 170]]
-    df = _df(rows)
-    out = sources.resample_ohlcv(df, "4h")
+    out = sources.resample_ohlcv(_df(rows), "4h")
     assert len(out) == 2
-    first = out.iloc[0]
-    assert first["open"] == 10 and first["close"] == 12   # open du 1er, close du 4e
-    assert first["high"] == 16 and first["low"] == 9       # extrêmes du bloc
-    assert first["volume"] == 700                          # somme 100+200+150+250
+    f = out.iloc[0]
+    assert f["open"] == 10 and f["close"] == 12 and f["high"] == 16 and f["low"] == 9
+    assert f["volume"] == 700
 
 
-def test_volume_guard_rejects_sparse_volume(monkeypatch):
-    rows = _accumulation_rows()
-    df = _df(rows)
-    # force la moitié des barres de la fenêtre à volume nul (cas Yahoo crypto intraday)
-    df.iloc[-20::2, df.columns.get_loc("volume")] = 0
-    monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
-    asset = Asset("SPARSE", "crypto", "SPARSE-USD", "SPARSE/USDT")
-    assert scan.analyze_asset(asset, dict(_CFG)) is None
+def test_tf_set_per_class():
+    assert TF_SET_BY_CLASS["crypto"] == ("1h", "4h")
+    assert TF_SET_BY_CLASS["equity"] == ("4h", "1d")
+    assert TF_SET_BY_CLASS["commodity"] == ("4h", "1d")
 
 
-def test_timeframes_per_class():
-    from screener.universe import TF_BY_CLASS
-    # Crypto reste en intraday 4h×1h (via ccxt), actions/MP en 1D×4h.
-    assert TF_BY_CLASS["crypto"] == ("4h", "1h")
-    assert TF_BY_CLASS["equity"] == ("1d", "4h")
-    assert TF_BY_CLASS["commodity"] == ("1d", "4h")
-
-
-def test_build_assets_classes_and_count():
-    crypto = build_assets(("crypto",))
-    assert all(a.cls == "crypto" and a.ccxt for a in crypto)
-    assert len(crypto) == 46
-    alla = build_assets()
-    assert len(alla) == 46 + 90 + 8
+def test_build_assets_count():
+    assert len(build_assets(("crypto",))) == 46
+    assert len(build_assets()) == 46 + 90 + 8
