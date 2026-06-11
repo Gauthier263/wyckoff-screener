@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 watchlist.csv
 screener.csv
+preselection_*.csv
 chart_*.png
 .venv/
 *.parquet
