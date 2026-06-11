@@ -57,6 +57,14 @@ CONFL_CONFLICT = 0.5  # HTF en conflit avec LTF
 # (Yahoo renvoie ~50 % de barres horaires crypto à volume 0 → VSA inexploitable ;
 # le crypto doit donc passer par ccxt/Binance. Cf. sources.get_spot_exchange.)
 MAX_ZERO_VOL_FRAC = 0.35
+# Contexte HTF de repli (quand la séquence Wyckoff complète n'est pas détectée sur le HTF,
+# typiquement le 4h crypto où le volume du climax est trop lissé). On lit alors un *biais
+# de contexte* léger — tendance + position dans la plage — fidèle au prérequis Wyckoff :
+# une distribution est précédée d'une hausse (prix perché), une accumulation d'une baisse.
+HTF_CTX_LOOKBACK = 40   # barres HTF pour juger tendance + position
+HTF_CTX_POS_HI = 0.55   # position ≥ → haut de plage (favorable distribution en B→C)
+HTF_CTX_POS_LO = 0.45   # position ≤ → bas de plage (favorable accumulation en B→C)
+HTF_CTX_TREND = 0.03    # |variation nette| mini sur la fenêtre pour trancher une tendance
 
 
 def _volume_ok(df: pd.DataFrame, window: int) -> bool:
@@ -118,22 +126,63 @@ def has_min_sequence(struct: WindowStructure) -> bool:
     return climax and "AR" in names and "ST" in names
 
 
+def _is_phase_d(struct: WindowStructure) -> bool:
+    """Phase D = signe directionnel imprimé (SOS/SOW) → markup/markdown en cours."""
+    return bool({"SOS", "SOW"} & {e.name for e in struct.events})
+
+
 def _phase(struct: WindowStructure) -> str:
-    names = {e.name for e in struct.events}
-    if {"SOS", "SOW"} & names:
+    if _is_phase_d(struct):
         side = "LPS" if struct.bias == "accumulation" else "LPSY"
         return f"D (signe imprimé — entrée {side})"
     return "B→C (test validé — entrée spring/test)"
 
 
-def _confluence(htf: WindowStructure, ltf: WindowStructure) -> tuple[float, str]:
-    """Multiplicateur de confluence HTF×LTF (réutilise l'esprit de mtf.combine_mtf)."""
-    htf_ok = htf.bias in ("accumulation", "distribution")
+def htf_context_bias(df: pd.DataFrame, ltf_bias: str, phase_d: bool,
+                     lookback: int = HTF_CTX_LOOKBACK) -> str:
+    """Biais de *contexte* HTF léger, en repli de la séquence Wyckoff complète.
+
+    Lit la tendance nette et la position dans la plage sur la fenêtre HTF, et tranche
+    selon la phase du déclencheur LTF :
+      - phase D (markdown/markup lancé) : la tendance HTF récente doit *confirmer* la
+        direction (HTF qui baisse → distribution, qui monte → accumulation) ;
+      - phase B→C (retournement en formation) : on exige une position extrême + une
+        tendance préalable cohérente (perché après une hausse → distribution ; tassé
+        après une baisse → accumulation).
+    Renvoie 'accumulation' | 'distribution' | 'neutral'. `ltf_bias` n'est pas utilisé
+    directement (le contexte reste indépendant) mais documente l'intention d'appel.
+    """
+    win = df.iloc[-lookback:]
+    lo, hi = float(win["low"].min()), float(win["high"].max())
+    rng = hi - lo
+    if rng <= 0 or len(win) < 6:
+        return "neutral"
+    last = float(win["close"].iloc[-1])
+    pos = (last - lo) / rng
+    early = float(win["close"].iloc[: max(3, lookback // 3)].mean())
+    prior = (last - early) / early if early else 0.0
+
+    if phase_d:
+        if prior <= -HTF_CTX_TREND:
+            return "distribution"
+        if prior >= HTF_CTX_TREND:
+            return "accumulation"
+        return "neutral"
+    if prior >= HTF_CTX_TREND and pos >= HTF_CTX_POS_HI:
+        return "distribution"
+    if prior <= -HTF_CTX_TREND and pos <= HTF_CTX_POS_LO:
+        return "accumulation"
+    return "neutral"
+
+
+def _confluence(htf_bias: str, ltf: WindowStructure) -> tuple[float, str]:
+    """Multiplicateur de confluence à partir du biais HTF (séquence ou contexte) ×
+    déclencheur LTF (réutilise l'échelle de mtf.combine_mtf)."""
     has_signal = bool({"SOS", "SOW"} & {e.name for e in ltf.events})
-    if htf_ok and htf.bias == ltf.bias:
-        return (CONFL_TRIGGER if has_signal else CONFL_ALIGNED), htf.bias
-    if htf_ok and htf.bias != ltf.bias:
-        return CONFL_CONFLICT, htf.bias
+    if htf_bias in ("accumulation", "distribution"):
+        if htf_bias == ltf.bias:
+            return (CONFL_TRIGGER if has_signal else CONFL_ALIGNED), htf_bias
+        return CONFL_CONFLICT, htf_bias
     return CONFL_NEUTRAL, "—"
 
 
@@ -179,14 +228,19 @@ def analyze_asset(asset: Asset, cfg: dict) -> ScanResult | None:
         return None
 
     # Contexte HTF (best-effort : son absence ne disqualifie pas, confluence neutre).
-    struct_h = WindowStructure("neutral", float("nan"), float("nan"))
+    # On tente d'abord la séquence Wyckoff complète ; si elle est neutre (cas du 4h crypto,
+    # climax trop lissé), on retombe sur le biais de contexte léger (tendance + position).
+    htf_bias_ctx = "neutral"
     df_h = sources.fetch(asset, htf_tf, cfg["limit"], mode=cfg["source"],
                          ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
     if df_h is not None and len(df_h) >= need:
         df_h = add_features(df_h, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
         struct_h = detect_window_structure(df_h, lookback=window, th=th)
+        htf_bias_ctx = struct_h.bias
+        if htf_bias_ctx == "neutral":
+            htf_bias_ctx = htf_context_bias(df_h, struct_l.bias, _is_phase_d(struct_l))
 
-    confl_mult, htf_bias = _confluence(struct_h, struct_l)
+    confl_mult, htf_bias = _confluence(htf_bias_ctx, struct_l)
     reliability, meta = _reliability(struct_l, confl_mult)
 
     ordered = sorted(struct_l.events, key=lambda e: e.bars_ago, reverse=True)

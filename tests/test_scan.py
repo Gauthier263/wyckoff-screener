@@ -81,13 +81,35 @@ def test_analyze_asset_rejects_flat(monkeypatch):
     assert scan.analyze_asset(asset, dict(_CFG)) is None
 
 
-def test_confluence_conflict_penalised():
+def test_confluence_from_bias():
     acc = detect_window_structure(add_features(_df(_accumulation_rows())), lookback=20)
-    neutral = detect_window_structure(add_features(_df(_drift(60, 100.0, seed=3))), lookback=20)
-    mult_neutral, _ = scan._confluence(neutral, acc)
-    assert mult_neutral == scan.CONFL_NEUTRAL
-    mult_aligned, bias = scan._confluence(acc, acc)
-    assert mult_aligned >= scan.CONFL_ALIGNED and bias == "accumulation"
+    # HTF aligné + SOS présent dans la séquence → multiplicateur déclencheur (1.5)
+    mult_aligned, bias = scan._confluence("accumulation", acc)
+    assert mult_aligned == scan.CONFL_TRIGGER and bias == "accumulation"
+    # HTF en conflit → pénalité
+    mult_conflict, _ = scan._confluence("distribution", acc)
+    assert mult_conflict == scan.CONFL_CONFLICT
+    # HTF neutre → pas de modification
+    mult_neutral, shown = scan._confluence("neutral", acc)
+    assert mult_neutral == scan.CONFL_NEUTRAL and shown == "—"
+
+
+def test_htf_context_phase_aware():
+    # Tendance haussière + clôture au plus haut → contexte distribution en B→C.
+    up = _df(_drift(50, 100.0, seed=1))
+    up.iloc[-1, up.columns.get_loc("close")] = float(up["high"].max())
+    # force une hausse nette de la moyenne récente vs le début de fenêtre
+    up.iloc[-10:, up.columns.get_loc("close")] += 12.0
+    up.iloc[-10:, up.columns.get_loc("high")] += 12.0
+    assert scan.htf_context_bias(up, "distribution", phase_d=False) == "distribution"
+    # En phase D, une tendance baissière confirme la distribution (markdown en cours).
+    down = _df(_drift(50, 100.0, seed=2))
+    down.iloc[-10:, down.columns.get_loc("close")] -= 12.0
+    down.iloc[-10:, down.columns.get_loc("low")] -= 12.0
+    assert scan.htf_context_bias(down, "distribution", phase_d=True) == "distribution"
+    # Dérive plate → neutre.
+    flat = _df(_drift(50, 100.0, seed=3))
+    assert scan.htf_context_bias(flat, "distribution", phase_d=False) == "neutral"
 
 
 def test_resample_4h_aggregates_ohlcv():

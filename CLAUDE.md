@@ -62,8 +62,13 @@ position. Aide discrétionnaire, pas d'exécution.
   (plus strict que `window.is_valid`). `_volume_ok` écarte les actifs à trop de barres
   volume=0 (Yahoo crypto intraday ≈50 % de zéros → VSA inexploitable, d'où ccxt obligatoire
   pour le crypto). Fiabilité = (w_climax·climax + w_test·test + w_complétude) × récence ×
-  confluence MTF (1.5/1.25/1.0/0.5). Phase B→C (entrée spring) vs D (entrée LPS/LPSY).
-  Pas de R:R pour l'instant (TODO). Tests : `tests/test_scan.py`.
+  confluence MTF (1.5/1.25/1.0/0.5). Confluence : on tente la séquence Wyckoff complète sur
+  le HTF, et si elle est neutre (4h crypto, climax trop lissé) on retombe sur
+  `htf_context_bias` — biais de contexte léger **phase-aware** (tendance + position dans la
+  plage) : en B→C il faut une position extrême + tendance préalable (perché après hausse →
+  distribution), en D la tendance HTF doit confirmer le markdown/markup en cours.
+  Phase B→C (entrée spring) vs D (entrée LPS/LPSY). Pas de R:R pour l'instant (TODO).
+  Tests : `tests/test_scan.py`.
   ```bash
   python -m screener.scan                       # univers complet (crypto ccxt + actions/MP Yahoo)
   python -m screener.scan --classes crypto      # crypto seul, 4h×1h, vrais volumes Binance
