@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 watchlist.csv
 chart_*.png
+tableau_rappel_theorie.html
 .venv/
 *.parquet
 .claude/settings.local.json
