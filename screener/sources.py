@@ -60,20 +60,9 @@ def get_spot_exchange(name: str = "binance"):
     ex.load_markets()
     return ex
 
-_AGG = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
-
 # Périodes Yahoo par intervalle natif (assez d'historique pour ~300 barres analysées).
 _YH_PERIOD = {"60m": "180d", "1d": "3y", "1wk": "5y"}
 _YH_PERIOD_4H = "360d"  # 1h ré-échantillonné en 4h
-
-
-def resample_ohlcv(df: pd.DataFrame, rule: str = "4h") -> pd.DataFrame:
-    """Agrège des barres fines en barres plus larges (OHLCV correct).
-
-    Blocs *calendaires* — adapté aux marchés continus (crypto). Pour les actions,
-    utiliser `resample_session_ohlcv` qui aligne sur l'ouverture de séance."""
-    out = df.resample(rule, label="left", closed="left").agg(_AGG).dropna()
-    return out
 
 
 def resample_session_ohlcv(df: pd.DataFrame, bars_per_bucket: int = 4) -> pd.DataFrame:

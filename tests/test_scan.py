@@ -9,10 +9,9 @@ import numpy as np
 import pandas as pd
 
 from screener import scan, sources
-from screener.events import Thresholds
 from screener.features import add_features
 from screener.universe import TF_SET_BY_CLASS, Asset, build_assets
-from screener.window import detect_window_structure
+from screener.wyckoff import Thresholds, detect_window_structure
 
 
 def _df(rows):
@@ -77,7 +76,8 @@ def test_has_min_sequence():
 def test_context_requires_prior_markdown():
     df = add_features(_df(_accumulation_with_markdown()))
     s = detect_window_structure(df, lookback=30)
-    emoji, text, ok = scan._context(df, s)
+    assert s.context_ok and s.context_move < 0       # contexte porté par la structure
+    emoji, text, ok = scan._context(s)
     assert ok and emoji == "✅" and "markdown" in text
 
 
@@ -92,7 +92,7 @@ def test_context_rejects_flat_prelude():
     df = add_features(_df(rows))
     s = detect_window_structure(df, lookback=30)
     if scan.has_min_sequence(s):  # selon le drift, la séquence peut être détectée
-        _, _, ok = scan._context(df, s)
+        _, _, ok = scan._context(s)
         assert not ok
 
 
@@ -129,24 +129,13 @@ def test_event_check_emojis():
 
 
 def test_render_detail_contains_sections(monkeypatch):
+    from screener import report
     df = _df(_accumulation_with_markdown())
     monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
     asset = Asset("TEST", "crypto", "TEST-USD", "TEST/USDT")
     rep = scan.analyze_tf(asset, "1h", dict(_CFG))
-    out = scan.render_detail(rep)
+    out = report.render_detail(rep)
     assert "Contexte" in out and "Critique" in out and "Séquence" in out
-
-
-def test_resample_4h_aggregates_ohlcv():
-    rows = [[10, 12, 9, 11, 100], [11, 15, 10, 14, 200],
-            [14, 16, 13, 15, 150], [15, 15, 11, 12, 250],
-            [12, 13, 8, 9, 300], [9, 11, 7, 10, 120],
-            [10, 14, 10, 13, 130], [13, 18, 12, 17, 170]]
-    out = sources.resample_ohlcv(_df(rows), "4h")
-    assert len(out) == 2
-    f = out.iloc[0]
-    assert f["open"] == 10 and f["close"] == 12 and f["high"] == 16 and f["low"] == 9
-    assert f["volume"] == 700
 
 
 def test_tf_set_per_class():

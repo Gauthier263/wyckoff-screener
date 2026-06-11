@@ -6,16 +6,13 @@ Balaie l'univers et, pour chaque actif, analyse **chaque timeframe séparément*
 pas passer à côté d'une structure visible sur une échelle et pas sur l'autre. Aucune
 confluence, aucun score de fiabilité : le but est de **fournir les éléments de décision**.
 
-Pour chaque schéma valide (Climax + AR + ST au minimum) on rend :
-  - le **contexte** : une accumulation suit toujours un *markdown* stoppé par un climax,
-    une distribution un *markup* — prérequis Wyckoff vérifié explicitement ;
-  - la **validation événement par événement** : vol×, spread/ATR, clv confrontés aux
-    seuils attendus, avec emojis ✅ / ⚠️ / ❌ ;
-  - un **commentaire critique** qui pèse forces et faiblesses, à charge pour l'opérateur
-    de trancher.
+Pour chaque schéma valide (Climax + AR + ST au minimum) on rend, via `report` :
+  - le **contexte** (markdown avant accumulation / markup avant distribution) — calculé
+    par `wyckoff.assess_context`, prérequis Wyckoff porté par la structure ;
+  - la **validation événement par événement** (vol×, spread/ATR, clv vs seuils, emojis) ;
+  - un **verdict + commentaire critique**, à charge pour l'opérateur de trancher.
 
-Réutilise la couche données/API (`sources.py`, ccxt via mirror Binance + Yahoo) et le
-moteur de détection de séquence (`window.py`). N'écrit rien d'automatique.
+Détection : `wyckoff` (cœur unique). Données/API : `sources`. Tracé : `plot`.
 
 Usage :
     python -m screener.scan                       # tout l'univers
@@ -25,26 +22,32 @@ Usage :
 from __future__ import annotations
 
 import argparse
+import math
 import sys
-from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
 from . import sources
-from .events import Thresholds
 from .features import add_features
+from .report import EventCheck, PatternReport, render_report
 from .universe import Asset, EXCLUDED, build_assets
-from .window import WindowEvent, WindowStructure, detect_window_structure
+from .wyckoff import Thresholds, WindowEvent, WindowStructure, detect_window_structure
 
 # Fenêtres d'analyse balayées par timeframe (on garde la meilleure structure trouvée).
 WINDOWS = (30, 45, 60)
 # Garde-fou qualité : fraction max de barres à volume nul tolérée (Yahoo crypto intraday
 # ≈50 % de zéros → VSA inexploitable ; le crypto passe donc par ccxt/Binance).
 MAX_ZERO_VOL_FRAC = 0.35
-# Contexte : amplitude mini du markdown/markup *précédant* le climax (prérequis Wyckoff).
-CTX_LOOKBACK = 25       # barres examinées avant le climax
-CTX_TREND_MIN = 0.05    # |variation| mini (5 %) pour valider un markdown / markup
+
+
+def load_config(path: str = "config.yaml") -> dict:
+    try:
+        import yaml
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except (FileNotFoundError, ImportError):
+        return {}
 
 
 # --------------------------------------------------------------------------- #
@@ -70,54 +73,6 @@ def _round_price(p: float) -> float:
     return float(f"{p:.5g}")
 
 
-# --------------------------------------------------------------------------- #
-# Modèle de rendu
-# --------------------------------------------------------------------------- #
-@dataclass
-class EventCheck:
-    name: str
-    bars_ago: int
-    vol_ratio: float
-    spread_atr: float
-    clv: float
-    flags: list[str]      # ex. ["vol ×2.8 ✅", "spread 1.6 ATR ✅", "clv 0.72 ✅"]
-    why: str              # justification volume/spread → thèse (issue de window.py)
-
-
-@dataclass
-class PatternReport:
-    name: str
-    cls: str
-    tf: str
-    window: int
-    schema: str
-    phase: str
-    context_emoji: str
-    context_text: str
-    events: list[EventCheck]
-    verdict: str          # ✅ solide | ⚠️ à surveiller | ❌ douteux
-    comment: str
-    last_bars_ago: int
-    price: float
-    sequence: str = field(default="")
-    struct: object = field(default=None, repr=False)   # WindowStructure (pour le tracé)
-    asset: object = field(default=None, repr=False)     # Asset (pour les bougies fines)
-
-    def index_row(self) -> dict:
-        return {
-            "actif": self.name,
-            "classe": self.cls,
-            "tf": self.tf,
-            "win": self.window,
-            "schéma": ("🟢 acc" if self.schema == "accumulation" else "🔴 dist"),
-            "phase": self.phase.split(" ")[0],
-            "contexte": self.context_emoji,
-            "séquence": self.sequence,
-            "récence": f"il y a {self.last_bars_ago}",
-            "verdict": self.verdict,
-        }
-
-
 def has_min_sequence(struct: WindowStructure) -> bool:
     """Schéma minimal exploitable : Climax + AR + ST présents."""
     names = {e.name for e in struct.events}
@@ -139,31 +94,17 @@ def _phase(struct: WindowStructure) -> str:
     return "B→C — test validé, entrée spring/test"
 
 
-# --------------------------------------------------------------------------- #
-# Contexte Wyckoff : markdown avant accumulation / markup avant distribution
-# --------------------------------------------------------------------------- #
-def _context(df: pd.DataFrame, struct: WindowStructure) -> tuple[str, str, bool]:
-    """Vérifie le mouvement *précédant* le climax. Renvoie (emoji, texte, ok)."""
-    climax = next((e for e in struct.events if e.name in ("SC", "BC")), None)
-    if climax is None:
-        return "❔", "climax introuvable", False
-    idx = len(df) - 1 - climax.bars_ago
-    start = max(0, idx - CTX_LOOKBACK)
-    if idx - start < 8:
-        return "❔", "historique insuffisant avant le climax", False
-    c0 = float(df["close"].iloc[start])
-    c1 = float(df["close"].iloc[idx])
-    move = (c1 - c0) / c0 if c0 else 0.0
-    n = idx - start
+def _context(struct: WindowStructure) -> tuple[str, str, bool]:
+    """Met en forme le contexte porté par la structure (emoji, texte, ok)."""
+    move, n = struct.context_move, struct.context_bars
     acc = struct.bias == "accumulation"
-    if acc:
-        if move <= -CTX_TREND_MIN:
-            return "✅", f"markdown préalable {move*100:+.1f}% sur {n} barres → climax d'arrêt cohérent", True
-        return "❌", f"pas de markdown net avant le SC ({move*100:+.1f}%) → prérequis d'accumulation non rempli", False
-    else:
-        if move >= CTX_TREND_MIN:
-            return "✅", f"markup préalable {move*100:+.1f}% sur {n} barres → climax d'arrêt cohérent", True
-        return "❌", f"pas de markup net avant le BC ({move*100:+.1f}%) → prérequis de distribution non rempli", False
+    if math.isnan(move):
+        return "❔", "historique insuffisant avant le climax", False
+    kind = "markdown" if acc else "markup"
+    if struct.context_ok:
+        return "✅", f"{kind} préalable {move*100:+.1f}% sur {n} barres → climax d'arrêt cohérent", True
+    prereq = "d'accumulation" if acc else "de distribution"
+    return "❌", f"pas de {kind} net avant le {'SC' if acc else 'BC'} ({move*100:+.1f}%) → prérequis {prereq} non rempli", False
 
 
 # --------------------------------------------------------------------------- #
@@ -201,18 +142,15 @@ def _verdict_and_comment(struct: WindowStructure, ctx_ok: bool, ctx_text: str,
 
     bullets: list[str] = []
     weak = 0
-    # Contexte = prérequis dur
     if not ctx_ok:
         bullets.append("contexte manquant (" + ctx_text.split(" → ")[0] + ")")
         weak += 2
-    # Climax
     if climax:
         if climax.vol_ratio >= th.climax_vol and climax.spread_atr >= th.wide_spread_atr:
             bullets.append(f"climax franc (vol ×{climax.vol_ratio:.1f}, spread large)")
         else:
             bullets.append(f"climax peu convaincant (vol ×{climax.vol_ratio:.1f})")
             weak += 1
-    # Test
     if test:
         if test.vol_ratio <= th.test_vol:
             bullets.append(f"test bien sec (vol ×{test.vol_ratio:.2f}) → {'offre' if acc else 'demande'} tarie")
@@ -220,12 +158,10 @@ def _verdict_and_comment(struct: WindowStructure, ctx_ok: bool, ctx_text: str,
             bullets.append(f"test à volume élevé (×{test.vol_ratio:.2f}) → "
                            f"{'offre' if acc else 'demande'} encore présente, test peu probant")
             weak += 1
-    # Complétude / phase
     if has_signal:
         bullets.append(f"{'SOS' if acc else 'SOW'} imprimé → {'markup' if acc else 'markdown'} amorcé (phase D)")
     else:
         bullets.append("pas encore de signe directionnel → structure jeune, attendre la cassure")
-    # Récence
     if last_ba > 12:
         bullets.append(f"déclencheur ancien (il y a {last_ba} barres) → possiblement périmé")
         weak += 1
@@ -265,7 +201,6 @@ def _best_structure(df: pd.DataFrame, th: Thresholds) -> tuple[WindowStructure, 
 
 def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
     th = Thresholds(**cfg.get("thresholds", {}))
-    need = max(WINDOWS) + cfg["vol_ma"] + 5
     df = sources.fetch(asset, tf, cfg["limit"], mode=cfg["source"],
                        ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
     if df is None or len(df) < min(WINDOWS) + cfg["vol_ma"] + 5 or not _volume_ok(df, min(WINDOWS)):
@@ -277,7 +212,7 @@ def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
     struct, window = found
 
     acc = struct.bias == "accumulation"
-    ctx_emoji, ctx_text, ctx_ok = _context(df, struct)
+    ctx_emoji, ctx_text, ctx_ok = _context(struct)
     ordered = sorted(struct.events, key=lambda e: e.bars_ago, reverse=True)
     checks = [_check_event(e, acc, th) for e in ordered]
     verdict, comment = _verdict_and_comment(struct, ctx_ok, ctx_text, checks, th)
@@ -288,8 +223,7 @@ def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
         phase=_phase(struct), context_emoji=ctx_emoji, context_text=ctx_text,
         events=checks, verdict=verdict, comment=comment,
         last_bars_ago=last.bars_ago, price=_round_price(last.price),
-        sequence=" → ".join(c.name for c in checks),
-        struct=struct, asset=asset,
+        sequence=" → ".join(c.name for c in checks), struct=struct, asset=asset,
     )
 
 
@@ -328,49 +262,9 @@ def run_scan(cfg: dict) -> list[PatternReport]:
 
     if cfg.get("bias") and cfg["bias"] != "both":
         reports = [r for r in reports if r.schema == cfg["bias"]]
-    # Tri : verdict (solide → douteux), puis récence.
     order = {"✅ solide": 0, "⚠️ à surveiller": 1, "❌ douteux": 2}
     reports.sort(key=lambda r: (order.get(r.verdict, 3), r.last_bars_ago))
     return reports
-
-
-# --------------------------------------------------------------------------- #
-# Rendu
-# --------------------------------------------------------------------------- #
-def render_index(reports: list[PatternReport]) -> pd.DataFrame:
-    return pd.DataFrame([r.index_row() for r in reports])
-
-
-def render_detail(r: PatternReport) -> str:
-    head = "🟢 ACCUMULATION" if r.schema == "accumulation" else "🔴 DISTRIBUTION"
-    lines = [
-        f"### {head} — {r.name} ({r.cls}) · {r.tf} · fenêtre {r.window} · {r.verdict}",
-        f"- **Phase** : {r.phase}",
-        f"- **Contexte** {r.context_emoji} : {r.context_text}",
-        f"- **Séquence** (du + ancien au + récent) :",
-    ]
-    for c in r.events:
-        flags = " · ".join(c.flags)
-        lines.append(f"    - `{c.name}` il y a {c.bars_ago} barres — {flags}")
-        lines.append(f"        ↳ {c.why}")
-    lines.append(f"- 💬 **Critique** : {r.comment}")
-    return "\n".join(lines)
-
-
-def render_report(reports: list[PatternReport]) -> str:
-    out = ["# Présélection Wyckoff — patterns en cours\n"]
-    n_acc = sum(r.schema == "accumulation" for r in reports)
-    n_dist = len(reports) - n_acc
-    out.append(f"{len(reports)} formations validées (Climax+AR+ST) — "
-               f"🟢 {n_acc} accumulation · 🔴 {n_dist} distribution.\n")
-    out.append("## Index\n")
-    idx = render_index(reports)
-    out.append(idx.to_string(index=False) if not idx.empty else "_(vide)_")
-    out.append("\n\n## Détail par formation\n")
-    for r in reports:
-        out.append(render_detail(r))
-        out.append("")
-    return "\n".join(out)
 
 
 def main() -> None:
@@ -380,17 +274,15 @@ def main() -> None:
         except Exception:
             pass
 
-    from .cli import load_config
     cfg = {
         "exchange": "binance", "limit": 400, "vol_ma": 20, "atr_period": 14,
         "use_cache": True, "bias": "both", "thresholds": {}, "source": "ccxt",
         "classes": None,
     }
     file_cfg = load_config()
-    cfg["vol_ma"] = file_cfg.get("vol_ma", cfg["vol_ma"])
-    cfg["atr_period"] = file_cfg.get("atr_period", cfg["atr_period"])
-    cfg["thresholds"] = file_cfg.get("thresholds", {})
-    cfg["exchange"] = file_cfg.get("exchange", cfg["exchange"])
+    for k in ("vol_ma", "atr_period", "thresholds", "exchange"):
+        if k in file_cfg:
+            cfg[k] = file_cfg[k]
 
     p = argparse.ArgumentParser(
         description="Screener Wyckoff multi-cours — analyse par timeframe, éléments de décision")

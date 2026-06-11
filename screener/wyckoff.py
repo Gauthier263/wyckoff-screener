@@ -1,33 +1,51 @@
 """
-window.py — Détection de structure Wyckoff sur une *fenêtre glissante*.
+wyckoff.py — Cœur unique de détection Wyckoff du screener.
 
-Complément au détecteur d'événements de `events.py`. Là où `detect_events` ne
-réagit qu'aux bornes de la grande plage et sur les `buffer` dernières barres, ce
-module reconnaît une **séquence ordonnée** (climax → rebond auto → test → signe
-directionnel) à l'intérieur d'une fenêtre récente, même si elle s'est jouée au
-milieu du lookback. Il identifie le schéma dominant :
+Reconnaît une **séquence ordonnée** d'événements sur une fenêtre glissante :
 
   Accumulation  : SC  → AR → ST → SOS   (plancher défendu puis détente haussière)
   Distribution  : BC  → AR → ST → SOW   (plafond vendu puis cassure baissière)
 
-Tout reste transparent et ajustable (seuils `Thresholds`). Chaque événement porte
-deux textes : `why` (pourquoi volume+spread confirment le rôle, calculé sur la
-barre) et `theory` (rappel de ce que dit la théorie Wyckoff sur cet événement
-dans le schéma détecté).
+et vérifie le **contexte** qui la précède (prérequis Wyckoff) : une accumulation
+suit un *markdown* stoppé par le climax, une distribution un *markup*.
+
+Tout est transparent et ajustable (seuils `Thresholds`). Chaque `WindowEvent` porte
+deux textes : `why` (pourquoi volume+spread confirment le rôle, calculé sur la barre)
+et `theory` (rappel de ce que dit la théorie sur cet événement dans le schéma).
+
+C'est la *seule* définition d'un événement Wyckoff dans le projet : la table
+récapitulative et les graphiques en dérivent directement.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
-from .events import Thresholds
+# Contexte : amplitude mini du markdown/markup *précédant* le climax (prérequis Wyckoff).
+CTX_LOOKBACK = 25       # barres examinées avant le climax
+CTX_TREND_MIN = 0.05    # |variation| mini (5 %) pour valider un markdown / markup
+
+
+# --------------------------------------------------------------------------- #
+# Seuils des détecteurs (heuristiques VSA transparentes et ajustables)
+# --------------------------------------------------------------------------- #
+@dataclass
+class Thresholds:
+    climax_vol: float = 2.0       # vol_ratio pour un climax (SC/BC)
+    sos_vol: float = 1.3          # vol_ratio pour SOS/SOW
+    wide_spread_atr: float = 1.3  # spread_atr d'une barre « large »
+    narrow_spread_atr: float = 0.7
+    test_vol: float = 0.85        # vol_ratio plafond pour un test/ST (volume sec)
+    pen_atr: float = 0.1          # pénétration mini hors borne, en ATR
+    reclaim_clv: float = 0.5      # clôture au-dessus/dessous du milieu de barre
+
 
 # --------------------------------------------------------------------------- #
 # Rappels théoriques (par schéma + événement)
 # --------------------------------------------------------------------------- #
-# Description "manuel Wyckoff" de chaque événement.
 _THEORY_DESC: dict[tuple[str, str], str] = {
     ("accumulation", "SC"): "Selling Climax — apogée de la baisse : l'offre paniquée "
         "est absorbée par les mains fortes. Fixe le plancher de la plage.",
@@ -94,6 +112,8 @@ class WindowStructure:
     high: float
     events: list[WindowEvent] = field(default_factory=list)
     score: float = 0.0
+    context_move: float = float("nan")   # variation nette avant le climax (prérequis)
+    context_bars: int = 0
 
     @property
     def is_valid(self) -> bool:
@@ -102,6 +122,18 @@ class WindowStructure:
         climax = {"SC", "BC"} & names
         follow = {"SOS", "SOW", "ST"} & names
         return bool(climax and follow)
+
+    @property
+    def context_ok(self) -> bool:
+        """Le mouvement précédant le climax respecte le prérequis Wyckoff
+        (markdown avant accumulation, markup avant distribution)."""
+        if math.isnan(self.context_move):
+            return False
+        if self.bias == "accumulation":
+            return self.context_move <= -CTX_TREND_MIN
+        if self.bias == "distribution":
+            return self.context_move >= CTX_TREND_MIN
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -224,17 +256,34 @@ def _scan(df: pd.DataFrame, lookback: int, th: Thresholds, bias: str) -> WindowS
     return WindowStructure(bias, lo, hi, events, score)
 
 
+def assess_context(df: pd.DataFrame, struct: WindowStructure) -> tuple[float, int]:
+    """Variation nette sur les `CTX_LOOKBACK` barres *avant* le climax (prérequis Wyckoff).
+    Renvoie (variation relative, nb de barres mesurées) ; (nan, n) si historique trop court."""
+    climax = next((e for e in struct.events if e.name in ("SC", "BC")), None)
+    if climax is None:
+        return float("nan"), 0
+    idx = len(df) - 1 - climax.bars_ago
+    start = max(0, idx - CTX_LOOKBACK)
+    if idx - start < 8:
+        return float("nan"), idx - start
+    c0 = float(df["close"].iloc[start])
+    c1 = float(df["close"].iloc[idx])
+    move = (c1 - c0) / c0 if c0 else 0.0
+    return move, idx - start
+
+
 def detect_window_structure(
     df: pd.DataFrame, lookback: int = 30, th: Thresholds | None = None
 ) -> WindowStructure:
-    """Renvoie le schéma (accumulation/distribution) dominant sur la fenêtre récente.
+    """Renvoie le schéma (accumulation/distribution) dominant sur la fenêtre récente,
+    contexte (markdown/markup préalable) compris. Neutre si aucune séquence valide.
 
-    `df` doit déjà porter les features (add_features). On évalue les deux biais et on
-    retient celui dont la séquence est la plus complète/forte ; neutre si aucun.
-    """
+    `df` doit déjà porter les features (add_features)."""
     th = th or Thresholds()
     cand = [_scan(df, lookback, th, "accumulation"), _scan(df, lookback, th, "distribution")]
     cand = [c for c in cand if c.is_valid]
     if not cand:
         return WindowStructure("neutral", np.nan, np.nan)
-    return max(cand, key=lambda c: c.score)
+    best = max(cand, key=lambda c: c.score)
+    best.context_move, best.context_bars = assess_context(df, best)
+    return best

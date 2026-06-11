@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from . import data as data_mod
-from .window import WindowStructure
+from .wyckoff import WindowStructure
 
 # TF d'analyse -> TF de dessin des bougies (plus fine)
 FINER_TF = {"1d": "4h", "4h": "1h", "1h": "15m", "30m": "5m", "15m": "5m", "5m": "1m"}

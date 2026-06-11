@@ -1,5 +1,5 @@
 """
-Tests synthétiques du détecteur de structure sur fenêtre (window.py).
+Tests synthétiques du détecteur de structure (wyckoff.py).
 
 On fabrique une séquence d'accumulation propre (SC → AR → ST → SOS) et son miroir
 de distribution, puis on vérifie que `detect_window_structure` retrouve le bon
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from screener.features import add_features
-from screener.window import detect_window_structure
+from screener.wyckoff import detect_window_structure
 
 
 def _df(rows):
