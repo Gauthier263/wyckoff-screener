@@ -107,14 +107,20 @@ def plot_window_structure(
     pts = {name: locate(e) for name, e in ev.items()}
 
     # Bornes de la micro-plage : plancher = climax, plafond = AR (c'est l'AR qui le définit).
+    # Sans AR détecté, on retombe sur l'extrême de la SÉQUENCE (post-climax) plutôt que sur
+    # le haut/bas de fenêtre, qui pourrait inclure des prix d'avant le climax.
     if acc:
-        floor = ev["SC"].bar_low
-        ceil = ev["AR"].bar_high if "AR" in ev else struct.high
-        floor_lbl, ceil_lbl = "plancher (SC)", "plafond (AR)"
+        floor, floor_lbl = ev["SC"].bar_low, "plancher (SC)"
+        if "AR" in ev:
+            ceil, ceil_lbl = ev["AR"].bar_high, "plafond (AR)"
+        else:
+            ceil, ceil_lbl = max(e.bar_high for e in struct.events), "plafond (séq.)"
     else:
-        ceil = ev["BC"].bar_high
-        floor = ev["AR"].bar_low if "AR" in ev else struct.low
-        floor_lbl, ceil_lbl = "plancher (AR)", "plafond (BC)"
+        ceil, ceil_lbl = ev["BC"].bar_high, "plafond (BC)"
+        if "AR" in ev:
+            floor, floor_lbl = ev["AR"].bar_low, "plancher (AR)"
+        else:
+            floor, floor_lbl = min(e.bar_low for e in struct.events), "plancher (séq.)"
     line_col = "#1f77b4"  # bleu, pointillé, trait fin pour les deux bornes
     for yv, lbl in ((floor, floor_lbl), (ceil, ceil_lbl)):
         axp.axhline(yv, color=line_col, ls="--", lw=0.6, alpha=0.8)
