@@ -141,10 +141,11 @@ def plot_window_structure(
         up = _wanted_extreme(name, acc) == "high"
         y = price + (gap if up else -gap)
         dy = 30 if up else -38
-        # Trait vertical fin et discret, identique sur le cours et le volume, pour
-        # délimiter les phases (même x sur les deux panneaux, qui partagent l'axe X).
+        # Trait vertical fin et discret, teinté de la couleur de l'événement (vert/bleu…),
+        # identique sur le cours et le volume, pour délimiter les phases (même x ; les deux
+        # panneaux partagent l'axe X).
         for axx in (axp, axv):
-            axx.axvline(xe, color="#888", ls=":", lw=0.6, alpha=0.45, zorder=0)
+            axx.axvline(xe, color=col, ls=":", lw=0.7, alpha=0.4, zorder=0)
         axp.annotate(name, (xe, y), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
                      arrowprops=dict(arrowstyle="-", color=col, lw=0.8))
