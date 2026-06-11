@@ -74,6 +74,17 @@ def _rows(bias: str, th: Thresholds) -> list[dict]:
             "invalide": f"volume élevé (> ×{th.test_vol}) ou cassure nette de la borne",
         },
         {
+            "ev": "SPRING" if acc else "UTAD",
+            "nom": "Spring" if acc else "Upthrust After Distribution",
+            "role": f"Phase C — fausse cassure {'sous le plancher' if acc else 'au-dessus du plafond'} "
+                    f"(shakeout) puis rejet : déloge les mains faibles avant le signe directionnel.",
+            "volx": "modéré (la cassure ne tient pas)",
+            "spread": "pic bref possible",
+            "cloture": f"revient DANS la plage (clv {'≥ 0.5' if acc else '≤ 0.5'} = rejet)",
+            "valide": f"pénétration brève ≈ {th.pen_atr} ATR hors borne + clôture rentrée",
+            "invalide": "clôture HORS de la plage = vraie cassure (pas un piège)",
+        },
+        {
             "ev": signe,
             "nom": _FULLNAME[signe],
             "role": f"La {'demande' if acc else 'offre'} prend le contrôle : "
@@ -83,6 +94,17 @@ def _rows(bias: str, th: Thresholds) -> list[dict]:
             "cloture": f"{cloture} — clv {clv_dir}",
             "valide": f"volume soutenu + spread large + clôture {cloture}",
             "invalide": "volume faible ou clôture molle (clv au mauvais bout)",
+        },
+        {
+            "ev": "LPS" if acc else "LPSY",
+            "nom": "Last Point of Support" if acc else "Last Point of Supply",
+            "role": f"Phase D — back-up après le signe : dernier "
+                    f"{'appui' if acc else 'rebond'} avant le {'markup' if acc else 'markdown'}.",
+            "volx": f"SEC ≤ ×{th.test_vol}",
+            "spread": "étroit (réaction sans engagement)",
+            "cloture": f"{'creux plus HAUT' if acc else 'sommet plus BAS'} que le climax",
+            "valide": f"réaction sèche + {'creux qui tient le support' if acc else 'sommet qui tient la résistance'}",
+            "invalide": f"volume lourd ou {'nouveau plus-bas sous le plancher' if acc else 'nouveau plus-haut au-dessus du plafond'}",
         },
     ]
 

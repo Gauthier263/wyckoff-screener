@@ -11,8 +11,9 @@ def test_build_theory_html(tmp_path):
     assert os.path.exists(out)
     doc = open(out, encoding="utf-8").read()
 
-    # Les deux schémas et tous les événements sont présents.
-    for token in ("ACCUMULATION", "DISTRIBUTION", "SC", "BC", "AR", "ST", "SOS", "SOW"):
+    # Les deux schémas et tous les événements (Phase A→D) sont présents.
+    for token in ("ACCUMULATION", "DISTRIBUTION", "SC", "BC", "AR", "ST", "SOS", "SOW",
+                  "SPRING", "UTAD", "LPS", "LPSY"):
         assert token in doc
     # Les seuils courants sont injectés (pas de valeurs en dur).
     assert "×2.5" in doc and "×1.4" in doc and "×0.8" in doc and "1.2 ATR" in doc

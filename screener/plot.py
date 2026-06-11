@@ -26,7 +26,8 @@ _TF_TD = {"1d": pd.Timedelta(days=1), "4h": pd.Timedelta(hours=4), "1h": pd.Time
           "5m": pd.Timedelta(minutes=5)}
 
 _EVENT_COLOR = {"SC": "#2ca02c", "SOS": "#2ca02c", "AR": "#1f77b4", "ST": "#1f77b4",
-                "BC": "#d62728", "SOW": "#d62728"}
+                "BC": "#d62728", "SOW": "#d62728", "SPRING": "#9467bd", "UTAD": "#9467bd",
+                "LPS": "#17a2b8", "LPSY": "#17a2b8"}
 
 # Pour chaque événement : sur quel extrême de barre poser le marqueur ("low"/"high").
 # SC→creux (plancher), AR→sommet du rebond (plafond), ST→re-test de la borne,
@@ -37,6 +38,8 @@ def _wanted_extreme(name: str, acc: bool) -> str:
         "AR": "high" if acc else "low",
         "ST": "low" if acc else "high",
         "SOS": "high", "SOW": "low",
+        "SPRING": "low", "UTAD": "high",   # pénétration sous/au-dessus de la borne
+        "LPS": "low", "LPSY": "high",      # creux/sommet de la réaction (back-up)
     }
     return table.get(name, "low")
 

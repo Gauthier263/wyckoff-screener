@@ -58,6 +58,37 @@ def test_accumulation_sequence():
         assert e.theory and "vol" in e.why
 
 
+def test_accumulation_spring_and_lps():
+    """Séquence complète Phase A→D : SC → AR → ST → SPRING → SOS → LPS.
+
+    Vérifie le resserrement de l'AR (rebond réflexe immédiat, volume en repli) et la
+    reconnaissance du Spring (fausse cassure sous le plancher) puis du LPS (back-up sec)."""
+    rows = _drift(40, 100.0, seed=11)                      # warmup vol_ma/ATR (~1000)
+    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]           # SC : climax, plancher 95.0
+    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]            # AR : rebond réflexe, volume en repli (<1×)
+    rows += _drift(2, 101.5, vol=600.0, seed=12)
+    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]              # ST : test sec, creux plus haut
+    rows += _drift(8, 99.0, vol=650.0, seed=13)            # Phase B (lows > 95)
+    rows += [[96.0, 96.2, 94.2, 95.8, 900.0]]              # SPRING : sous 95.0 puis clôture rentrée
+    rows += _drift(1, 97.0, vol=600.0, seed=14)
+    rows += [[98.0, 104.5, 97.8, 104.2, 2600.0]]           # SOS : JAC large + volumique
+    rows += _drift(1, 102.0, vol=700.0, seed=15)
+    rows += [[102.0, 102.5, 100.5, 101.8, 500.0]]          # LPS : back-up sec, creux plus haut
+    rows += _drift(2, 102.0, vol=700.0, seed=16)
+
+    struct = detect_window_structure(_df(rows), lookback=20)
+    names = [e.name for e in struct.events]
+    assert struct.bias == "accumulation" and struct.is_valid
+    assert names[0] == "SC"
+    for ev in ("AR", "ST", "SPRING", "SOS", "LPS"):
+        assert ev in names, f"{ev} manquant : {names}"
+    # ordre chronologique respecté
+    assert names == sorted(names, key=lambda nm: [e.ts for e in struct.events if e.name == nm][0])
+    # l'AR validé porte bien un volume en repli (< 1×)
+    ar = next(e for e in struct.events if e.name == "AR")
+    assert ar.vol_ratio < 1.0
+
+
 def test_distribution_sequence():
     rows = _drift(40, 100.0, seed=5)
     # BC : grosse barre acheteuse qui fait un plus-haut et clôture bas, volume x3

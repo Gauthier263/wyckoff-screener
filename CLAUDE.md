@@ -24,12 +24,17 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `overfit_report` (verdict robuste/fragile/surajustement), `walk_forward` (k plis).
   Features calculées une fois par symbole puis réutilisées sur toute la grille.
 - `screener/window.py` — `detect_window_structure` : reconnaît une *séquence* Wyckoff
-  ordonnée (SC→AR→ST→SOS en accumulation, BC→AR→ST→SOW en distribution) sur une
-  fenêtre glissante (défaut 60 barres), indépendamment des bornes de la grande plage.
-  Complète `events.py` qui ne réagit qu'aux bornes sur les `buffer` dernières barres.
-  Chaque `WindowEvent` porte `why` (justification volume+spread calculée sur la barre)
-  et `theory` (rappel théorique, dict `THEORY`). AR cherché sur horizon borné après le
-  climax (sinon il attrape l'extrême du SOS/SOW final).
+  ordonnée (Phase A→D) sur une fenêtre glissante (défaut 60 barres), indépendamment des
+  bornes de la grande plage. Accumulation : SC→AR→ST→**SPRING**→SOS→**LPS** ;
+  distribution : BC→AR→ST→**UTAD**→SOW→**LPSY** (tous optionnels sauf le climax + un
+  signe/test). Complète `events.py` qui ne réagit qu'aux bornes sur les `buffer` dernières
+  barres. Chaque `WindowEvent` porte `why` (justification volume+spread) et `theory`.
+  Détection (ordre interne) : climax → **AR** (rebond réflexe *immédiat*, horizon court,
+  on s'arrête dès que l'extrême cale ; validé seulement si volume EN REPLI <1× — un rebond
+  volumique est un SOS, pas un AR) → **SOS/SOW** (1ʳᵉ poussée large+volumique = *jump across
+  the creek* ; détecté avant l'ST/Spring pour les borner en Phase B) → **ST** & **SPRING/
+  UTAD** (entre AR et signe) → **LPS/LPSY** (back-up à volume sec après le signe, tenant le
+  bon côté de la borne). Événements triés par horodatage avant rendu.
 - `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure. Dessine les
   bougies sur une **TF inférieure** que l'analyse (`FINER_TF` : H4→H1, H1→15m, 15m→5m).
   Bornes : **plancher = climax (SC), plafond = AR** (c'est l'AR qui le définit), miroir
