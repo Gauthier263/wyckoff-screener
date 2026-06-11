@@ -117,13 +117,18 @@ def plot_window_structure(
     axp.axhline(ceil, color="#b08900", ls="-", lw=1.0, alpha=0.85)
     axp.text(x[0], ceil, f" {ceil_lbl} {ceil:.0f}", va="bottom", fontsize=8, color="#7a5c00")
 
-    # Marqueurs d'événements : rond + acronyme uniquement (pas de barre verticale).
+    # Marqueurs d'événements : rond + acronyme, légèrement écartés de la mèche pour
+    # ne pas la chevaucher. Sommet → marqueur/label au-dessus ; creux → en dessous.
+    yr = float(sub["high"].max() - sub["low"].min()) or 1.0
+    gap = yr * 0.02
     for name, e in ev.items():
         xe, price = pts[name]
         col = _EVENT_COLOR.get(name, "#555")
-        axp.scatter([xe], [price], s=150, facecolor="none", edgecolor=col, lw=1.2, zorder=6)
-        dy = 20 if name in ("AR", "SOS", "SOW") else -36
-        axp.annotate(name, (xe, price), textcoords="offset points", xytext=(0, dy),
+        up = _wanted_extreme(name, acc) == "high"
+        y = price + (gap if up else -gap)
+        axp.scatter([xe], [y], s=150, facecolor="none", edgecolor=col, lw=1.2, zorder=6)
+        dy = 16 if up else -22
+        axp.annotate(name, (xe, y), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
                      arrowprops=dict(arrowstyle="-", color=col, lw=0.8))
 
