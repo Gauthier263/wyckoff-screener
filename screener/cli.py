@@ -109,7 +109,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
     ex = data_mod.get_exchange(cfg["exchange"])
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = Thresholds(**cfg.get("thresholds", {}))
-    lookback = cfg.get("window", 30)
+    lookback = cfg.get("window", 60)
 
     rows: list[dict] = []
     for sym in universe:
@@ -149,7 +149,7 @@ def main() -> None:
         "exchange": "binance", "quote": "USDT", "timeframe": "1h", "top": 60,
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
-        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60,
     }
     cfg.update(load_config())
 
@@ -161,8 +161,8 @@ def main() -> None:
     p.add_argument("--bias", choices=["accumulation", "distribution", "both"], default=cfg["bias"])
     p.add_argument("--max-results", type=int, default=cfg["max_results"])
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
-    p.add_argument("--window", nargs="?", type=int, const=30, default=None,
-                   help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
+    p.add_argument("--window", nargs="?", type=int, const=60, default=None,
+                   help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")

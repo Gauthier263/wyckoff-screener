@@ -25,7 +25,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   Features calculées une fois par symbole puis réutilisées sur toute la grille.
 - `screener/window.py` — `detect_window_structure` : reconnaît une *séquence* Wyckoff
   ordonnée (SC→AR→ST→SOS en accumulation, BC→AR→ST→SOW en distribution) sur une
-  fenêtre glissante (défaut 30 barres), indépendamment des bornes de la grande plage.
+  fenêtre glissante (défaut 60 barres), indépendamment des bornes de la grande plage.
   Complète `events.py` qui ne réagit qu'aux bornes sur les `buffer` dernières barres.
   Chaque `WindowEvent` porte `why` (justification volume+spread calculée sur la barre)
   et `theory` (rappel théorique, dict `THEORY`). AR cherché sur horizon borné après le
@@ -48,7 +48,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - Tout nouveau détecteur doit venir avec un test synthétique dans `tests/`.
 - **Illustration d'une analyse** (préférences Gauthier) :
   - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
-    lien cliquable `[texte](...)`).
+    lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
+    dans le fil** (outil d'envoi de fichier) — Gauthier veut le voir sans cliquer.
   - Bougies en TF inférieure à l'analyse : analyse H1 → bougies 15m, analyse H4 →
     bougies H1 (voir `FINER_TF`).
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
@@ -64,7 +65,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 ```bash
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
-python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
+python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
