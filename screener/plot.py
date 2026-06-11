@@ -118,23 +118,26 @@ def plot_window_structure(
     line_col = "#1f77b4"  # bleu, pointillé, trait fin pour les deux bornes
     for yv, lbl in ((floor, floor_lbl), (ceil, ceil_lbl)):
         axp.axhline(yv, color=line_col, ls="--", lw=0.6, alpha=0.8)
-        # Étiquette posée hors de l'aire de tracé (bord droit) : ne chevauche jamais
-        # les bougies ni les mèches.
-        axp.annotate(f"{lbl} {yv:.0f}", xy=(1.0, yv), xycoords=axp.get_yaxis_transform(),
-                     xytext=(6, 0), textcoords="offset points", va="center", ha="left",
-                     fontsize=8, color=line_col, clip_on=False)
+        # Étiquette à GAUCHE, côté échelle des prix : ancrée au bord gauche, posée sur le
+        # côté ouvert de la borne (sous le plancher / au-dessus du plafond), avec un fond
+        # blanc pour rester lisible sans chevaucher les bougies.
+        below = yv == floor
+        axp.annotate(f"{lbl} {yv:.0f}", xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
+                     xytext=(4, -2 if below else 2), textcoords="offset points",
+                     va="top" if below else "bottom", ha="left", fontsize=8, color=line_col,
+                     bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7))
 
     # Marqueurs d'événements : rond + acronyme, légèrement écartés de la mèche pour
     # ne pas la chevaucher. Sommet → marqueur/label au-dessus ; creux → en dessous.
     yr = float(sub["high"].max() - sub["low"].min()) or 1.0
-    gap = yr * 0.04
+    gap = yr * 0.06
     for name, e in ev.items():
         xe, price = pts[name]
         col = _EVENT_COLOR.get(name, "#555")
         up = _wanted_extreme(name, acc) == "high"
         y = price + (gap if up else -gap)
         axp.scatter([xe], [y], s=150, facecolor="none", edgecolor=col, lw=1.2, zorder=6)
-        dy = 22 if up else -30
+        dy = 30 if up else -38
         axp.annotate(name, (xe, y), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
                      arrowprops=dict(arrowstyle="-", color=col, lw=0.8))
@@ -145,7 +148,7 @@ def plot_window_structure(
     axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
     # marge verticale pour que les marqueurs/étiquettes ne mordent pas le titre
     plo, phi = float(sub["low"].min()), float(sub["high"].max())
-    axp.set_ylim(plo - (phi - plo) * 0.20, phi + (phi - plo) * 0.16)
+    axp.set_ylim(plo - (phi - plo) * 0.28, phi + (phi - plo) * 0.24)
 
     # Volume + étiquettes d'événements pour repérage
     bc = ["#ef5350" if c < o else "#26a69a" for o, c in zip(sub["open"], sub["close"])]
