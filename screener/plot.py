@@ -112,22 +112,26 @@ def plot_window_structure(
         ceil = ev["BC"].bar_high
         floor = ev["AR"].bar_low if "AR" in ev else struct.low
         floor_lbl, ceil_lbl = "plancher (AR)", "plafond (BC)"
-    axp.axhline(floor, color="#2ca02c", ls="--", lw=1.0, alpha=0.85)
-    axp.text(x[0], floor, f" {floor_lbl} {floor:.0f}", va="bottom", fontsize=8, color="#1b6b1b")
-    axp.axhline(ceil, color="#b08900", ls="-", lw=1.0, alpha=0.85)
-    axp.text(x[0], ceil, f" {ceil_lbl} {ceil:.0f}", va="bottom", fontsize=8, color="#7a5c00")
+    line_col = "#1f77b4"  # bleu, pointillé, trait fin pour les deux bornes
+    for yv, lbl in ((floor, floor_lbl), (ceil, ceil_lbl)):
+        axp.axhline(yv, color=line_col, ls="--", lw=0.6, alpha=0.8)
+        # Étiquette posée hors de l'aire de tracé (bord droit) : ne chevauche jamais
+        # les bougies ni les mèches.
+        axp.annotate(f"{lbl} {yv:.0f}", xy=(1.0, yv), xycoords=axp.get_yaxis_transform(),
+                     xytext=(6, 0), textcoords="offset points", va="center", ha="left",
+                     fontsize=8, color=line_col, clip_on=False)
 
     # Marqueurs d'événements : rond + acronyme, légèrement écartés de la mèche pour
     # ne pas la chevaucher. Sommet → marqueur/label au-dessus ; creux → en dessous.
     yr = float(sub["high"].max() - sub["low"].min()) or 1.0
-    gap = yr * 0.02
+    gap = yr * 0.04
     for name, e in ev.items():
         xe, price = pts[name]
         col = _EVENT_COLOR.get(name, "#555")
         up = _wanted_extreme(name, acc) == "high"
         y = price + (gap if up else -gap)
         axp.scatter([xe], [y], s=150, facecolor="none", edgecolor=col, lw=1.2, zorder=6)
-        dy = 16 if up else -22
+        dy = 22 if up else -30
         axp.annotate(name, (xe, y), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
                      arrowprops=dict(arrowstyle="-", color=col, lw=0.8))
@@ -138,7 +142,7 @@ def plot_window_structure(
     axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
     # marge verticale pour que les marqueurs/étiquettes ne mordent pas le titre
     plo, phi = float(sub["low"].min()), float(sub["high"].max())
-    axp.set_ylim(plo - (phi - plo) * 0.14, phi + (phi - plo) * 0.10)
+    axp.set_ylim(plo - (phi - plo) * 0.20, phi + (phi - plo) * 0.16)
 
     # Volume + étiquettes d'événements pour repérage
     bc = ["#ef5350" if c < o else "#26a69a" for o, c in zip(sub["open"], sub["close"])]
@@ -154,8 +158,8 @@ def plot_window_structure(
         i = int((abs(x - xe)).argmin())
         bar_y = float(vol_arr[i])
         axv.annotate(f"{name}\n×{e.vol_ratio:.1f}", (xe, bar_y), textcoords="offset points",
-                     xytext=(0, 4), ha="center", va="bottom", fontsize=7.5, weight="bold", color=col)
-    axv.set_ylim(0, vmax * 1.30)
+                     xytext=(0, 10), ha="center", va="bottom", fontsize=7.5, weight="bold", color=col)
+    axv.set_ylim(0, vmax * 1.42)
     axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
     axv.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)
