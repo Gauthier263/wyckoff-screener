@@ -54,8 +54,15 @@ donne les **éléments de décision** à l'opérateur. Aide discrétionnaire, pa
   actions/MP **H4 et D1** — analysés indépendamment. `EXCLUDED` liste les demandés écartés
   (OpenAI/Infleqtion non cotés, microcaps absents).
 - `screener/sources.py` — couche données multi-sources (réutilise `data.py`, n'y touche
-  pas). Route crypto→ccxt, actions/MP→Yahoo. Yahoo n'a pas de 4h natif → `resample_ohlcv`
-  (1h→4h). `get_spot_exchange` rend **Binance joignable depuis le cloud** : endpoints
+  pas). Route crypto→ccxt ; **actions US→Polygon.io si clé** (`POLYGON_API_KEY` ou
+  `config.yaml: polygon_api_key`) : volume SIP consolidé = TradingView, 1 requête
+  d'agrégats 30 min/titre (throttle 5 req/min, cache 12 h) dont on dérive H1/H4/D1 sur
+  les heures de séance (`polygon_session_frames`, RTH 9h30→16h ET) ; sinon Yahoo.
+  Actions non-US/MP→Yahoo. Le 4h actions est **aligné sur l'ouverture de séance**
+  (`resample_session_ohlcv`, convention TradingView : 9h30→13h30, 13h30→clôture) — les
+  blocs calendaires UTC faussaient la VSA. L'intraday Yahoo de Séoul/Tokyo est lacunaire
+  (Σ1h/1d≈0,5-0,7) → `Asset.timeframes()` restreint `.KS`/`.T` au D1.
+  `get_spot_exchange` rend **Binance joignable depuis le cloud** : endpoints
   publics routés vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
   géo-bloqué), `session.trust_env=True` (sinon SSLError : la CA du proxy TLS est dans le
   bundle système, pas dans certifi), marchés **spot only** (fapi/dapi restent 451).

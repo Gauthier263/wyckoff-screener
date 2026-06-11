@@ -156,17 +156,117 @@ def _cached_yahoo(ticker: str, timeframe: str, limit: int,
     return df
 
 
+# --------------------------------------------------------------------------- #
+# Polygon.io — volume SIP consolidé pour les actions US (= celui de TradingView).
+# Free tier : 5 req/min, 2 ans d'historique, données fin de séance. Stratégie :
+# UNE requête d'agrégats 30 minutes par titre (cache parquet 12 h), depuis laquelle
+# H1 / H4 / D1 sont dérivés localement sur les heures de séance régulières (9h30 ET),
+# blocs alignés sur l'ouverture → mêmes barres que TradingView.
+# --------------------------------------------------------------------------- #
+_POLYGON_BASE = "https://api.polygon.io"
+_POLYGON_30M_DAYS = 420       # profondeur demandée (≈ 200 barres 4h de séance)
+_POLYGON_CACHE_S = 12 * 3600  # données EOD → cache long
+_POLYGON_MIN_INTERVAL_S = 12.5  # 5 req/min sur le free tier
+_polygon_last_call = 0.0
+
+
+def polygon_key() -> str:
+    if os.environ.get("POLYGON_API_KEY"):
+        return os.environ["POLYGON_API_KEY"]
+    try:
+        import yaml
+        with open("config.yaml", encoding="utf-8") as f:
+            return (yaml.safe_load(f) or {}).get("polygon_api_key", "") or ""
+    except Exception:
+        return ""
+
+
+def _polygon_raw_30m(ticker: str, key: str) -> pd.DataFrame:
+    """Agrégats 30 min ajustés (sort asc, limite max) sur _POLYGON_30M_DAYS jours."""
+    global _polygon_last_call
+    import requests
+
+    wait = _POLYGON_MIN_INTERVAL_S - (time.time() - _polygon_last_call)
+    if wait > 0:
+        time.sleep(wait)
+    end = pd.Timestamp.utcnow().date()
+    start = end - pd.Timedelta(days=_POLYGON_30M_DAYS)
+    url = (f"{_POLYGON_BASE}/v2/aggs/ticker/{ticker}/range/30/minute/"
+           f"{start}/{end}?adjusted=true&sort=asc&limit=50000&apiKey={key}")
+    r = requests.get(url, timeout=30)
+    _polygon_last_call = time.time()
+    r.raise_for_status()
+    results = r.json().get("results") or []
+    if not results:
+        return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    df = pd.DataFrame(results)[["t", "o", "h", "l", "c", "v"]]
+    df.columns = ["ts", "open", "high", "low", "close", "volume"]
+    df["ts"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
+    return df.set_index("ts")
+
+
+def _polygon_cached_30m(ticker: str, use_cache: bool) -> pd.DataFrame:
+    key = polygon_key()
+    if not key:
+        raise RuntimeError("POLYGON_API_KEY absente")
+    os.makedirs(data_mod.CACHE_DIR, exist_ok=True)
+    path = os.path.join(data_mod.CACHE_DIR, f"polygon_{ticker}_30m.parquet")
+    if use_cache and os.path.exists(path) and (time.time() - os.path.getmtime(path)) < _POLYGON_CACHE_S:
+        try:
+            return pd.read_parquet(path)
+        except Exception:
+            pass
+    df = _polygon_raw_30m(ticker, key)
+    if use_cache and not df.empty:
+        try:
+            df.to_parquet(path)
+        except Exception:
+            pass
+    return df
+
+
+def polygon_session_frames(raw_30m: pd.DataFrame, timeframe: str) -> pd.DataFrame:
+    """Dérive H1 / H4 / D1 depuis des agrégats 30 min : filtre les heures de séance
+    régulières (9h30→16h ET, comme TradingView par défaut) puis agrège en blocs
+    alignés sur l'ouverture. Renvoie un index UTC."""
+    if raw_30m.empty:
+        return raw_30m
+    et = raw_30m.tz_convert("America/New_York")
+    rth = et.between_time("09:30", "15:59")
+    tf = timeframe.lower()
+    if tf in ("1h", "60m"):
+        out = resample_session_ohlcv(rth, 2)    # 2 × 30 min
+    elif tf == "4h":
+        out = resample_session_ohlcv(rth, 8)    # 8 × 30 min = 9h30→13h30, 13h30→16h
+    elif tf in ("1d", "1day", "d"):
+        out = resample_session_ohlcv(rth, 13)   # séance entière (13 × 30 min)
+    else:
+        raise ValueError(f"timeframe Polygon non supporté : {timeframe}")
+    out.index = out.index.tz_convert("UTC")
+    return out
+
+
+def _polygon_fetch(ticker: str, timeframe: str, limit: int, use_cache: bool) -> pd.DataFrame:
+    ticker = ticker.replace("-", ".")  # classes d'actions : Yahoo BRK-B → Polygon BRK.B
+    raw = _polygon_cached_30m(ticker, use_cache)
+    return polygon_session_frames(raw, timeframe).tail(limit)
+
+
 def source_for(asset: Asset, mode: str) -> str:
     """Résout la source effective pour un actif selon le mode demandé.
 
     mode='yahoo'  → tout via Yahoo (fonctionne partout, y compris crypto en `-USD`).
-    mode='ccxt'   → crypto via ccxt, actions/MP via Yahoo.
-    mode='auto'   → identique à 'ccxt' (crypto exchange si dispo, sinon Yahoo en repli).
+    mode='ccxt'   → crypto via ccxt ; actions US via Polygon si clé présente
+                    (volume SIP consolidé), sinon Yahoo ; non-US et MP via Yahoo.
+    mode='auto'   → identique à 'ccxt'.
     """
     if mode == "yahoo":
         return "yahoo"
     if asset.cls == "crypto" and asset.ccxt:
         return "ccxt"
+    # Polygon free = actions US uniquement (pas de suffixe de place, pas de futures).
+    if asset.cls == "equity" and "." not in asset.yahoo and polygon_key():
+        return "polygon"
     return "yahoo"
 
 
@@ -177,4 +277,11 @@ def fetch(asset: Asset, timeframe: str, limit: int, *, mode: str = "yahoo",
     if src == "ccxt":
         return data_mod.fetch_ohlcv(ex, asset.ccxt, timeframe=timeframe,
                                     limit=limit, use_cache=use_cache)
+    if src == "polygon":
+        try:
+            df = _polygon_fetch(asset.yahoo, timeframe, limit, use_cache)
+            if not df.empty:
+                return df
+        except Exception:
+            pass  # repli Yahoo : un raté Polygon ne casse pas le scan
     return _cached_yahoo(asset.yahoo, timeframe, limit, use_cache)

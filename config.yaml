@@ -8,6 +8,10 @@ max_results: 25         # taille de la watchlist finale
 bias: both              # both | accumulation | distribution
 use_cache: true
 
+# Actions US : volume SIP consolidé (= TradingView) via Polygon.io si une clé est
+# fournie ici ou dans la variable d'environnement POLYGON_API_KEY ; sinon Yahoo.
+polygon_api_key: ""
+
 # --- Multi-timeframe (option --mtf) : [HTF contexte, LTF déclencheur] ---
 timeframes: [4h, 1h]
 

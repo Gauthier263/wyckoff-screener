@@ -191,3 +191,46 @@ def test_resample_session_aligns_on_open():
 def test_build_assets_count():
     assert len(build_assets(("crypto",))) == 46
     assert len(build_assets()) == 46 + 90 + 8
+
+
+def _polygon_30m_synthetic(days=2):
+    """Agrégats 30 min couvrant pre-market + séance + after-hours (index UTC)."""
+    idx, rows = [], []
+    i = 0
+    for day in range(1, days + 1):
+        # 8h00 → 19h30 ET : pre-market (3 barres), séance 9h30-16h (13), after (7)
+        start = pd.Timestamp(f"2024-07-0{day} 08:00", tz="America/New_York")
+        for k in range(23):
+            idx.append(start + pd.Timedelta(minutes=30 * k))
+            rows.append([100 + i, 101 + i, 99 + i, 100.5 + i, 500])
+            i += 1
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"],
+                      index=pd.DatetimeIndex(idx).tz_convert("UTC"))
+    return df
+
+
+def test_polygon_session_frames_filters_rth_and_aligns():
+    raw = _polygon_30m_synthetic(days=2)
+    h4 = sources.polygon_session_frames(raw, "4h")
+    # 2 blocs par séance (9h30→13h30 : 8×30min, puis 13h30→16h : 5×30min)
+    assert len(h4) == 4
+    et = h4.index.tz_convert("America/New_York")
+    assert {(t.hour, t.minute) for t in et} == {(9, 30), (13, 30)}
+    assert h4["volume"].iloc[0] == 8 * 500      # bloc plein, sans pre-market
+    assert h4["volume"].iloc[1] == 5 * 500      # fin de séance
+    d1 = sources.polygon_session_frames(raw, "1d")
+    assert len(d1) == 2 and d1["volume"].iloc[0] == 13 * 500  # séance entière
+    h1 = sources.polygon_session_frames(raw, "1h")
+    assert len(h1) == 14                        # 7 blocs par séance
+
+
+def test_source_routing_polygon(monkeypatch):
+    aapl = Asset("Apple", "equity", "AAPL")
+    samsung = Asset("Samsung", "equity", "005930.KS")
+    gold = Asset("Gold", "commodity", "GC=F")
+    monkeypatch.setattr(sources, "polygon_key", lambda: "fake-key")
+    assert sources.source_for(aapl, "ccxt") == "polygon"
+    assert sources.source_for(samsung, "ccxt") == "yahoo"   # non-US → Yahoo
+    assert sources.source_for(gold, "ccxt") == "yahoo"      # futures → Yahoo
+    monkeypatch.setattr(sources, "polygon_key", lambda: "")
+    assert sources.source_for(aapl, "ccxt") == "yahoo"      # sans clé → repli
