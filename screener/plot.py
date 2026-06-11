@@ -117,12 +117,11 @@ def plot_window_structure(
     axp.axhline(ceil, color="#b08900", ls="-", lw=1.0, alpha=0.85)
     axp.text(x[0], ceil, f" {ceil_lbl} {ceil:.0f}", va="bottom", fontsize=8, color="#7a5c00")
 
-    # Marqueurs d'événements + lignes-guides verticales (price <-> volume)
+    # Marqueurs d'événements : rond + acronyme uniquement (pas de barre verticale).
     for name, e in ev.items():
         xe, price = pts[name]
         col = _EVENT_COLOR.get(name, "#555")
-        axp.axvline(xe, color=col, lw=0.6, alpha=0.25, zorder=0)
-        axp.scatter([xe], [price], s=150, facecolor="none", edgecolor=col, lw=2.2, zorder=6)
+        axp.scatter([xe], [price], s=150, facecolor="none", edgecolor=col, lw=1.2, zorder=6)
         dy = 20 if name in ("AR", "SOS", "SOW") else -36
         axp.annotate(name, (xe, price), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
@@ -134,20 +133,24 @@ def plot_window_structure(
     axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
     # marge verticale pour que les marqueurs/étiquettes ne mordent pas le titre
     plo, phi = float(sub["low"].min()), float(sub["high"].max())
-    axp.set_ylim(plo - (phi - plo) * 0.08, phi + (phi - plo) * 0.10)
+    axp.set_ylim(plo - (phi - plo) * 0.14, phi + (phi - plo) * 0.10)
 
     # Volume + étiquettes d'événements pour repérage
     bc = ["#ef5350" if c < o else "#26a69a" for o, c in zip(sub["open"], sub["close"])]
     axv.bar(x, sub["volume"].values, width=width, color=bc, alpha=0.6)
     axv.plot(x, sub["vol_ma"].values, color="#555", lw=0.8, label="vol MA")
     vmax = float(sub["volume"].max())
+    vol_arr = sub["volume"].values
     for name, e in ev.items():
         xe, _ = pts[name]
         col = _EVENT_COLOR.get(name, "#555")
-        axv.axvline(xe, color=col, lw=0.6, alpha=0.25, zorder=0)
-        axv.annotate(f"{name}\n×{e.vol_ratio:.1f}", (xe, vmax), textcoords="offset points",
+        # Ancre l'étiquette juste au-dessus de SA barre (pas du sommet commun) : les
+        # événements à faible volume descendent et se décollent du trait noir (vol MA).
+        i = int((abs(x - xe)).argmin())
+        bar_y = float(vol_arr[i])
+        axv.annotate(f"{name}\n×{e.vol_ratio:.1f}", (xe, bar_y), textcoords="offset points",
                      xytext=(0, 4), ha="center", va="bottom", fontsize=7.5, weight="bold", color=col)
-    axv.set_ylim(0, vmax * 1.28)
+    axv.set_ylim(0, vmax * 1.30)
     axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
     axv.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)
