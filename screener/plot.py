@@ -118,11 +118,15 @@ def plot_window_structure(
     line_col = "#1f77b4"  # bleu, pointillé, trait fin pour les deux bornes
     for yv, lbl in ((floor, floor_lbl), (ceil, ceil_lbl)):
         axp.axhline(yv, color=line_col, ls="--", lw=0.6, alpha=0.8)
-        # Étiquette à GAUCHE, côté échelle des prix : ancrée au bord gauche, posée sur le
-        # côté ouvert de la borne (sous le plancher / au-dessus du plafond), avec un fond
-        # blanc pour rester lisible sans chevaucher les bougies.
         below = yv == floor
-        axp.annotate(f"{lbl} {yv:.0f}", xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
+        # Prix de la borne en BLEU sur l'échelle (gouttière des ticks), aligné avec les
+        # graduations noires existantes — même axe des prix.
+        axp.annotate(f"{yv:.0f}", xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
+                     xytext=(-4, 0), textcoords="offset points", va="center", ha="right",
+                     fontsize=8, weight="bold", color=line_col, clip_on=False)
+        # Nom de la borne (plancher/plafond + source) à gauche DANS le graphe, côté ouvert
+        # de la ligne, sur fond blanc pour ne pas chevaucher les bougies.
+        axp.annotate(lbl, xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
                      xytext=(4, -2 if below else 2), textcoords="offset points",
                      va="top" if below else "bottom", ha="left", fontsize=8, color=line_col,
                      bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.7))
