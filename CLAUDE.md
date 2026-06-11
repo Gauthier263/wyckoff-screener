@@ -41,6 +41,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
+- `screener/theory_table.py` — `build_theory_html` : mémo « rappel théorie » (HTML
+  cliquable) listant, pour accumulation ET distribution, le rôle de chaque événement
+  et ses seuils de validité (vol×, spread ATR, clôture). Seuils lus depuis `Thresholds`
+  (jamais en dur). `run_window` le régénère à chaque analyse (`tableau_rappel_theorie.html`).
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
@@ -60,6 +64,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     test ≤ ×test_vol, SOS/SOW ≥ ×sos_vol, spread vs wide_spread_atr). Texte généré par
     `window._theory(bias, name, th)` à partir des `Thresholds` courants — but : développer
     des automatismes de lecture event par event.
+  - **Tableau rappel théorie** : à *chaque* demande d'analyse, livrer dans le fil le
+    mémo HTML cliquable (`theory_table.build_theory_html` → `tableau_rappel_theorie.html`)
+    — rôle + seuils de validité (vol×, ATR) de chaque événement, accumulation et
+    distribution, pour mémoriser ce qui rend un événement valide ou non. À la **fin** de
+    chaque analyse, proposer explicitement à Gauthier de pouvoir y référer.
 
 ## Commandes
 ```bash

@@ -111,6 +111,11 @@ def run_window(cfg: dict) -> pd.DataFrame:
     th = Thresholds(**cfg.get("thresholds", {}))
     lookback = cfg.get("window", 60)
 
+    # Mémo « rappel théorie » (cliquable) régénéré à chaque analyse, sur les seuils courants.
+    from .theory_table import build_theory_html
+    memo = build_theory_html(th)
+    print(f"→ tableau rappel théorie : {memo}", file=sys.stderr)
+
     rows: list[dict] = []
     for sym in universe:
         try:
