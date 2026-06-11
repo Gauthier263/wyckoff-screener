@@ -60,8 +60,12 @@ donne les **éléments de décision** à l'opérateur. Aide discrétionnaire, pa
   les heures de séance (`polygon_session_frames`, RTH 9h30→16h ET) ; sinon Yahoo.
   Actions non-US/MP→Yahoo. Le 4h actions est **aligné sur l'ouverture de séance**
   (`resample_session_ohlcv`, convention TradingView : 9h30→13h30, 13h30→clôture) — les
-  blocs calendaires UTC faussaient la VSA. L'intraday Yahoo de Séoul/Tokyo est lacunaire
-  (Σ1h/1d≈0,5-0,7) → `Asset.timeframes()` restreint `.KS`/`.T` au D1.
+  blocs calendaires UTC faussaient la VSA. Sans clé Polygon, le volume intraday Yahoo
+  est **recalé chaque jour sur le daily consolidé** (`rescale_intraday_volume` : Yahoo
+  intraday = 77-94 % du SIP, facteur variable jour à jour 1,0→2,1, mais son daily est
+  exact → profil intraday conservé, niveau quotidien = TradingView ; garde-fou facteur
+  [0.5,5]). L'intraday Yahoo de Séoul/Tokyo est lacunaire (Σ1h/1d≈0,5-0,7) →
+  `Asset.timeframes()` restreint `.KS`/`.T` au D1.
   `get_spot_exchange` rend **Binance joignable depuis le cloud** : endpoints
   publics routés vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
   géo-bloqué), `session.trust_env=True` (sinon SSLError : la CA du proxy TLS est dans le

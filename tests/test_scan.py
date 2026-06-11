@@ -224,6 +224,41 @@ def test_polygon_session_frames_filters_rth_and_aligns():
     assert len(h1) == 14                        # 7 blocs par séance
 
 
+def test_rescale_intraday_volume_matches_daily():
+    # 2 séances de 7 barres 1h ; Yahoo intraday sous-estime (Σ=7000 vs daily consolidé).
+    idx, rows = [], []
+    for day in (1, 2):
+        start = pd.Timestamp(f"2024-07-0{day} 09:30", tz="America/New_York")
+        for h in range(7):
+            idx.append(start + pd.Timedelta(hours=h))
+            rows.append([100, 101, 99, 100.5, 1000])
+    intra = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"],
+                         index=pd.DatetimeIndex(idx))
+    daily = pd.DataFrame(
+        {"open": [100, 100], "high": [101, 101], "low": [99, 99],
+         "close": [100.5, 100.5], "volume": [14000.0, 7000.0]},  # jour 1 : il manque 50 %
+        index=pd.DatetimeIndex([pd.Timestamp(f"2024-07-0{d} 00:00", tz="America/New_York")
+                                for d in (1, 2)]))
+    out = sources.rescale_intraday_volume(intra, daily)
+    sums = out["volume"].groupby(pd.Index(out.index.date)).sum()
+    assert float(sums.iloc[0]) == 14000.0   # recalé sur le consolidé
+    assert float(sums.iloc[1]) == 7000.0    # facteur 1 → inchangé
+    # le profil intra-journalier reste uniforme (facteur appliqué à toutes les barres)
+    assert float(out["volume"].iloc[0]) == 2000.0
+
+
+def test_rescale_guard_against_aberrant_factor():
+    # Intraday quasi vide (cas crypto Yahoo troué) : facteur > 5 → pas de correction.
+    idx = pd.DatetimeIndex([pd.Timestamp("2024-07-01 09:30", tz="America/New_York")])
+    intra = pd.DataFrame([[100, 101, 99, 100.5, 10]],
+                         columns=["open", "high", "low", "close", "volume"], index=idx)
+    daily = pd.DataFrame({"open": [100], "high": [101], "low": [99],
+                          "close": [100.5], "volume": [1_000_000.0]},
+                         index=pd.DatetimeIndex([pd.Timestamp("2024-07-01", tz="America/New_York")]))
+    out = sources.rescale_intraday_volume(intra, daily)
+    assert float(out["volume"].iloc[0]) == 10.0  # inchangé
+
+
 def test_source_routing_polygon(monkeypatch):
     aapl = Asset("Apple", "equity", "AAPL")
     samsung = Asset("Samsung", "equity", "005930.KS")

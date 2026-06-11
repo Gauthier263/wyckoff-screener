@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import time
 
+import numpy as np
 import pandas as pd
 
 from . import data as data_mod
@@ -104,6 +105,30 @@ def resample_session_ohlcv(df: pd.DataFrame, bars_per_bucket: int = 4) -> pd.Dat
     return out
 
 
+def rescale_intraday_volume(intra: pd.DataFrame, daily: pd.DataFrame) -> pd.DataFrame:
+    """Cale le volume intraday Yahoo sur le total quotidien **consolidé**.
+
+    Yahoo intraday n'agrège pas toutes les places (77-94 % du SIP sur les actions US,
+    et le manque varie d'un jour à l'autre : facteur mesuré 1,0→2,1 sur AAPL), alors
+    que son *daily* est consolidé et exact. On renormalise donc chaque jour de séance :
+    le profil intra-journalier reste celui de l'intraday, le niveau quotidien devient
+    celui du consolidé (= TradingView). Les deux index doivent être dans le même
+    fuseau (celui de la bourse) pour que le groupement par jour soit correct.
+    Garde-fou : facteur hors [0.5, 5] (données aberrantes ou trouées) → pas de correction.
+    """
+    if intra.empty or daily.empty:
+        return intra
+    out = intra.copy()
+    day = pd.Index(out.index.date)
+    day_sum = out["volume"].groupby(day).transform("sum").set_axis(out.index)
+    dmap = {ts.date(): float(v) for ts, v in daily["volume"].items()}
+    target = pd.Series([dmap.get(d, np.nan) for d in day], index=out.index)
+    factor = target / day_sum.replace(0, np.nan)
+    factor = factor.where((factor >= 0.5) & (factor <= 5.0)).fillna(1.0)
+    out["volume"] = out["volume"] * factor
+    return out
+
+
 def _yahoo_history(ticker: str, interval: str, period: str,
                    keep_tz: bool = False) -> pd.DataFrame:
     import yfinance as yf  # import paresseux (tests hors-ligne)
@@ -122,9 +147,14 @@ def _yahoo_history(ticker: str, interval: str, period: str,
 def _yahoo_fetch(ticker: str, timeframe: str, limit: int) -> pd.DataFrame:
     tf = timeframe.lower()
     if tf in ("1h", "60m"):
-        df = _yahoo_history(ticker, "60m", _YH_PERIOD["60m"])
+        base = _yahoo_history(ticker, "60m", _YH_PERIOD["60m"], keep_tz=True)
+        daily = _yahoo_history(ticker, "1d", _YH_PERIOD["60m"], keep_tz=True)
+        df = rescale_intraday_volume(base, daily)
+        df.index = pd.to_datetime(df.index, utc=True)
     elif tf == "4h":
         base = _yahoo_history(ticker, "60m", _YH_PERIOD_4H, keep_tz=True)
+        daily = _yahoo_history(ticker, "1d", _YH_PERIOD_4H, keep_tz=True)
+        base = rescale_intraday_volume(base, daily)
         df = resample_session_ohlcv(base, 4)
         df.index = pd.to_datetime(df.index, utc=True)
     elif tf in ("1d", "1day", "d"):
