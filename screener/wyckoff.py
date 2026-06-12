@@ -24,9 +24,14 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from .features import swing_points
+
 # Contexte : amplitude mini du markdown/markup *précédant* le climax (prérequis Wyckoff).
 CTX_LOOKBACK = 25       # barres examinées avant le climax
 CTX_TREND_MIN = 0.05    # |variation| mini (5 %) pour valider un markdown / markup
+# Géométrie des retournements (AR, ST) : pivots locaux, pas extrêmes de fenêtre.
+PIVOT_RIGHT = 2         # barres de confirmation d'un pivot (fractale)
+AR_MIN_ATR = 1.0        # amplitude mini du rebond automatique depuis le climax (en ATR)
 
 
 # --------------------------------------------------------------------------- #
@@ -211,30 +216,54 @@ def _scan(df: pd.DataFrame, lookback: int, th: Thresholds, bias: str) -> WindowS
     gi = len(df) - n + cpos  # index global
     events.append(_mk(df, gi, "SC" if acc else "BC", bias, th))
     c_extreme = float(cbar["low"] if acc else cbar["high"])
+    atr_ref = float(cbar["atr"]) if not np.isnan(cbar["atr"]) else 0.02 * abs(c_extreme)
 
-    # 2) AR : extrême opposé du *rebond initial*. On borne l'horizon de recherche
-    # juste après le climax (sinon on attraperait l'extrême du SOS/SOW final).
-    horizon = max(2, n // 3)
-    after = win.iloc[cpos + 1: cpos + 1 + horizon]
-    if len(after) >= 1:
-        apos_local = int(after["high"].values.argmax() if acc else after["low"].values.argmin())
-        apos = cpos + 1 + apos_local
-        events.append(_mk(df, len(df) - n + apos, "AR", bias, th))
-    else:
-        apos = cpos
+    # Pivots de la fenêtre (fractales) : l'AR et le ST sont des *retournements locaux*,
+    # pas des extrêmes sur une fenêtre — c'est ce qui les recale au bon endroit.
+    sw = swing_points(win, left=1, right=PIVOT_RIGHT)
+    swing_hi = np.where(sw["swing_high"].values)[0]
+    swing_lo = np.where(sw["swing_low"].values)[0]
 
-    # 3) ST : après l'AR, retour près du climax sur volume sec, sans nouvel extrême franc
+    # 2) AR : PREMIER pivot de réaction après le climax (le rebond réflexe immédiat),
+    # d'amplitude ≥ AR_MIN_ATR·ATR, le climax restant l'extrême jusque-là. Pas l'argmax
+    # de la fenêtre (qui attraperait un sommet/creux plus tardif d'un markup/markdown).
+    horizon = max(2, n // 2)
+    ar_pivots = swing_hi if acc else swing_lo
+    apos = None
+    for i in ar_pivots:
+        if not (cpos < i <= cpos + horizon):
+            continue
+        seg = win.iloc[cpos:i + 1]  # le climax doit rester l'extrême jusqu'à l'AR
+        if acc and float(seg["low"].min()) < c_extreme - 1e-9:
+            continue
+        if (not acc) and float(seg["high"].max()) > c_extreme + 1e-9:
+            continue
+        extreme = float(win["high"].iloc[i] if acc else win["low"].iloc[i])
+        amp = (extreme - c_extreme) if acc else (c_extreme - extreme)
+        if amp >= AR_MIN_ATR * atr_ref:
+            apos = i
+            break
+    if apos is None:
+        return WindowStructure(bias, lo, hi)  # pas de réaction franche → pas de structure
+    events.append(_mk(df, len(df) - n + apos, "AR", bias, th))
+
+    # 3) ST : PREMIER pivot creux (acc) / sommet (dist) après l'AR, près de la borne,
+    # sans cassure (higher-low / lower-high), volume sec et spread étroit. On prend le
+    # premier vrai test au creux/sommet, pas la barre la plus sèche au milieu d'un mouvement.
+    st_pivots = swing_lo if acc else swing_hi
     st_pos = None
-    best = None
-    for j in range(apos + 1, n):
+    for j in st_pivots:
+        if j <= apos:
+            continue
         b = win.iloc[j]
-        near = (abs(float(b["low"]) - c_extreme) <= tol) if acc else (abs(float(b["high"]) - c_extreme) <= tol)
+        extreme = float(b["low"] if acc else b["high"])
+        near = abs(extreme - c_extreme) <= tol
+        no_break = (extreme >= c_extreme - 0.1 * tol) if acc else (extreme <= c_extreme + 0.1 * tol)
         vr = float(b["vol_ratio"]) if not np.isnan(b["vol_ratio"]) else 1.0
         sa = float(b["spread_atr"]) if not np.isnan(b["spread_atr"]) else 1.0
-        no_break = (float(b["low"]) >= c_extreme - 0.1 * tol) if acc else (float(b["high"]) <= c_extreme + 0.1 * tol)
-        if near and vr <= th.test_vol * 1.15 and sa <= th.wide_spread_atr and no_break:
-            if best is None or vr < best:
-                best, st_pos = vr, j
+        if near and no_break and vr <= th.test_vol * 1.15 and sa <= th.wide_spread_atr:
+            st_pos = j
+            break
     if st_pos is not None:
         events.append(_mk(df, len(df) - n + st_pos, "ST", bias, th))
 
