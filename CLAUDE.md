@@ -15,8 +15,13 @@ mtf/score/cli/detect_events) et la couche Yahoo/Polygon ont été retirés.
   `WindowEvent` porte `why` (justification volume+spread sur la barre) et `theory`
   (rappel + seuils attendus). `assess_context` calcule la **variation avant le climax**
   (prérequis Wyckoff : markdown avant accumulation, markup avant distribution), portée par
-  `WindowStructure.context_move`/`context_ok`. AR cherché sur horizon borné après le climax
-  (sinon il attrape l'extrême du SOS/SOW final). Seule définition d'un événement Wyckoff.
+  `WindowStructure.context_move`/`context_ok`. **AR et ST = pivots locaux** (via
+  `features.swing_points`), pas extrêmes de fenêtre : l'AR est le *premier* rebond après le
+  climax (amplitude ≥ `AR_MIN_ATR`·ATR, climax restant l'extrême jusque-là) ; le ST est le
+  *premier* pivot creux/sommet près de la borne, sans cassure, volume sec. Pas d'AR franc →
+  pas de structure (rejet du bruit grossier). Tests géométrie : `tests/test_wyckoff.py`.
+  TODO fiabilité : filtre de cohérence post-ST (containment plage ST→signe) pour écarter
+  les structures bruitées (aller-retour hors bornes) — à calibrer sur cas étiquetés.
 - `screener/report.py` — modèle de rendu (`EventCheck`, `PatternReport`) + mise en forme
   (`render_index`, `render_detail`, `render_report`). Sépare présentation et détection.
 - `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure. Dessine les
