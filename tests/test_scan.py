@@ -175,3 +175,38 @@ def test_fetch_routes_to_asset_exchange(monkeypatch):
     nvda = Asset("NVDA", "equity", "NVDA/USDT:USDT", "bitget")
     sources.fetch(nvda, "1h", 300, exchanges=exchanges)
     assert calls == {"ex": "bitget", "symbol": "NVDA/USDT:USDT"}
+
+
+def test_oi_reading_refines_ar():
+    # L'AR : rachat de shorts (OI↓) = rebond réflexe conforme ; OI↑ = vrais acheteurs.
+    assert "rachat de shorts" in scan._oi_reading("AR", acc=True, d=-5)
+    assert "vrais acheteurs" in scan._oi_reading("AR", acc=True, d=+5)
+    # SOS sans OI nouveau = signe moins fiable.
+    assert "moins fiable" in scan._oi_reading("SOS", acc=True, d=-4)
+    assert "demande réelle" in scan._oi_reading("SOS", acc=True, d=+4)
+
+
+def test_event_oi_deltas_and_flags():
+    df = add_features(_df(_accumulation_with_markdown()))
+    s = detect_window_structure(df, lookback=30)
+    ordered = sorted(s.events, key=lambda e: e.bars_ago, reverse=True)
+    oi = pd.Series(range(100, 100 + len(df)), index=df.index, dtype=float)  # OI croissant
+    deltas = scan._event_oi_deltas(ordered, oi, "1h")
+    assert deltas and all(v > 0 for v in deltas.values())   # OI croissant → ΔOI>0 partout
+    chk = scan._check_event(ordered[0], acc=True, th=Thresholds(), oi_delta=5.0)
+    assert chk.oi_delta == 5.0 and chk.oi_note and any("ΔOI" in f for f in chk.flags)
+    # sans OI : pas de flag ΔOI ni de note
+    chk2 = scan._check_event(ordered[0], acc=True, th=Thresholds(), oi_delta=None)
+    assert chk2.oi_delta is None and not chk2.oi_note
+
+
+def test_render_solid_table(monkeypatch):
+    from screener import report
+    df = _df(_accumulation_with_markdown())
+    monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
+    monkeypatch.setattr(sources, "fetch_open_interest", lambda *a, **k: None)
+    asset = Asset("TEST", "crypto", "TEST/USDT", "binance")
+    rep = scan.analyze_tf(asset, "1h", dict(_CFG))
+    rep.verdict = "✅ solide"   # force pour tester le rendu du tableau
+    table = report.render_solid_table([rep])
+    assert "Événements" in table and "TEST" in table and "SC(" in table

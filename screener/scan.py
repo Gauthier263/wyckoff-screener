@@ -38,6 +38,9 @@ from .wyckoff import Thresholds, WindowEvent, WindowStructure, detect_window_str
 WINDOWS = (30, 45, 60)
 # Garde-fou qualité : fraction max de barres à volume nul tolérée sur la fenêtre.
 MAX_ZERO_VOL_FRAC = 0.35
+# Durée d'une barre par TF (pour situer l'OI avant le climax).
+_TF_TD = {"1h": pd.Timedelta(hours=1), "4h": pd.Timedelta(hours=4), "1d": pd.Timedelta(days=1)}
+OI_FLAT = 1.0  # |ΔOI| (%) en-deçà duquel l'OI est considéré stable
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -109,7 +112,41 @@ def _context(struct: WindowStructure) -> tuple[str, str, bool]:
 # --------------------------------------------------------------------------- #
 # Validation événement par événement
 # --------------------------------------------------------------------------- #
-def _check_event(e: WindowEvent, acc: bool, th: Thresholds) -> EventCheck:
+def _oi_reading(name: str, acc: bool, d: float) -> str:
+    """Lecture Wyckoff de l'Open Interest sur un événement (d = ΔOI %)."""
+    up, down = d > OI_FLAT, d < -OI_FLAT
+    if name in ("SC", "BC"):
+        if up:
+            return "OI gonflé vers le climax → positions agressives prises avant absorption"
+        if down:
+            return "OI en baisse → débouclage dans le climax (capitulation)"
+    elif name == "AR":
+        if acc:
+            if down:
+                return "rebond porté par du rachat de shorts (OI↓) → AR réflexe, conforme à la théorie"
+            if up:
+                return "OI en hausse pendant l'AR → de vrais acheteurs entrent, plus qu'un simple rebond auto"
+        else:
+            if down:
+                return "repli par liquidation de longs (OI↓) → réaction automatique conforme"
+            if up:
+                return "OI en hausse pendant l'AR → nouveaux vendeurs, pression baissière réelle"
+    elif name == "ST":
+        if up:
+            return "OI en hausse sur le test → engagement persistant, test moins probant"
+        return "pas de nouvel engagement (OI stable/↓) → test sain, pression épuisée"
+    elif name in ("SOS", "SOW"):
+        side = "demande" if acc else "offre"
+        if up:
+            return f"cassure soutenue par de l'OI nouveau → {side} réelle, signe solide"
+        if down:
+            cover = "rachat de shorts" if acc else "liquidation de longs"
+            return f"cassure surtout sur {cover} (OI↓) → signe directionnel moins fiable"
+    return "OI stable sur l'événement"
+
+
+def _check_event(e: WindowEvent, acc: bool, th: Thresholds,
+                 oi_delta: float | None = None) -> EventCheck:
     flags: list[str] = []
     vr, sa, clv = e.vol_ratio, e.spread_atr, e.clv
     if e.name in ("SC", "BC"):
@@ -127,7 +164,33 @@ def _check_event(e: WindowEvent, acc: bool, th: Thresholds) -> EventCheck:
         flags.append(f"spread {sa:.2f} ATR {_ge(sa, th.wide_spread_atr)} (large)")
         ok_dir = (clv >= 0.6) if acc else (clv <= 0.4)
         flags.append(f"clv {clv:.2f} {'✅' if ok_dir else '⚠️'} ({'haute' if acc else 'basse'})")
-    return EventCheck(e.name, e.bars_ago, vr, sa, clv, flags, e.why)
+    oi_note = ""
+    if oi_delta is not None:
+        arrow = "↑" if oi_delta > OI_FLAT else ("↓" if oi_delta < -OI_FLAT else "~")
+        flags.append(f"ΔOI {oi_delta:+.0f}% {arrow}")
+        oi_note = _oi_reading(e.name, acc, oi_delta)
+    return EventCheck(e.name, e.bars_ago, vr, sa, clv, flags, e.why,
+                      oi_delta=oi_delta, oi_note=oi_note)
+
+
+def _event_oi_deltas(ordered: list[WindowEvent], oi_series, tf: str) -> dict:
+    """ΔOI (%) de chaque événement vs le précédent (le climax vs ~6 barres avant).
+    Clé = bars_ago de l'événement. Vide si OI indisponible."""
+    if oi_series is None or len(oi_series) == 0:
+        return {}
+    td = _TF_TD.get(tf, pd.Timedelta(hours=1))
+    out: dict = {}
+    prev_ts = ordered[0].ts - 6 * td  # ligne de base avant le climax
+    for e in ordered:
+        try:
+            oi_now = oi_series.asof(e.ts)
+            oi_ref = oi_series.asof(prev_ts)
+        except Exception:
+            oi_now = oi_ref = float("nan")
+        if pd.notna(oi_now) and pd.notna(oi_ref) and oi_ref:
+            out[e.bars_ago] = (oi_now - oi_ref) / oi_ref * 100
+        prev_ts = e.ts
+    return out
 
 
 def _verdict_and_comment(struct: WindowStructure, ctx_ok: bool, ctx_text: str,
@@ -198,6 +261,17 @@ def _best_structure(df: pd.DataFrame, th: Thresholds) -> tuple[WindowStructure, 
     return best[1], best[2]
 
 
+def _append_oi_comment(comment: str, checks: list[EventCheck], acc: bool) -> str:
+    """Ajoute au commentaire la lecture OI de l'événement le plus décisif : le signe
+    directionnel (SOS/SOW) s'il existe, sinon l'AR (clé pour distinguer rebond réflexe
+    d'une vraie entrée d'argent)."""
+    by = {c.name: c for c in checks}
+    focus = by.get("SOS") or by.get("SOW") or by.get("AR")
+    if focus is None or not focus.oi_note:
+        return comment
+    return comment[:-1] + f" ; OI [{focus.name}] : {focus.oi_note}."
+
+
 def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
     th = Thresholds(**cfg.get("thresholds", {}))
     df = sources.fetch(asset, tf, cfg["limit"], exchanges=cfg.get("_exchanges", {}),
@@ -213,8 +287,14 @@ def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
     acc = struct.bias == "accumulation"
     ctx_emoji, ctx_text, ctx_ok = _context(struct)
     ordered = sorted(struct.events, key=lambda e: e.bars_ago, reverse=True)
-    checks = [_check_event(e, acc, th) for e in ordered]
+
+    # Open Interest (best-effort, via OKX) → ΔOI inter-événements pour affiner la lecture.
+    oi_series = sources.fetch_open_interest(asset.name, exchanges=cfg.get("_exchanges", {}),
+                                            use_cache=cfg["use_cache"])
+    oi_deltas = _event_oi_deltas(ordered, oi_series, tf)
+    checks = [_check_event(e, acc, th, oi_deltas.get(e.bars_ago)) for e in ordered]
     verdict, comment = _verdict_and_comment(struct, ctx_ok, ctx_text, checks, th)
+    comment = _append_oi_comment(comment, checks, acc)
     last = min(struct.events, key=lambda e: e.bars_ago)
 
     return PatternReport(

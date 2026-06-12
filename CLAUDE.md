@@ -37,13 +37,16 @@ donne les **éléments de décision** à l'opérateur. Aide discrétionnaire, pa
   3 MP (Bitget perp futures, `BASE/USDT:USDT`). `Asset(name, cls, symbol, source)` ;
   `source` ∈ {binance, bitget}. `TIMEFRAMES = ("1h","4h")` pour toutes les classes (pas
   de séance → pas de D1 ni de recalage).
-- `screener/sources.py` — données via ccxt, deux exchanges (réutilise `data.fetch_ohlcv`,
+- `screener/sources.py` — données via ccxt, trois exchanges (réutilise `data.fetch_ohlcv`,
   n'y touche pas). `get_spot_exchange` (Binance, crypto) et `get_bitget_exchange` (Bitget
   swap, actions/métaux/MP) partagent `_apply_env_fixes` : `session.trust_env=True` + bundle
   CA système (sinon SSLError : la CA du proxy TLS n'est pas dans certifi). Binance route ses
   endpoints publics vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
   géo-bloqué), spot only. `build_exchanges` instancie ce qu'il faut ; `fetch` route par
-  `asset.source`.
+  `asset.source`. **Open Interest** : Bitget n'a pas d'historique OI ; `get_okx_exchange`
+  + `fetch_open_interest(base)` récupèrent ~12 j d'OI horaire (notionnel USD) du même
+  sous-jacent sur OKX (33/45 paires ; best-effort, None sinon). Sert à lire le *flux*
+  inter-événements, pas le prix.
 - `screener/scan.py` — pour chaque (actif, TF) : balaie `WINDOWS` (30/45/60) et garde la
   meilleure séquence valide (**Climax+AR+ST** mini ; `_volume_ok` écarte les séries à trop
   de barres volume=0 → ccxt obligatoire pour le crypto). Rend trois choses :
@@ -52,9 +55,13 @@ donne les **éléments de décision** à l'opérateur. Aide discrétionnaire, pa
   *avant* le climax) ; (2) **validation événementielle** `_check_event` — vol×, spread/ATR,
   clv confrontés aux `Thresholds`, emojis ✅/⚠️/❌, + la justification `why` de `wyckoff.py` ;
   (3) **verdict + commentaire critique** `_verdict_and_comment` (✅ solide / ⚠️ à surveiller /
-  ❌ douteux ; contexte manquant = disqualifiant). Sortie : index + fiches détaillées en
-  markdown (`rapport_wyckoff.md`). Phase B→C (entrée spring) vs D (LPS/LPSY). Tests :
-  `tests/test_scan.py`.
+  ❌ douteux ; contexte manquant = disqualifiant). **OI** : `_event_oi_deltas` calcule le ΔOI
+  *entre événements* (vs ~6 barres avant pour le climax), `_oi_reading` en donne la lecture
+  Wyckoff (AR : rachat de shorts/OI↓ = rebond réflexe conforme vs OI↑ = vrais acheteurs ;
+  SOS/SOW : OI↑ = signe réel vs OI↓ = simple débouclage). Sortie : index + **tableau des
+  solides** (`report.render_solid_table` : événements vol×·spread·ΔOI + lecture) + fiches
+  détaillées en markdown (`rapport_wyckoff.md`). Phase B→C (entrée spring) vs D (LPS/LPSY).
+  Tests : `tests/test_scan.py`.
   ```bash
   python -m screener.scan                       # univers complet (91 actifs, Binance + Bitget)
   python -m screener.scan --classes equity metal commodity   # Bitget seul
