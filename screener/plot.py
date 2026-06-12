@@ -14,7 +14,6 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from . import data as data_mod
 from .wyckoff import WindowStructure
 
 # TF d'analyse -> TF de dessin des bougies (plus fine)
@@ -55,20 +54,13 @@ def _candles(ax, df, width):
 
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
-    ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
-    fine_df: pd.DataFrame | None = None,
+    fine_df: pd.DataFrame, tz_hours: int = 2, tz_label: str = "CEST",
 ) -> str:
-    """Dessine la structure `struct` (détectée en `analysis_tf`) avec des bougies en
-    TF inférieure, sur l'intervalle couvert par les événements.
-
-    Les bougies fines sont fournies via `fine_df` (récupérées par la source de l'actif) ;
-    à défaut elles sont récupérées via ccxt (`ex`)."""
+    """Dessine la structure `struct` (détectée en `analysis_tf`) avec les bougies en
+    TF inférieure `fine_df` (récupérées par la source de l'actif), sur l'intervalle
+    couvert par les événements."""
     fine_tf = FINER_TF.get(analysis_tf, analysis_tf)
-    if fine_df is not None:
-        fine = fine_df
-    else:
-        ex = ex or data_mod.get_exchange("binance")
-        fine = data_mod.fetch_ohlcv(ex, symbol, fine_tf, limit, use_cache=False)
+    fine = fine_df
 
     # bornes temporelles : du climax au dernier événement, avec un peu de marge
     ts = [e.ts for e in struct.events]
