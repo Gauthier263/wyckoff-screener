@@ -31,13 +31,12 @@ import pandas as pd
 from . import sources
 from .features import add_features
 from .report import EventCheck, PatternReport, render_report
-from .universe import Asset, EXCLUDED, build_assets
+from .universe import Asset, build_assets
 from .wyckoff import Thresholds, WindowEvent, WindowStructure, detect_window_structure
 
 # Fenêtres d'analyse balayées par timeframe (on garde la meilleure structure trouvée).
 WINDOWS = (30, 45, 60)
-# Garde-fou qualité : fraction max de barres à volume nul tolérée (Yahoo crypto intraday
-# ≈50 % de zéros → VSA inexploitable ; le crypto passe donc par ccxt/Binance).
+# Garde-fou qualité : fraction max de barres à volume nul tolérée sur la fenêtre.
 MAX_ZERO_VOL_FRAC = 0.35
 
 
@@ -201,8 +200,8 @@ def _best_structure(df: pd.DataFrame, th: Thresholds) -> tuple[WindowStructure, 
 
 def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
     th = Thresholds(**cfg.get("thresholds", {}))
-    df = sources.fetch(asset, tf, cfg["limit"], mode=cfg["source"],
-                       ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
+    df = sources.fetch(asset, tf, cfg["limit"], exchanges=cfg.get("_exchanges", {}),
+                       use_cache=cfg["use_cache"])
     if df is None or len(df) < min(WINDOWS) + cfg["vol_ma"] + 5 or not _volume_ok(df, min(WINDOWS)):
         return None
     df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
@@ -228,24 +227,18 @@ def analyze_tf(asset: Asset, tf: str, cfg: dict) -> PatternReport | None:
 
 
 def plot_report(r: PatternReport, cfg: dict, out_path: str) -> str:
-    """Trace la structure d'un PatternReport (bougies en TF inférieure), source-aware :
-    bougies fines via ccxt (crypto) ou Yahoo (actions/MP)."""
+    """Trace la structure d'un PatternReport (bougies en TF inférieure), bougies fines
+    récupérées via l'exchange de la source de l'actif (Binance ou Bitget)."""
     from .plot import FINER_TF, plot_window_structure
     fine_tf = FINER_TF.get(r.tf, r.tf)
-    fine = sources.fetch(r.asset, fine_tf, 1500, mode=cfg["source"],
-                         ex=cfg.get("_ex"), use_cache=cfg["use_cache"])
-    return plot_window_structure(r.name, r.tf, r.struct, out_path,
-                                 ex=cfg.get("_ex"), fine_df=fine)
+    fine = sources.fetch(r.asset, fine_tf, 1500, exchanges=cfg.get("_exchanges", {}),
+                         use_cache=cfg["use_cache"])
+    return plot_window_structure(r.name, r.tf, r.struct, out_path, fine_df=fine)
 
 
 def run_scan(cfg: dict) -> list[PatternReport]:
     assets = build_assets(cfg.get("classes"))
-    if cfg["source"] in ("ccxt", "auto") and any(a.cls == "crypto" for a in assets):
-        try:
-            cfg["_ex"] = sources.get_spot_exchange(cfg.get("exchange", "binance"))
-        except Exception as e:
-            print(f"  [ccxt indisponible : {e} — crypto écarté]", file=sys.stderr)
-            cfg["source"] = "yahoo"
+    cfg["_exchanges"] = sources.build_exchanges(assets)
 
     print(f"Univers : {len(assets)} actifs", file=sys.stderr)
     reports: list[PatternReport] = []
@@ -256,7 +249,7 @@ def run_scan(cfg: dict) -> list[PatternReport]:
                 if r is not None:
                     reports.append(r)
             except Exception as e:
-                print(f"  [skip] {a.name} {tf} ({a.yahoo}): {e}", file=sys.stderr)
+                print(f"  [skip] {a.name} {tf} ({a.symbol}): {e}", file=sys.stderr)
         if i % 20 == 0:
             print(f"  ...{i}/{len(assets)}", file=sys.stderr)
 
@@ -275,33 +268,29 @@ def main() -> None:
             pass
 
     cfg = {
-        "exchange": "binance", "limit": 400, "vol_ma": 20, "atr_period": 14,
-        "use_cache": True, "bias": "both", "thresholds": {}, "source": "ccxt",
-        "classes": None,
+        "limit": 400, "vol_ma": 20, "atr_period": 14,
+        "use_cache": True, "bias": "both", "thresholds": {}, "classes": None,
     }
     file_cfg = load_config()
-    for k in ("vol_ma", "atr_period", "thresholds", "exchange"):
+    for k in ("vol_ma", "atr_period", "thresholds"):
         if k in file_cfg:
             cfg[k] = file_cfg[k]
 
     p = argparse.ArgumentParser(
         description="Screener Wyckoff multi-cours — analyse par timeframe, éléments de décision")
-    p.add_argument("--classes", nargs="*", choices=["crypto", "equity", "commodity"], default=None)
-    p.add_argument("--source", choices=["yahoo", "ccxt", "auto"], default="ccxt")
+    p.add_argument("--classes", nargs="*",
+                   choices=["crypto", "equity", "metal", "commodity"], default=None)
     p.add_argument("--bias", choices=["accumulation", "distribution", "both"], default="both")
     p.add_argument("--limit", type=int, default=cfg["limit"])
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--md", default="rapport_wyckoff.md", help="fichier rapport markdown")
     args = p.parse_args()
 
-    cfg.update(source=args.source, bias=args.bias, limit=args.limit,
+    cfg.update(bias=args.bias, limit=args.limit,
                use_cache=not args.no_cache,
                classes=tuple(args.classes) if args.classes else None)
 
     reports = run_scan(cfg)
-    if EXCLUDED:
-        skipped = ", ".join(f"{k} ({v})" for k, v in EXCLUDED.items())
-        print(f"\nÉcartés de l'univers : {skipped}", file=sys.stderr)
     if not reports:
         print("Aucune formation validée (Climax+AR+ST) avec les seuils actuels.")
         return

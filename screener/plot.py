@@ -61,8 +61,8 @@ def plot_window_structure(
     """Dessine la structure `struct` (détectée en `analysis_tf`) avec des bougies en
     TF inférieure, sur l'intervalle couvert par les événements.
 
-    Les bougies fines peuvent être fournies via `fine_df` (cas multi-sources : actions
-    Yahoo) ; sinon elles sont récupérées via ccxt (`ex`)."""
+    Les bougies fines sont fournies via `fine_df` (récupérées par la source de l'actif) ;
+    à défaut elles sont récupérées via ccxt (`ex`)."""
     fine_tf = FINER_TF.get(analysis_tf, analysis_tf)
     if fine_df is not None:
         fine = fine_df

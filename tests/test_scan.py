@@ -2,15 +2,15 @@
 Tests synthétiques du screener multi-cours (scan.py + sources.py), hors-ligne.
 
 Couvre : validité minimale Climax+AR+ST, vérification du contexte (markdown avant
-accumulation), validation événementielle (emojis), verdict/commentaire, le rendu, le
-ré-échantillonnage 4h et l'univers.
+accumulation), validation événementielle (emojis), verdict/commentaire, le rendu,
+l'univers et le routage des sources.
 """
 import numpy as np
 import pandas as pd
 
 from screener import scan, sources
 from screener.features import add_features
-from screener.universe import TF_SET_BY_CLASS, Asset, build_assets
+from screener.universe import Asset, build_assets
 from screener.wyckoff import Thresholds, detect_window_structure
 
 
@@ -62,7 +62,7 @@ def _accumulation_with_markdown():
 
 _CFG = {
     "thresholds": {}, "vol_ma": 20, "atr_period": 14,
-    "limit": 400, "source": "yahoo", "use_cache": False,
+    "limit": 400, "use_cache": False,
 }
 
 
@@ -99,7 +99,7 @@ def test_context_rejects_flat_prelude():
 def test_analyze_tf_full_report(monkeypatch):
     df = _df(_accumulation_with_markdown())
     monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
-    asset = Asset("TEST", "crypto", "TEST-USD", "TEST/USDT")
+    asset = Asset("TEST", "crypto", "TEST/USDT", "binance")
     r = scan.analyze_tf(asset, "1h", dict(_CFG))
     assert r is not None
     assert r.schema == "accumulation"
@@ -113,7 +113,7 @@ def test_analyze_tf_full_report(monkeypatch):
 def test_analyze_tf_rejects_flat(monkeypatch):
     df = _df(_drift(90, 100.0, seed=11))
     monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
-    asset = Asset("FLAT", "crypto", "FLAT-USD", "FLAT/USDT")
+    asset = Asset("FLAT", "crypto", "FLAT/USDT", "binance")
     assert scan.analyze_tf(asset, "1h", dict(_CFG)) is None
 
 
@@ -132,129 +132,46 @@ def test_render_detail_contains_sections(monkeypatch):
     from screener import report
     df = _df(_accumulation_with_markdown())
     monkeypatch.setattr(sources, "fetch", lambda *a, **k: df.copy())
-    asset = Asset("TEST", "crypto", "TEST-USD", "TEST/USDT")
+    asset = Asset("TEST", "crypto", "TEST/USDT", "binance")
     rep = scan.analyze_tf(asset, "1h", dict(_CFG))
     out = report.render_detail(rep)
     assert "Contexte" in out and "Critique" in out and "Séquence" in out
 
 
-def test_tf_set_per_class():
-    assert TF_SET_BY_CLASS["crypto"] == ("1h", "4h")
-    assert TF_SET_BY_CLASS["equity"] == ("4h", "1d")
-    assert TF_SET_BY_CLASS["commodity"] == ("4h", "1d")
 
 
-def test_non_us_equities_daily_only():
-    # KR/JP : volume intraday Yahoo lacunaire → D1 uniquement.
-    samsung = Asset("Samsung", "equity", "005930.KS")
-    tokyo = Asset("Tokyo Electron", "equity", "8035.T")
-    aapl = Asset("Apple", "equity", "AAPL")
-    assert samsung.timeframes() == ("1d",)
-    assert tokyo.timeframes() == ("1d",)
-    assert aapl.timeframes() == ("4h", "1d")
+def test_timeframes_uniform_24_7():
+    from screener.universe import TIMEFRAMES
+    assert TIMEFRAMES == ("1h", "4h")
+    assert Asset("NVDA", "equity", "NVDA/USDT:USDT", "bitget").timeframes() == ("1h", "4h")
+    assert Asset("BTC", "crypto", "BTC/USDT", "binance").timeframes() == ("1h", "4h")
 
 
-def test_resample_session_aligns_on_open():
-    # Séance type actions US : 7 barres 1h démarrant à 9h30 locale, sur 2 jours.
-    import datetime as dt
-    idx = []
-    for day in (1, 2):
-        start = pd.Timestamp(f"2024-07-0{day} 09:30", tz="America/New_York")
-        idx += [start + pd.Timedelta(hours=h) for h in range(7)]
-    rows = [[100 + i, 101 + i, 99 + i, 100.5 + i, 1000] for i in range(len(idx))]
-    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"],
-                      index=pd.DatetimeIndex(idx))
-    out = sources.resample_session_ohlcv(df, 4)
-    # 2 blocs par séance : 4 barres (9h30→13h30) puis 3 barres (13h30→clôture)
-    assert len(out) == 4
-    first = out.iloc[0]
-    assert first.name.hour == 9 and first.name.minute == 30   # aligné sur l'ouverture
-    assert first["volume"] == 4000                            # 4 barres pleines
-    assert out.iloc[1]["volume"] == 3000                      # fin de séance : 3 barres
-    assert out.iloc[1].name.hour == 13                        # second bloc à 13h30
-    # OHLC du bloc : open de la 1re barre, extrêmes du bloc, close de la dernière
-    assert first["open"] == 100 and first["close"] == 103.5
-    assert first["high"] == 104 and first["low"] == 99
-
-
-def test_build_assets_count():
+def test_build_assets_count_and_sources():
     assert len(build_assets(("crypto",))) == 46
-    assert len(build_assets()) == 46 + 90 + 8
+    assert len(build_assets(("equity",))) == 35
+    assert len(build_assets(("metal",))) == 7
+    assert len(build_assets(("commodity",))) == 3
+    assert len(build_assets()) == 46 + 35 + 7 + 3
+    crypto = build_assets(("crypto",))
+    assert all(a.source == "binance" and a.symbol.endswith("/USDT") for a in crypto)
+    bitget = build_assets(("equity", "metal", "commodity"))
+    assert all(a.source == "bitget" and a.symbol.endswith("/USDT:USDT") for a in bitget)
 
 
-def _polygon_30m_synthetic(days=2):
-    """Agrégats 30 min couvrant pre-market + séance + after-hours (index UTC)."""
-    idx, rows = [], []
-    i = 0
-    for day in range(1, days + 1):
-        # 8h00 → 19h30 ET : pre-market (3 barres), séance 9h30-16h (13), after (7)
-        start = pd.Timestamp(f"2024-07-0{day} 08:00", tz="America/New_York")
-        for k in range(23):
-            idx.append(start + pd.Timedelta(minutes=30 * k))
-            rows.append([100 + i, 101 + i, 99 + i, 100.5 + i, 500])
-            i += 1
-    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"],
-                      index=pd.DatetimeIndex(idx).tz_convert("UTC"))
-    return df
+def test_fetch_routes_to_asset_exchange(monkeypatch):
+    calls = {}
 
+    class FakeEx:
+        def __init__(self, tag): self.tag = tag
 
-def test_polygon_session_frames_filters_rth_and_aligns():
-    raw = _polygon_30m_synthetic(days=2)
-    h4 = sources.polygon_session_frames(raw, "4h")
-    # 2 blocs par séance (9h30→13h30 : 8×30min, puis 13h30→16h : 5×30min)
-    assert len(h4) == 4
-    et = h4.index.tz_convert("America/New_York")
-    assert {(t.hour, t.minute) for t in et} == {(9, 30), (13, 30)}
-    assert h4["volume"].iloc[0] == 8 * 500      # bloc plein, sans pre-market
-    assert h4["volume"].iloc[1] == 5 * 500      # fin de séance
-    d1 = sources.polygon_session_frames(raw, "1d")
-    assert len(d1) == 2 and d1["volume"].iloc[0] == 13 * 500  # séance entière
-    h1 = sources.polygon_session_frames(raw, "1h")
-    assert len(h1) == 14                        # 7 blocs par séance
+    def fake_fetch_ohlcv(ex, symbol, timeframe, limit, use_cache):
+        calls["ex"] = ex.tag
+        calls["symbol"] = symbol
+        return "df"
 
-
-def test_rescale_intraday_volume_matches_daily():
-    # 2 séances de 7 barres 1h ; Yahoo intraday sous-estime (Σ=7000 vs daily consolidé).
-    idx, rows = [], []
-    for day in (1, 2):
-        start = pd.Timestamp(f"2024-07-0{day} 09:30", tz="America/New_York")
-        for h in range(7):
-            idx.append(start + pd.Timedelta(hours=h))
-            rows.append([100, 101, 99, 100.5, 1000])
-    intra = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"],
-                         index=pd.DatetimeIndex(idx))
-    daily = pd.DataFrame(
-        {"open": [100, 100], "high": [101, 101], "low": [99, 99],
-         "close": [100.5, 100.5], "volume": [14000.0, 7000.0]},  # jour 1 : il manque 50 %
-        index=pd.DatetimeIndex([pd.Timestamp(f"2024-07-0{d} 00:00", tz="America/New_York")
-                                for d in (1, 2)]))
-    out = sources.rescale_intraday_volume(intra, daily)
-    sums = out["volume"].groupby(pd.Index(out.index.date)).sum()
-    assert float(sums.iloc[0]) == 14000.0   # recalé sur le consolidé
-    assert float(sums.iloc[1]) == 7000.0    # facteur 1 → inchangé
-    # le profil intra-journalier reste uniforme (facteur appliqué à toutes les barres)
-    assert float(out["volume"].iloc[0]) == 2000.0
-
-
-def test_rescale_guard_against_aberrant_factor():
-    # Intraday quasi vide (cas crypto Yahoo troué) : facteur > 5 → pas de correction.
-    idx = pd.DatetimeIndex([pd.Timestamp("2024-07-01 09:30", tz="America/New_York")])
-    intra = pd.DataFrame([[100, 101, 99, 100.5, 10]],
-                         columns=["open", "high", "low", "close", "volume"], index=idx)
-    daily = pd.DataFrame({"open": [100], "high": [101], "low": [99],
-                          "close": [100.5], "volume": [1_000_000.0]},
-                         index=pd.DatetimeIndex([pd.Timestamp("2024-07-01", tz="America/New_York")]))
-    out = sources.rescale_intraday_volume(intra, daily)
-    assert float(out["volume"].iloc[0]) == 10.0  # inchangé
-
-
-def test_source_routing_polygon(monkeypatch):
-    aapl = Asset("Apple", "equity", "AAPL")
-    samsung = Asset("Samsung", "equity", "005930.KS")
-    gold = Asset("Gold", "commodity", "GC=F")
-    monkeypatch.setattr(sources, "polygon_key", lambda: "fake-key")
-    assert sources.source_for(aapl, "ccxt") == "polygon"
-    assert sources.source_for(samsung, "ccxt") == "yahoo"   # non-US → Yahoo
-    assert sources.source_for(gold, "ccxt") == "yahoo"      # futures → Yahoo
-    monkeypatch.setattr(sources, "polygon_key", lambda: "")
-    assert sources.source_for(aapl, "ccxt") == "yahoo"      # sans clé → repli
+    monkeypatch.setattr(sources.data_mod, "fetch_ohlcv", fake_fetch_ohlcv)
+    exchanges = {"binance": FakeEx("binance"), "bitget": FakeEx("bitget")}
+    nvda = Asset("NVDA", "equity", "NVDA/USDT:USDT", "bitget")
+    sources.fetch(nvda, "1h", 300, exchanges=exchanges)
+    assert calls == {"ex": "bitget", "symbol": "NVDA/USDT:USDT"}

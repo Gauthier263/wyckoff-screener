@@ -1,11 +1,6 @@
 # Configuration du Wyckoff screener — tout est ajustable.
-exchange: binance        # exchange ccxt pour le crypto (spot, via mirror)
 vol_ma: 20               # période de la moyenne de volume (vol_ratio)
 atr_period: 14           # période de l'ATR
-
-# Actions US : volume SIP consolidé (= TradingView) via Polygon.io si une clé est
-# fournie ici ou dans la variable d'environnement POLYGON_API_KEY ; sinon Yahoo.
-polygon_api_key: ""
 
 # --- Seuils des détecteurs (heuristiques Wyckoff/VSA) ---
 thresholds:

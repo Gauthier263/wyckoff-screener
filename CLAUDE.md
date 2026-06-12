@@ -1,9 +1,9 @@
 # CLAUDE.md — contexte projet
 
-Screener Wyckoff multi-cours (accumulation/distribution) : crypto H1/H4 + actions/MP
-H4/D1. **Détection de pattern uniquement** — aide à la décision discrétionnaire, jamais
-d'exécution d'ordres. Tout l'ancien moteur d'analyse profonde (backtest/optimize/mtf/
-score/cli/detect_events) a été retiré pour recentrer le code sur la détection.
+Screener Wyckoff multi-cours (accumulation/distribution), **tout en H1/H4 sur des paires
+24/7 via ccxt**. **Détection de pattern uniquement** — aide à la décision discrétionnaire,
+jamais d'exécution d'ordres. Tout l'ancien moteur d'analyse profonde (backtest/optimize/
+mtf/score/cli/detect_events) et la couche Yahoo/Polygon ont été retirés.
 
 ## Architecture (chaîne de détection)
 - `screener/data.py` — ccxt bas niveau : `fetch_ohlcv()` avec cache parquet, import ccxt
@@ -23,51 +23,41 @@ score/cli/detect_events) a été retiré pour recentrer le code sur la détectio
   bougies sur une **TF inférieure** que l'analyse (`FINER_TF` : H4→H1, H1→15m, 15m→5m).
   Bornes : **plancher = climax (SC), plafond = AR**, miroir en distribution. Les marqueurs
   sont *recalés sur l'extrême réel* de chaque barre d'analyse, retrouvé dans les bougies
-  fines (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure). Bougies fines injectables
-  via `fine_df` (actions Yahoo) ou récupérées via ccxt. Horodatage CEST.
+  fines (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure). Bougies fines injectées
+  via `fine_df` (récupérées par `sources.fetch`). Horodatage CEST.
 
 ## Screener multi-cours (`python -m screener.scan`)
 Couche de *présélection* par-dessus le moteur Wyckoff : balaie un univers fixe
-(crypto + actions + matières premières) et remonte les formations acc/dist validées.
+(crypto + actions tokenisées + métaux + MP) et remonte les formations acc/dist validées.
 **Pas de confluence ni de score de fiabilité** : chaque timeframe est analysé
 *séparément* (on varie TF + fenêtres pour ne pas manquer une structure), et le rendu
 donne les **éléments de décision** à l'opérateur. Aide discrétionnaire, pas d'exécution.
-- `screener/universe.py` — univers (données seules) : 46 cryptos, 90 actions, 8 MP.
-  Tickers selon la source : ccxt `BASE/USDT` (crypto) / Yahoo (`-USD`, parfois suffixé
-  d'un id numérique ; actions ; futures MP `=F`). `TF_SET_BY_CLASS` : crypto **H1 et H4**,
-  actions/MP **H4 et D1** — analysés indépendamment. `EXCLUDED` liste les demandés écartés
-  (OpenAI/Infleqtion non cotés, microcaps absents).
-- `screener/sources.py` — couche données multi-sources (réutilise `data.py`, n'y touche
-  pas). Route crypto→ccxt ; **actions US→Polygon.io si clé** (`POLYGON_API_KEY` ou
-  `config.yaml: polygon_api_key`) : volume SIP consolidé = TradingView, 1 requête
-  d'agrégats 30 min/titre (throttle 5 req/min, cache 12 h) dont on dérive H1/H4/D1 sur
-  les heures de séance (`polygon_session_frames`, RTH 9h30→16h ET) ; sinon Yahoo.
-  Actions non-US/MP→Yahoo. Le 4h actions est **aligné sur l'ouverture de séance**
-  (`resample_session_ohlcv`, convention TradingView : 9h30→13h30, 13h30→clôture) — les
-  blocs calendaires UTC faussaient la VSA. Sans clé Polygon, le volume intraday Yahoo
-  est **recalé chaque jour sur le daily consolidé** (`rescale_intraday_volume` : Yahoo
-  intraday = 77-94 % du SIP, facteur variable jour à jour 1,0→2,1, mais son daily est
-  exact → profil intraday conservé, niveau quotidien = TradingView ; garde-fou facteur
-  [0.5,5]). L'intraday Yahoo de Séoul/Tokyo est lacunaire (Σ1h/1d≈0,5-0,7) →
-  `Asset.timeframes()` restreint `.KS`/`.T` au D1.
-  `get_spot_exchange` rend **Binance joignable depuis le cloud** : endpoints
-  publics routés vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
-  géo-bloqué), `session.trust_env=True` (sinon SSLError : la CA du proxy TLS est dans le
-  bundle système, pas dans certifi), marchés **spot only** (fapi/dapi restent 451).
+- `screener/universe.py` — univers (données seules), **91 actifs, tous en paires USDT
+  24/7** : 46 cryptos (Binance spot, `BASE/USDT`) + 35 actions tokenisées + 7 métaux +
+  3 MP (Bitget perp futures, `BASE/USDT:USDT`). `Asset(name, cls, symbol, source)` ;
+  `source` ∈ {binance, bitget}. `TIMEFRAMES = ("1h","4h")` pour toutes les classes (pas
+  de séance → pas de D1 ni de recalage).
+- `screener/sources.py` — données via ccxt, deux exchanges (réutilise `data.fetch_ohlcv`,
+  n'y touche pas). `get_spot_exchange` (Binance, crypto) et `get_bitget_exchange` (Bitget
+  swap, actions/métaux/MP) partagent `_apply_env_fixes` : `session.trust_env=True` + bundle
+  CA système (sinon SSLError : la CA du proxy TLS n'est pas dans certifi). Binance route ses
+  endpoints publics vers le mirror `data-api.binance.vision` (api.binance.com = HTTP 451
+  géo-bloqué), spot only. `build_exchanges` instancie ce qu'il faut ; `fetch` route par
+  `asset.source`.
 - `screener/scan.py` — pour chaque (actif, TF) : balaie `WINDOWS` (30/45/60) et garde la
   meilleure séquence valide (**Climax+AR+ST** mini ; `_volume_ok` écarte les séries à trop
   de barres volume=0 → ccxt obligatoire pour le crypto). Rend trois choses :
   (1) **contexte** `_context` — une accumulation suit un *markdown* stoppé par le climax,
   une distribution un *markup* (prérequis Wyckoff vérifié sur les `CTX_LOOKBACK` barres
   *avant* le climax) ; (2) **validation événementielle** `_check_event` — vol×, spread/ATR,
-  clv confrontés aux `Thresholds`, emojis ✅/⚠️/❌, + la justification `why` de `window.py` ;
+  clv confrontés aux `Thresholds`, emojis ✅/⚠️/❌, + la justification `why` de `wyckoff.py` ;
   (3) **verdict + commentaire critique** `_verdict_and_comment` (✅ solide / ⚠️ à surveiller /
   ❌ douteux ; contexte manquant = disqualifiant). Sortie : index + fiches détaillées en
   markdown (`rapport_wyckoff.md`). Phase B→C (entrée spring) vs D (LPS/LPSY). Tests :
   `tests/test_scan.py`.
   ```bash
-  python -m screener.scan                       # univers complet (crypto ccxt + actions/MP Yahoo)
-  python -m screener.scan --classes crypto      # crypto seul, H1 + H4, vrais volumes Binance
+  python -m screener.scan                       # univers complet (91 actifs, Binance + Bitget)
+  python -m screener.scan --classes equity metal commodity   # Bitget seul
   python -m screener.scan --bias accumulation
   ```
 

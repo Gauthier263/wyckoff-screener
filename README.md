@@ -1,10 +1,10 @@
 # Wyckoff Screener
 
-Screener Wyckoff multi-cours d'**accumulation** et de **distribution** : crypto (H1/H4),
-actions et matières premières (H4/D1). Pour chaque actif et chaque timeframe analysé
-*séparément*, il remonte les formations validées (Climax → AR → ST …) et fournit les
-**éléments de décision** : contexte, validation volume/spread événement par événement,
-verdict critique.
+Screener Wyckoff multi-cours d'**accumulation** et de **distribution** : 91 paires USDT
+24/7 (46 cryptos + 35 actions tokenisées + 7 métaux + 3 matières premières), analysées
+en H1 et H4. Pour chaque actif et chaque timeframe analysé *séparément*, il remonte les
+formations validées (Climax → AR → ST …) et fournit les **éléments de décision** :
+contexte, validation volume/spread événement par événement, verdict critique.
 
 > ⚠️ Outil d'**aide à la décision** discrétionnaire, pas un automate d'exécution.
 > Les détecteurs sont des heuristiques VSA transparentes et ajustables.
@@ -16,21 +16,21 @@ pip install -r requirements.txt
 
 ## Lancer le screener
 ```bash
-python -m screener.scan                       # univers complet (crypto + actions + MP)
-python -m screener.scan --classes crypto      # crypto seul (H1 + H4)
-python -m screener.scan --bias accumulation   # un seul biais
-python -m screener.scan --source yahoo        # tout via Yahoo (sans Binance)
+python -m screener.scan                                    # univers complet (91 actifs)
+python -m screener.scan --classes crypto                   # crypto seul
+python -m screener.scan --classes equity metal commodity   # Bitget seul
+python -m screener.scan --bias accumulation                # un seul biais
 ```
 Sortie : un rapport markdown (`rapport_wyckoff.md`) — index trié par verdict, puis une
 fiche par formation (contexte, séquence vol×/spread, commentaire critique).
 
 ## Sources de données
-- **Crypto** → ccxt/Binance (mirror `data-api.binance.vision`, volumes réels).
-- **Actions US** → Polygon.io si une clé est fournie (`POLYGON_API_KEY` ou
-  `config.yaml: polygon_api_key`, volume SIP consolidé = TradingView) ; sinon Yahoo
-  avec volume intraday recalé sur le daily consolidé.
-- **Actions non-US / matières premières** → Yahoo (4h aligné sur l'ouverture de séance ;
-  Séoul/Tokyo en D1 seul, intraday lacunaire).
+Tout passe par ccxt, sur des paires USDT continues (volume crypto-natif fiable) :
+- **Crypto** → Binance spot (mirror `data-api.binance.vision`).
+- **Actions tokenisées, métaux, matières premières** → Bitget (perp futures `BASE/USDT:USDT`).
+
+Les deux exchanges appliquent le même correctif d'environnement (`trust_env` + bundle CA
+système) pour passer le proxy TLS et la géo-restriction.
 
 ## Ce que produit chaque formation
 - **Schéma & phase** : accumulation/distribution, B→C (entrée spring) ou D (entrée LPS).
@@ -47,8 +47,8 @@ Tout est dans `config.yaml` (section `thresholds`) : `climax_vol`, `sos_vol`,
 ## Structure
 ```
 screener/
-  universe.py  # univers fixe (46 cryptos, 90 actions, 8 MP) + timeframes par classe
-  sources.py   # données multi-sources : ccxt / Yahoo (recalé) / Polygon
+  universe.py  # univers fixe (91 paires USDT) : Binance crypto + Bitget actions/métaux/MP
+  sources.py   # données ccxt : deux exchanges (Binance, Bitget) + routage
   data.py      # ccxt bas niveau + cache OHLCV
   features.py  # VSA : spread, CLV, ATR, vol_ratio
   wyckoff.py   # cœur unique : Thresholds + détection de séquence + contexte
