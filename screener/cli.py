@@ -147,7 +147,7 @@ def run_divergence(cfg: dict) -> pd.DataFrame:
     params = DivergenceParams(**cfg.get("divergence", {}))
     look = cfg["lookback"] + cfg["buffer"]
 
-    rows: list[dict] = []
+    results = []
     for i, sym in enumerate(universe, 1):
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
@@ -161,16 +161,27 @@ def run_divergence(cfg: dict) -> pd.DataFrame:
                 continue
             if cfg.get("bias") and cfg["bias"] != "both" and res.bias != cfg["bias"]:
                 continue
-            rows.append(res.as_row())
+            results.append(res)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
         if i % 10 == 0:
             print(f"  ...{i}/{len(universe)}", file=sys.stderr)
 
-    df_out = pd.DataFrame(rows)
-    if not df_out.empty:
-        df_out = df_out.sort_values("score", ascending=False).head(cfg["max_results"])
-    return df_out
+    results.sort(key=lambda r: r.strength, reverse=True)
+    results = results[: cfg["max_results"]]
+
+    if cfg.get("chart") and results:
+        from .plot import plot_double_divergence
+        for r in results:
+            out = f"chart_{r.symbol.replace('/', '').lower()}_{cfg['timeframe']}_divergence.png"
+            try:
+                plot_double_divergence(r.symbol, cfg["timeframe"], r, out, ex=ex,
+                                       rsi_period=params.rsi_period)
+                print(f"→ graphique : {out}", file=sys.stderr)
+            except Exception as e:
+                print(f"  [chart skip] {r.symbol}: {e}", file=sys.stderr)
+
+    return pd.DataFrame([r.as_row() for r in results])
 
 
 def main() -> None:

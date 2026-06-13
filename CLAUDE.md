@@ -46,6 +46,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
   creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
   lignes-guides verticales. Horodatage en CEST.
+  `plot_double_divergence` : rendu d'un setup `DoubleDivergence`. Panneau prix (bougies
+  TF inférieure) avec bornes du double creux/sommet, ligne de cou et *droite des extrêmes*
+  reliant les deux pivots ; **panneau RSI** (TF d'analyse) avec la **droite de divergence**
+  reliant le RSI des deux pivots (montante=haussière, descendante=baissière). Marqueurs
+  recalés sur l'extrême réel ; fusion SC/BC ↔ 1er pivot quand c'est la même barre.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--divergence` → run_divergence (double creux/sommet + divergence RSI),
@@ -75,6 +80,7 @@ pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
 python -m screener.cli --timeframe 4h --divergence   # double creux/sommet + divergence RSI
+python -m screener.cli --timeframe 4h --divergence --chart   # + PNG (panneau RSI + droite de divergence)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
