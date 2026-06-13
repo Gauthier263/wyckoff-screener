@@ -51,3 +51,12 @@ thresholds:
   test_vol: 0.85         # volume sec d'un test/ST
   pen_atr: 0.1           # pénétration mini hors borne (en ATR) pour spring/UTAD
   reclaim_clv: 0.5       # position de clôture dans la barre
+
+# --- Liquidity void / FVG (option --void, façon ICT) ---
+void_lookback: 120       # barres scannées pour les Fair Value Gaps
+void:
+  min_gap_atr: 0.4       # hauteur mini du gap en ATR (sous = micro-imbalance/bruit)
+  displacement_atr: 1.2  # spread/ATR mini de la bougie centrale (vrai déplacement)
+  vol_ratio_min: 1.0     # vol_ratio attendu sur le déplacement (bonus de qualité)
+  fill_threshold: 1.0    # fraction de comblement à partir de laquelle le vide est "filled"
+  max_dist_atr: 4.0      # horizon de proximité (distance prix→vide) pour le screening

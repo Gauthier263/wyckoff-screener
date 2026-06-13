@@ -38,9 +38,18 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
   creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
   lignes-guides verticales. Horodatage en CEST.
+- `screener/liquidity.py` — détecteur ICT de **Fair Value Gaps / liquidity voids**.
+  `detect_voids` : motif 3 bougies (gap non chevauché ; bougie centrale = *displacement*),
+  filtres `VoidThresholds` (min_gap_atr, displacement_atr, vol_ratio_min). Suit le
+  **comblement** (`fill_frac`/`fill_status` : unfilled/partial/filled) barre par barre
+  jusqu'au présent, et la **distance prix→vide** en ATR. Score = qualité (taille+volume)
+  × fraîcheur (demi-vie 8 barres) × proximité × part non comblée → un vide purgé score 0.
+  Thèse ICT : le prix revient *rééquilibrer* le vide ; on screene les vides ouverts
+  proches du prix. Chaque vide porte `why` (déplacement+comblement) et `theory` (mémo ICT).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
-  `--chart` génère le PNG.
+  `--void [N]` → run_void (FVG non comblés proches du prix, colonnes déplacement→thèse +
+  théorie), `--chart` génère le PNG.
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
@@ -65,6 +74,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
+python -m screener.cli --timeframe 1h --symbols BTC/USDT --void             # FVG/voids ICT non comblés
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

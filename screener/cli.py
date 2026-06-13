@@ -17,6 +17,7 @@ import yaml
 from . import data as data_mod
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
+from .liquidity import VoidThresholds, detect_voids
 from .mtf import MTFResult, combine_mtf
 from .score import SymbolResult, score_symbol
 from .window import detect_window_structure
@@ -137,6 +138,41 @@ def run_window(cfg: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def run_void(cfg: dict) -> pd.DataFrame:
+    """Mode liquidity void (ICT) : repère les Fair Value Gaps non comblés proches du
+    prix — cibles de rééquilibrage (rebalance). Une ligne par vide retenu, avec
+    justification du déplacement et rappel théorique. Triés par score décroissant."""
+    ex = data_mod.get_exchange(cfg["exchange"])
+    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    th = VoidThresholds(**cfg.get("void", {}))
+    lookback = cfg.get("void_lookback", 120)
+
+    rows: list[dict] = []
+    for sym in universe:
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+            for v in detect_voids(df, th=th, lookback=lookback):
+                # screening : on ne garde que les vides ouverts et proches du prix
+                if v.fill_status == "filled" or v.dist_atr > th.max_dist_atr:
+                    continue
+                rows.append({
+                    "symbol": sym, "dir": v.direction, "top": round(v.top, 4),
+                    "bottom": round(v.bottom, 4), "size_atr": round(v.size_atr, 2),
+                    "age": v.created_ago, "fill": v.fill_status,
+                    "fill_%": round(v.fill_frac * 100, 0), "dist_atr": v.dist_atr,
+                    "score": v.score, "vol_x": round(v.vol_ratio, 2),
+                    "déplacement → thèse": v.why, "théorie": v.theory,
+                })
+        except Exception as e:
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+    table = pd.DataFrame(rows)
+    if not table.empty:
+        table = table.sort_values("score", ascending=False).reset_index(drop=True)
+        table = table.head(cfg["max_results"])
+    return table
+
+
 def main() -> None:
     # Console Windows en cp1252 : on force l'UTF-8 pour les symboles (→, ×, …).
     for stream in (sys.stdout, sys.stderr):
@@ -150,6 +186,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "void": {}, "void_lookback": 120,
     }
     cfg.update(load_config())
 
@@ -163,6 +200,8 @@ def main() -> None:
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
     p.add_argument("--window", nargs="?", type=int, const=30, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
+    p.add_argument("--void", nargs="?", type=int, const=120, default=None,
+                   help="mode liquidity void/FVG (ICT) : vides non comblés proches du prix (défaut 120 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
@@ -173,8 +212,12 @@ def main() -> None:
                use_cache=not args.no_cache, chart=args.chart)
     if args.window is not None:
         cfg["window"] = args.window
+    if args.void is not None:
+        cfg["void_lookback"] = args.void
 
-    if args.window is not None:
+    if args.void is not None:
+        table = run_void(cfg)
+    elif args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)
