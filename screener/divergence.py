@@ -87,12 +87,14 @@ class DoubleDivergence:
         }
 
 
-def _pivot(win: pd.DataFrame, pos: int, n_df: int, n_win: int, acc: bool) -> Pivot:
+def _pivot(win: pd.DataFrame, pos: int, n_win: int, acc: bool) -> Pivot:
     bar = win.iloc[pos]
     vr = float(bar["vol_ratio"]) if not np.isnan(bar["vol_ratio"]) else 1.0
     rs = float(bar["rsi"]) if not np.isnan(bar["rsi"]) else 50.0
     price = float(bar["low"] if acc else bar["high"])
-    bars_ago = (n_win - 1 - pos) + (n_df - n_win)
+    # `win` est la queue de df (df.iloc[-lookback:]) → sa dernière barre est la dernière
+    # de df, donc bars_ago se mesure directement dans la fenêtre.
+    bars_ago = n_win - 1 - pos
     return Pivot(ts=win.index[pos], bars_ago=bars_ago, price=price, rsi=rs, vol_ratio=vr)
 
 
@@ -132,7 +134,7 @@ def _detect_side(
     th: Thresholds, params: DivergenceParams, bias: str,
 ) -> DoubleDivergence | None:
     acc = bias == "accumulation"
-    n_df, n_win = len(df), len(win)
+    n_win = len(win)
     height = tr.height
     if not (height and height > 0):
         return None
@@ -152,12 +154,12 @@ def _detect_side(
 
     # 2ᵉ pivot = le plus récent ; il doit être « en formation » (récent)
     p2_pos = cand[-1]
-    p2 = _pivot(win, p2_pos, n_df, n_win, acc)
+    p2 = _pivot(win, p2_pos, n_win, acc)
     if p2.bars_ago > params.recent_bars:
         return None
     # 1er pivot = pivot qualifiant juste avant le 2ᵉ
     p1_pos = cand[-2]
-    p1 = _pivot(win, p1_pos, n_df, n_win, acc)
+    p1 = _pivot(win, p1_pos, n_win, acc)
 
     # proximité des deux pivots (≈ double bottom/top)
     double_tol = params.double_tol_pct * height
@@ -180,7 +182,7 @@ def _detect_side(
             climax_vr, climax_pos = vr, pos
     if climax_pos is None:
         return None
-    climax = _pivot(win, climax_pos, n_df, n_win, acc)
+    climax = _pivot(win, climax_pos, n_win, acc)
 
     # ligne de cou = extrême opposé entre les deux pivots
     seg = win.iloc[p1_pos:p2_pos + 1]
