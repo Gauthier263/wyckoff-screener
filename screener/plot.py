@@ -29,6 +29,18 @@ _EVENT_COLOR = {"SC": "#2ca02c", "SOS": "#2ca02c", "AR": "#1f77b4", "ST": "#1f77
                 "BC": "#d62728", "SOW": "#d62728", "SPRING": "#9467bd", "UTAD": "#9467bd",
                 "LPS": "#17a2b8", "LPSY": "#17a2b8"}
 
+
+def _fmt_price(v: float) -> str:
+    """Formate un prix selon sa magnitude (BTC à 62000 comme un alt à 0.0689)."""
+    a = abs(v)
+    if a >= 1000:
+        return f"{v:,.0f}"
+    if a >= 1:
+        return f"{v:.2f}"
+    if a >= 0.01:
+        return f"{v:.4f}"
+    return f"{v:.6f}"
+
 # Pour chaque événement : sur quel extrême de barre poser le marqueur ("low"/"high").
 # SC→creux (plancher), AR→sommet du rebond (plafond), ST→re-test de la borne,
 # SOS→sommet de la cassure. Miroir en distribution.
@@ -127,7 +139,7 @@ def plot_window_structure(
         below = yv == floor
         # Prix de la borne en BLEU sur l'échelle (gouttière des ticks), aligné avec les
         # graduations noires existantes — même axe des prix.
-        axp.annotate(f"{yv:.0f}", xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
+        axp.annotate(_fmt_price(yv), xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
                      xytext=(-4, 0), textcoords="offset points", va="center", ha="right",
                      fontsize=8, weight="bold", color=line_col, clip_on=False)
         # Nom de la borne (plancher/plafond + source) à gauche DANS le graphe, côté ouvert
