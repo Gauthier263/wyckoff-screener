@@ -159,6 +159,8 @@ def run_divergence(cfg: dict) -> pd.DataFrame:
             res = detect_double_divergence(sym, df, tr, th=th, params=params, lookback=look)
             if res is None:
                 continue
+            if cfg.get("forming_only") and not res.is_forming:
+                continue  # ne garder que les setups précoces (ligne de cou intacte)
             if cfg.get("bias") and cfg["bias"] != "both" and res.bias != cfg["bias"]:
                 continue
             results.append(res)
@@ -197,6 +199,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "divergence": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "forming_only": False,
     }
     cfg.update(load_config())
 
@@ -214,6 +217,8 @@ def main() -> None:
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
     p.add_argument("--divergence", action="store_true",
                    help="double creux/sommet + divergence RSI dans une plage ouverte par un climax")
+    p.add_argument("--forming-only", action="store_true",
+                   help="(avec --divergence) ne garder que les setups en formation (ligne de cou intacte)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
@@ -221,7 +226,8 @@ def main() -> None:
 
     cfg.update(exchange=args.exchange, mirror=args.mirror, timeframe=args.timeframe,
                top=args.top, symbols=args.symbols, bias=args.bias,
-               max_results=args.max_results, use_cache=not args.no_cache, chart=args.chart)
+               max_results=args.max_results, use_cache=not args.no_cache, chart=args.chart,
+               forming_only=args.forming_only)
     if args.window is not None:
         cfg["window"] = args.window
 

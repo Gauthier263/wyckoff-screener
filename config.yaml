@@ -9,6 +9,7 @@ top: 60                  # nombre de paires les plus liquides à scanner
 limit: 300              # barres OHLCV récupérées par paire
 max_results: 25         # taille de la watchlist finale
 bias: both              # both | accumulation | distribution
+forming_only: false     # (mode --divergence) ne garder que les setups en formation (ligne de cou intacte)
 use_cache: true
 
 # --- Multi-timeframe (option --mtf) : [HTF contexte, LTF déclencheur] ---

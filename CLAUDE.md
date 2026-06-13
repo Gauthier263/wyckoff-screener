@@ -53,7 +53,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   recalés sur l'extrême réel ; fusion SC/BC ↔ 1er pivot quand c'est la même barre.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
-  `--divergence` → run_divergence (double creux/sommet + divergence RSI),
+  `--divergence` → run_divergence (double creux/sommet + divergence RSI ; `--forming-only`
+  ne garde que les setups précoces, ligne de cou intacte),
   `--chart` génère le PNG.
 
 ## Conventions
@@ -81,6 +82,7 @@ python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
 python -m screener.cli --timeframe 4h --divergence   # double creux/sommet + divergence RSI
 python -m screener.cli --timeframe 4h --divergence --chart   # + PNG (panneau RSI + droite de divergence)
+python -m screener.cli --timeframe 4h --divergence --forming-only --chart   # setups précoces seulement
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
