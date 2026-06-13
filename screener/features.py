@@ -33,7 +33,29 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     return true_range(df).rolling(period, min_periods=period).mean()
 
 
-def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd.DataFrame:
+def rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """RSI de Wilder (lissage exponentiel à coefficient 1/period).
+
+    Mesure le momentum : une divergence prix/RSI (prix qui fait un creux ≤ mais
+    RSI qui remonte) trahit un essoufflement de la pression vendeuse — confirmation
+    classique d'un double creux d'absorption.
+    """
+    delta = df["close"].diff()
+    gain = delta.clip(lower=0.0)
+    loss = (-delta).clip(lower=0.0)
+    # Lissage de Wilder = EMA de coefficient alpha = 1/period.
+    avg_gain = gain.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    out = 100 - 100 / (1 + rs)
+    # avg_loss == 0 (que des hausses) → RSI = 100 ; avg_gain == 0 → RSI = 0.
+    out = out.where(avg_loss != 0, 100.0)
+    out = out.where(avg_gain != 0, 0.0)
+    return out
+
+
+def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14,
+                 rsi_period: int = 14) -> pd.DataFrame:
     """Enrichit le DataFrame avec les colonnes VSA utilisées par les détecteurs."""
     out = df.copy()
     rng = (out["high"] - out["low"]).replace(0, np.nan)
@@ -47,6 +69,7 @@ def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd
     # Spread relatif à l'ATR : > 1 = barre large, < 1 = barre étroite
     out["spread_atr"] = out["spread"] / out["atr"].replace(0, np.nan)
     out["ret"] = out["close"].pct_change()
+    out["rsi"] = rsi(out, rsi_period)
     return out
 
 

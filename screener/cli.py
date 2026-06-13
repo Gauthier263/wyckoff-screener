@@ -15,6 +15,7 @@ import pandas as pd
 import yaml
 
 from . import data as data_mod
+from .divergence import DivergenceParams, detect_double_divergence
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
@@ -137,6 +138,41 @@ def run_window(cfg: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def run_divergence(cfg: dict) -> pd.DataFrame:
+    """Mode double creux / double sommet + divergence RSI : paires en consolidation
+    (plage ouverte par un climax) amorçant un double bottom/top avec divergence RSI."""
+    ex = data_mod.get_exchange(cfg["exchange"])
+    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    th = Thresholds(**cfg.get("thresholds", {}))
+    params = DivergenceParams(**cfg.get("divergence", {}))
+    look = cfg["lookback"] + cfg["buffer"]
+
+    rows: list[dict] = []
+    for i, sym in enumerate(universe, 1):
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            if df is None or len(df) < cfg["lookback"] + cfg["buffer"] + cfg["vol_ma"]:
+                continue
+            df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"],
+                              rsi_period=params.rsi_period)
+            tr = detect_trading_range(df, lookback=cfg["lookback"], buffer=cfg["buffer"])
+            res = detect_double_divergence(sym, df, tr, th=th, params=params, lookback=look)
+            if res is None:
+                continue
+            if cfg.get("bias") and cfg["bias"] != "both" and res.bias != cfg["bias"]:
+                continue
+            rows.append(res.as_row())
+        except Exception as e:
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+        if i % 10 == 0:
+            print(f"  ...{i}/{len(universe)}", file=sys.stderr)
+
+    df_out = pd.DataFrame(rows)
+    if not df_out.empty:
+        df_out = df_out.sort_values("score", ascending=False).head(cfg["max_results"])
+    return df_out
+
+
 def main() -> None:
     # Console Windows en cp1252 : on force l'UTF-8 pour les symboles (→, ×, …).
     for stream in (sys.stdout, sys.stderr):
@@ -163,6 +199,8 @@ def main() -> None:
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
     p.add_argument("--window", nargs="?", type=int, const=30, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
+    p.add_argument("--divergence", action="store_true",
+                   help="double creux/sommet + divergence RSI dans une plage ouverte par un climax")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
@@ -174,7 +212,9 @@ def main() -> None:
     if args.window is not None:
         cfg["window"] = args.window
 
-    if args.window is not None:
+    if args.divergence:
+        table = run_divergence(cfg)
+    elif args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)

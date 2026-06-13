@@ -30,6 +30,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   Chaque `WindowEvent` porte `why` (justification volume+spread calculée sur la barre)
   et `theory` (rappel théorique, dict `THEORY`). AR cherché sur horizon borné après le
   climax (sinon il attrape l'extrême du SOS/SOW final).
+- `screener/divergence.py` — `detect_double_divergence` : repère une paire en
+  consolidation (plage valide ouverte par une réaction *climactique* SC/BC) amorçant
+  un **double creux / double sommet** confirmé par une **divergence RSI** (RSI ajouté
+  dans `features.add_features` via `rsi()`, Wilder). Couplage *souple* : un climax doit
+  avoir ouvert la plage, mais les deux pivots sont les deux extrêmes près de la borne
+  (le 1er peut être l'SC). `is_forming` = 2ᵉ pivot récent (`recent_bars`) ET ligne de
+  cou non encore cassée → signal précoce. Chaque `DoubleDivergence` porte `why`
+  (volume+divergence) et `theory`. Seuils dans `DivergenceParams` (config `divergence:`).
 - `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure. Dessine les
   bougies sur une **TF inférieure** que l'analyse (`FINER_TF` : H4→H1, H1→15m, 15m→5m).
   Bornes : **plancher = climax (SC), plafond = AR** (c'est l'AR qui le définit), miroir
@@ -40,6 +48,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   lignes-guides verticales. Horodatage en CEST.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
+  `--divergence` → run_divergence (double creux/sommet + divergence RSI),
   `--chart` génère le PNG.
 
 ## Conventions
@@ -65,6 +74,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
+python -m screener.cli --timeframe 4h --divergence   # double creux/sommet + divergence RSI
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
