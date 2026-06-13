@@ -14,9 +14,30 @@ CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".cache")
 
 def get_exchange(name: str = "binance"):
     import ccxt  # import paresseux : pas requis pour les tests hors-ligne
+    import requests
 
     klass = getattr(ccxt, name)
-    ex = klass({"enableRateLimit": True})
+    opts: dict = {"enableRateLimit": True}
+    if name == "binance":
+        # Le miroir public de market-data ne sert que le spot : on restreint le
+        # chargement des marchés pour éviter les endpoints futures (géo-bloqués).
+        opts["options"] = {"fetchMarkets": ["spot"]}
+    ex = klass(opts)
+
+    # ccxt embarque son propre bundle certifi ; une session requests standard honore
+    # REQUESTS_CA_BUNDLE / SSL_CERT_FILE — indispensable derrière un proxy TLS qui
+    # ré-signe le trafic (cas des environnements d'exécution distants).
+    ex.session = requests.Session()
+
+    if name == "binance":
+        # data-api.binance.vision : miroir public de market-data, non géo-restreint
+        # (l'API principale renvoie HTTP 451 depuis certaines régions). Spot only.
+        for key, url in ex.urls["api"].items():
+            if isinstance(url, str):
+                ex.urls["api"][key] = url.replace(
+                    "https://api.binance.com", "https://data-api.binance.vision"
+                )
+
     ex.load_markets()
     return ex
 
