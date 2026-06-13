@@ -5,11 +5,13 @@ dans une plage ouverte par une réaction avec **climax**.
 
 Lecture Wyckoff/VSA visée :
   Accumulation : après un Selling Climax (réaction qui stoppe la baisse et ouvre la
-    plage), le prix revient tester le plancher. Si ce 2ᵉ creux tient au même niveau
-    (≈ double bottom) sur un volume plus sec ET un RSI plus haut (divergence
-    haussière), l'offre s'épuise : chaque test trouve moins de vendeurs. Confirmation
-    = cassure de la ligne de cou (sommet intermédiaire) → SOS.
-  Distribution : miroir (Buying Climax → double top → divergence baissière → SOW).
+    plage), le prix revient tester le plancher. Le 2ᵉ creux fait un plus-bas ÉGAL ou
+    PLUS BAS (double bottom / undercut) mais sur un volume plus sec ET un RSI PLUS HAUT
+    (divergence haussière) : l'offre s'épuise. Un creux plus HAUT avec un RSI plus haut
+    n'est PAS une divergence (le prix et le momentum montent ensemble = confirmation).
+    Confirmation = cassure de la ligne de cou (sommet intermédiaire) → SOS.
+  Distribution : miroir (Buying Climax → double top, sommet égal/plus haut + RSI plus
+    bas → divergence baissière → SOW).
 
 « Début de formation » = 2ᵉ pivot récent et ligne de cou pas encore cassée : le
 signal est *précoce*, le pattern n'est pas confirmé. Aide à la décision, jamais
@@ -32,7 +34,9 @@ from .features import TradingRange, swing_points
 class DivergenceParams:
     rsi_period: int = 14         # période du RSI (doit matcher add_features)
     min_rsi_div: float = 5.0     # écart RSI mini entre les deux pivots (points)
-    double_tol_pct: float = 0.33 # proximité des deux pivots, en fraction de la hauteur de plage
+    double_tol_pct: float = 0.33 # ampleur max de l'undercut du 2e pivot, en fraction de hauteur
+    equal_tol_pct: float = 0.003 # bande d'« égalité » des pivots (fraction de prix) : au-delà,
+                                 # un 2e creux plus haut (resp. sommet plus bas) n'est plus une divergence
     support_frac: float = 0.33   # « près de la borne » : fraction de hauteur depuis la borne
     recent_bars: int = 8         # le 2ᵉ pivot doit tomber dans les N dernières barres
     left: int = 2                # fractale : barres à gauche d'un pivot
@@ -101,11 +105,16 @@ def _pivot(win: pd.DataFrame, pos: int, n_win: int, acc: bool) -> Pivot:
 def _why(acc: bool, p1: Pivot, p2: Pivot, rsi_div: float) -> str:
     side = "vendeurs" if acc else "acheteurs"
     rsi_dir = "plus haut" if acc else "plus bas"
+    kind = "creux" if acc else "sommet"
+    if acc:
+        price_rel = "plus bas" if p2.price < p1.price else "au même niveau"
+    else:
+        price_rel = "plus haut" if p2.price > p1.price else "au même niveau"
     return (
-        f"2ᵉ {'creux' if acc else 'sommet'} ≈ 1er ({p2.price:.4g} vs {p1.price:.4g}) "
-        f"mais RSI {rsi_dir} ({p2.rsi:.0f} vs {p1.rsi:.0f}, Δ{rsi_div:+.0f}) sur volume "
-        f"×{p2.vol_ratio:.2f} (vs ×{p1.vol_ratio:.2f} au 1er) → la pression des {side} "
-        f"s'épuise : chaque test de la borne en trouve moins."
+        f"2ᵉ {kind} {price_rel} ({p2.price:.4g} vs {p1.price:.4g}) mais RSI {rsi_dir} "
+        f"({p2.rsi:.0f} vs {p1.rsi:.0f}, Δ{rsi_div:+.0f}) sur volume ×{p2.vol_ratio:.2f} "
+        f"(vs ×{p1.vol_ratio:.2f} au 1er) → divergence : le prix n'améliore pas son extrême "
+        f"alors que le momentum se retourne, la pression des {side} s'épuise."
     )
 
 
@@ -113,17 +122,18 @@ def _theory(acc: bool, th: Thresholds, params: DivergenceParams) -> str:
     if acc:
         return (
             "Double creux + divergence RSI haussière. En accumulation, le 2ᵉ test du "
-            "plancher (ST/spring après le Selling Climax) sur momentum plus haut et "
-            "volume plus sec trahit l'absorption de l'offre par les mains fortes. "
-            f"Repères : 2ᵉ creux à ±{params.double_tol_pct:.0%} de la hauteur de plage du 1er, "
-            f"Δrsi ≥ {params.min_rsi_div:g} pts, volume du test sec (≤ ×{th.test_vol}). "
-            "Confirmation = cassure de la ligne de cou (sommet intermédiaire) en SOS."
+            "plancher (ST/spring après le Selling Climax) fait un creux ÉGAL ou PLUS BAS "
+            "mais sur un RSI PLUS HAUT et un volume plus sec : l'offre est absorbée. "
+            "(Un creux plus HAUT avec un RSI plus haut n'est pas une divergence mais une "
+            f"simple confirmation.) Repères : Δrsi ≥ {params.min_rsi_div:g} pts, volume du "
+            f"test sec (≤ ×{th.test_vol}). Confirmation = cassure de la ligne de cou "
+            "(sommet intermédiaire) en SOS."
         )
     return (
-        "Double sommet + divergence RSI baissière. En distribution, le 2ᵉ test du "
-        "plafond (ST/UTAD après le Buying Climax) sur momentum plus bas et volume plus "
-        "sec trahit l'épuisement de la demande. "
-        f"Repères : 2ᵉ sommet à ±{params.double_tol_pct:.0%} de la hauteur de plage du 1er, "
+        "Double sommet + divergence RSI baissière. En distribution, le 2ᵉ test du plafond "
+        "(ST/UTAD après le Buying Climax) fait un sommet ÉGAL ou PLUS HAUT mais sur un RSI "
+        "PLUS BAS et un volume plus sec : la demande s'épuise. (Un sommet plus BAS avec un "
+        "RSI plus bas n'est pas une divergence mais une simple confirmation.) Repères : "
         f"Δrsi ≥ {params.min_rsi_div:g} pts, volume du test sec (≤ ×{th.test_vol}). "
         "Confirmation = cassure de la ligne de cou (creux intermédiaire) en SOW."
     )
@@ -161,12 +171,23 @@ def _detect_side(
     p1_pos = cand[-2]
     p1 = _pivot(win, p1_pos, n_win, acc)
 
-    # proximité des deux pivots (≈ double bottom/top)
-    double_tol = params.double_tol_pct * height
-    if abs(p2.price - p1.price) > double_tol:
-        return None
+    # Le 2e pivot doit rester dans la même zone (double) ET ne PAS améliorer l'extrême
+    # dans le sens de la tendance. Un creux PLUS HAUT (resp. sommet plus bas) accompagné
+    # d'un RSI qui suit n'est pas une divergence mais une simple confirmation.
+    double_tol = params.double_tol_pct * height   # ampleur max de l'undercut (reste un double)
+    eq = params.equal_tol_pct * p1.price          # bande d'« égalité » (bruit)
+    if acc:
+        if p2.price > p1.price + eq:              # 2e creux nettement plus haut → pas de divergence
+            return None
+        if p1.price - p2.price > double_tol:      # 2e creux trop bas → cassure, plus un double
+            return None
+    else:
+        if p2.price < p1.price - eq:              # 2e sommet nettement plus bas → pas de divergence
+            return None
+        if p2.price - p1.price > double_tol:
+            return None
 
-    # divergence dans le sens du biais
+    # divergence : le RSI part à contre-sens de l'absence d'amélioration du prix
     rsi_div = (p2.rsi - p1.rsi) if acc else (p1.rsi - p2.rsi)
     if rsi_div < params.min_rsi_div:
         return None

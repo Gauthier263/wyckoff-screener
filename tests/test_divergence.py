@@ -32,7 +32,7 @@ def _drift(n, base, vol=1000.0, seed=0):
     return rows
 
 
-def _acc_rows(dip2=94.0, path2=(100.0, 97.8, 96.2)):
+def _acc_rows(dip2=93.2, path2=(100.0, 97.8, 96.2)):
     """Accumulation : SC (1er creux + climax) → plage → 2e creux récent.
 
     Deux seuls creux près du plancher : le Selling Climax (descente brève et raide →
@@ -115,6 +115,7 @@ def test_accumulation_double_bottom_divergence():
     assert res.pattern == "double bottom"
     assert res.climax == "SC"
     assert res.rsi_div >= 5.0                 # RSI du 2e creux nettement plus haut
+    assert res.p2.price <= res.p1.price       # vraie divergence : 2e creux égal ou PLUS BAS
     assert res.p2.bars_ago <= 8               # 2e creux récent (formation)
     assert res.is_forming                     # ligne de cou pas encore cassée
     assert res.p2.vol_ratio < res.p1.vol_ratio  # 2e test plus sec
@@ -132,10 +133,21 @@ def test_distribution_double_top_divergence():
     assert res.pattern == "double top"
     assert res.climax == "BC"
     assert res.rsi_div >= 5.0
+    assert res.p2.price >= res.p1.price       # vraie divergence : 2e sommet égal ou PLUS HAUT
 
 
 def test_no_divergence_when_momentum_falls():
     df = _df(_acc_rows_nodiv())
+    tr = detect_trading_range(df, lookback=30, buffer=5)
+    res = detect_double_divergence("TEST/USDT", df, tr,
+                                   params=DivergenceParams(recent_bars=8), lookback=45)
+    assert res is None
+
+
+def test_no_divergence_on_higher_low():
+    # 2e creux PLUS HAUT que le 1er, avec RSI lui aussi plus haut : prix et momentum
+    # montent ensemble → simple confirmation, PAS une divergence (cas type TRX).
+    df = _df(_acc_rows(dip2=95.0, path2=(98.0,)))
     tr = detect_trading_range(df, lookback=30, buffer=5)
     res = detect_double_divergence("TEST/USDT", df, tr,
                                    params=DivergenceParams(recent_bars=8), lookback=45)
