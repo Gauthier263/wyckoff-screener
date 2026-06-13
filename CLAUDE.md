@@ -45,11 +45,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   jusqu'au présent, et la **distance prix→vide** en ATR. Score = qualité (taille+volume)
   × fraîcheur (demi-vie 8 barres) × proximité × part non comblée → un vide purgé score 0.
   Thèse ICT : le prix revient *rééquilibrer* le vide ; on screene les vides ouverts
-  proches du prix. Chaque vide porte `why` (déplacement+comblement) et `theory` (mémo ICT).
+  proches du prix. Chaque vide porte `why` (déplacement+comblement), `theory` (mémo ICT)
+  et `ts` (barre de confirmation, pour le chart).
+- `screener/plot.py` — `plot_voids` : rendu PNG des liquidity voids d'un symbole. Chaque
+  vide = **zone ombrée** (vert=demande/haussier, rouge=offre/baissier) de la bougie de
+  déplacement jusqu'au présent ; opacité ∝ part non comblée (vide intact = opaque, purgé =
+  effacé). Bougies en TF inférieure (`FINER_TF`), ligne de prix courant, horodatage CEST.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--void [N]` → run_void (FVG non comblés proches du prix, colonnes déplacement→thèse +
-  théorie), `--chart` génère le PNG.
+  théorie ; `--chart` → un PNG par symbole du top via `plot_voids`), `--chart` génère le PNG.
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
@@ -74,7 +79,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
-python -m screener.cli --timeframe 1h --symbols BTC/USDT --void             # FVG/voids ICT non comblés
+python -m screener.cli --timeframe 1h --symbols BTC/USDT --void --chart     # FVG/voids ICT non comblés + PNG
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

@@ -53,6 +53,84 @@ def _candles(ax, df, width):
     return x
 
 
+_VOID_COLOR = {"bullish": "#26a69a", "bearish": "#ef5350"}
+
+
+def plot_voids(
+    symbol: str, analysis_tf: str, voids: list, out_path: str,
+    ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 500,
+) -> str:
+    """Dessine les liquidity voids / FVG d'un symbole : chaque vide est une **zone
+    ombrée** (vert = demande/haussier, rouge = offre/baissier) s'étendant de la bougie
+    de déplacement jusqu'au présent. L'opacité reflète la part *non comblée* (un vide
+    intact ressort, un vide largement rééquilibré s'efface). Bougies en TF inférieure."""
+    from .liquidity import LiquidityVoid  # noqa: F401 (typage documentaire)
+
+    if not voids:
+        return out_path
+    fine_tf = FINER_TF.get(analysis_tf, analysis_tf)
+    ex = ex or data_mod.get_exchange("binance")
+    fine = data_mod.fetch_ohlcv(ex, symbol, fine_tf, limit, use_cache=False)
+    td = _TF_TD.get(analysis_tf, pd.Timedelta(hours=1))
+    delta = pd.Timedelta(hours=tz_hours)
+
+    fine = fine.copy()
+    fine.index = fine.index + delta
+    left = min(v.ts + delta for v in voids) - td * 4  # un peu de contexte avant le + ancien
+    sub = fine.loc[left:].copy()
+    if len(sub) < 5:
+        sub = fine.iloc[-80:].copy()
+
+    from .features import add_features
+    sub = add_features(sub)
+
+    x = mdates.date2num(sub.index.to_pydatetime())
+    width = (x[1] - x[0]) * 0.7 if len(x) > 1 else 0.01
+    x_right = x[-1]
+    fig, (axp, axv) = plt.subplots(2, 1, figsize=(13, 7.5), sharex=True,
+                                   gridspec_kw={"height_ratios": [3, 1], "hspace": 0.05})
+    fig.patch.set_facecolor("white")
+    _candles(axp, sub, width)
+
+    for v in voids:
+        col = _VOID_COLOR[v.direction]
+        # début de zone = bougie de déplacement (une barre d'analyse avant la confirmation)
+        x0 = mdates.date2num((v.ts - td + delta).to_pydatetime())
+        remaining = max(0.0, 1.0 - v.fill_frac)
+        alpha = 0.14 + 0.26 * remaining           # vide intact = plus opaque
+        axp.add_patch(plt.Rectangle((x0, v.bottom), x_right - x0, max(v.top - v.bottom, 1e-9),
+                                    facecolor=col, edgecolor=col, lw=1.0, alpha=alpha, zorder=1))
+        axp.axvline(x0, color=col, lw=0.6, alpha=0.3, zorder=0)
+        lbl = f"{v.direction[:4]} {v.size_atr:.1f}ATR · {v.fill_status} {v.fill_frac * 100:.0f}%"
+        axp.text(x_right, v.mid, "  " + lbl, va="center", ha="left",
+                 fontsize=7.5, color=col, weight="bold")
+
+    last_close = float(sub["close"].iloc[-1])
+    axp.axhline(last_close, color="#333", ls=":", lw=0.8, alpha=0.7)
+    axp.text(x[0], last_close, f" prix {last_close:g}", va="bottom", ha="left", fontsize=8, color="#333")
+
+    axp.set_title(f"{symbol} — {len(voids)} liquidity void(s) / FVG (ICT)  |  analyse {analysis_tf}, "
+                  f"bougies {fine_tf} ({tz_label})", fontsize=11, weight="bold")
+    axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
+    vb = [v.bottom for v in voids] + [v.top for v in voids]
+    plo, phi = min(float(sub["low"].min()), min(vb)), max(float(sub["high"].max()), max(vb))
+    axp.set_ylim(plo - (phi - plo) * 0.06, phi + (phi - plo) * 0.08)
+    axp.set_xlim(x[0] - width, x_right + (x_right - x[0]) * 0.20)  # marge pour les étiquettes
+
+    bc = ["#ef5350" if c < o else "#26a69a" for o, c in zip(sub["open"], sub["close"])]
+    axv.bar(x, sub["volume"].values, width=width, color=bc, alpha=0.6)
+    axv.plot(x, sub["vol_ma"].values, color="#555", lw=0.8, label="vol MA")
+    for v in voids:
+        x0 = mdates.date2num((v.ts - td + delta).to_pydatetime())
+        axv.axvline(x0, color=_VOID_COLOR[v.direction], lw=0.6, alpha=0.3)
+    axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
+    axv.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
+    fig.autofmt_xdate(rotation=30)
+    fig.savefig(out_path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    return out_path
+
+
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,

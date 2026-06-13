@@ -53,6 +53,7 @@ class LiquidityVoid:
     top: float               # bord supérieur du vide
     bottom: float            # bord inférieur du vide
     size_atr: float          # hauteur du vide rapportée à l'ATR (qualité du déplacement)
+    ts: pd.Timestamp         # horodatage de la barre de confirmation (3ᵉ bougie du motif)
     created_ago: int         # barres depuis la création (0 = dernière barre clôturée)
     fill_frac: float         # fraction comblée [0..1+], mesurée jusqu'au présent
     fill_status: FillStatus
@@ -160,7 +161,8 @@ def detect_voids(
 
         voids.append(LiquidityVoid(
             direction=direction, top=top, bottom=bottom, size_atr=size_atr,
-            created_ago=created_ago, fill_frac=round(fill_frac, 3), fill_status=status,
+            ts=df.index[m + 1], created_ago=created_ago,
+            fill_frac=round(fill_frac, 3), fill_status=status,
             dist_atr=round(float(dist_atr), 2), vol_ratio=vr, spread_atr=sa,
             score=round(float(score), 4),
             why=_why(direction, size_atr, vr, sa, fill_frac, status, th),

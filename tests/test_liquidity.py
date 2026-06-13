@@ -51,6 +51,7 @@ def test_bullish_fvg_unfilled():
     assert abs(v.bottom - 100.5) < 0.6 and abs(v.top - 102.0) < 0.6
     assert v.fill_status == "unfilled"
     assert v.score > 0
+    assert isinstance(v.ts, pd.Timestamp)        # horodatage de confirmation pour le chart
     assert "déplacement" in v.why and v.theory
 
 

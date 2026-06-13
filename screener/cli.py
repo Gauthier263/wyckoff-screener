@@ -148,6 +148,7 @@ def run_void(cfg: dict) -> pd.DataFrame:
     lookback = cfg.get("void_lookback", 120)
 
     rows: list[dict] = []
+    kept: dict[str, list] = {}                       # symbole -> vides retenus (pour le chart)
     for sym in universe:
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
@@ -156,6 +157,7 @@ def run_void(cfg: dict) -> pd.DataFrame:
                 # screening : on ne garde que les vides ouverts et proches du prix
                 if v.fill_status == "filled" or v.dist_atr > th.max_dist_atr:
                     continue
+                kept.setdefault(sym, []).append(v)
                 rows.append({
                     "symbol": sym, "dir": v.direction, "top": round(v.top, 4),
                     "bottom": round(v.bottom, 4), "size_atr": round(v.size_atr, 2),
@@ -170,6 +172,15 @@ def run_void(cfg: dict) -> pd.DataFrame:
     if not table.empty:
         table = table.sort_values("score", ascending=False).reset_index(drop=True)
         table = table.head(cfg["max_results"])
+
+    if cfg.get("chart") and not table.empty:
+        from .plot import plot_voids
+        for sym in dict.fromkeys(table["symbol"]):       # symboles distincts du top, dans l'ordre
+            shown = set(table.loc[table["symbol"] == sym, "score"])
+            vs = [v for v in kept.get(sym, []) if v.score in shown]
+            out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_voids.png"
+            plot_voids(sym, cfg["timeframe"], vs, out, ex=ex)
+            print(f"→ graphique : {out}", file=sys.stderr)
     return table
 
 
