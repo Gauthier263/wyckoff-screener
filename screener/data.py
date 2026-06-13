@@ -12,11 +12,42 @@ import pandas as pd
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".cache")
 
 
-def get_exchange(name: str = "binance"):
+def get_exchange(name: str = "binance", mirror: str | None = None,
+                 spot_only: bool = True):
+    """Instancie un exchange ccxt (OHLCV public, sans clé API).
+
+    `mirror` : hôte de remplacement pour les données publiques Binance lorsque
+    `api.binance.com` est géo-bloqué (ex. `data-api.binance.vision`, le miroir
+    officiel des klines/tickers). Sans effet sur les autres exchanges.
+
+    Derrière un proxy TLS d'entreprise (CA personnalisé exposé via `REQUESTS_CA_BUNDLE`
+    / `SSL_CERT_FILE`), on fait confiance à ce CA — sinon aucun changement de comportement.
+    """
     import ccxt  # import paresseux : pas requis pour les tests hors-ligne
 
-    klass = getattr(ccxt, name)
-    ex = klass({"enableRateLimit": True})
+    opts: dict = {"enableRateLimit": True}
+    if spot_only and name == "binance":
+        opts["options"] = {"fetchMarkets": ["spot"]}  # évite fapi/dapi (hors miroir)
+    ex = getattr(ccxt, name)(opts)
+
+    ca = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if ca:
+        ex.verify = ca
+        try:
+            ex.session.trust_env = True
+            ex.session.verify = ca
+        except Exception:
+            pass
+
+    if mirror:
+        host = mirror if mirror.startswith("http") else f"https://{mirror}"
+        api = ex.urls.get("api")
+        if isinstance(api, dict):
+            for k, v in list(api.items()):
+                if isinstance(v, str):
+                    api[k] = v.replace("https://api.binance.com", host)
+            ex.urls["api"] = api
+
     ex.load_markets()
     return ex
 

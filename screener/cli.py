@@ -43,7 +43,7 @@ def analyze_symbol(symbol: str, df: pd.DataFrame, cfg: dict) -> SymbolResult | N
 
 
 def run(cfg: dict) -> pd.DataFrame:
-    ex = data_mod.get_exchange(cfg["exchange"])
+    ex = data_mod.get_exchange(cfg["exchange"], mirror=cfg.get("mirror") or None)
     if cfg.get("symbols"):
         universe = cfg["symbols"]
     else:
@@ -74,7 +74,7 @@ def run(cfg: dict) -> pd.DataFrame:
 def run_mtf(cfg: dict) -> pd.DataFrame:
     """Scan en confluence : contexte HTF + déclencheur LTF (cfg['timeframes'])."""
     htf_tf, ltf_tf = cfg["timeframes"]
-    ex = data_mod.get_exchange(cfg["exchange"])
+    ex = data_mod.get_exchange(cfg["exchange"], mirror=cfg.get("mirror") or None)
     if cfg.get("symbols"):
         universe = cfg["symbols"]
     else:
@@ -107,7 +107,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
     """Mode fenêtre : reconnaît une séquence Wyckoff (SC-AR-ST-SOS / BC-AR-ST-SOW)
     sur une fenêtre glissante, avec rappel théorique et justification volume/spread
     par événement. Optionnellement, génère un graphique en TF inférieure par symbole."""
-    ex = data_mod.get_exchange(cfg["exchange"])
+    ex = data_mod.get_exchange(cfg["exchange"], mirror=cfg.get("mirror") or None)
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = Thresholds(**cfg.get("thresholds", {}))
     lookback = cfg.get("window", 30)
@@ -141,7 +141,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
 def run_divergence(cfg: dict) -> pd.DataFrame:
     """Mode double creux / double sommet + divergence RSI : paires en consolidation
     (plage ouverte par un climax) amorçant un double bottom/top avec divergence RSI."""
-    ex = data_mod.get_exchange(cfg["exchange"])
+    ex = data_mod.get_exchange(cfg["exchange"], mirror=cfg.get("mirror") or None)
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = Thresholds(**cfg.get("thresholds", {}))
     params = DivergenceParams(**cfg.get("divergence", {}))
@@ -182,15 +182,17 @@ def main() -> None:
             pass
 
     cfg = {
-        "exchange": "binance", "quote": "USDT", "timeframe": "1h", "top": 60,
+        "exchange": "binance", "mirror": "", "quote": "USDT", "timeframe": "1h", "top": 60,
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
-        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "thresholds": {}, "divergence": {}, "timeframes": ["4h", "1h"], "window": 30,
     }
     cfg.update(load_config())
 
     p = argparse.ArgumentParser(description="Wyckoff crypto screener (accumulation/distribution)")
     p.add_argument("--exchange", default=cfg["exchange"])
+    p.add_argument("--mirror", default=cfg["mirror"],
+                   help="hôte miroir des données publiques Binance (ex. data-api.binance.vision)")
     p.add_argument("--timeframe", default=cfg["timeframe"], help="1h, 4h, ...")
     p.add_argument("--top", type=int, default=cfg["top"])
     p.add_argument("--symbols", nargs="*", default=cfg["symbols"])
@@ -206,9 +208,9 @@ def main() -> None:
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 
-    cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
-               symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+    cfg.update(exchange=args.exchange, mirror=args.mirror, timeframe=args.timeframe,
+               top=args.top, symbols=args.symbols, bias=args.bias,
+               max_results=args.max_results, use_cache=not args.no_cache, chart=args.chart)
     if args.window is not None:
         cfg["window"] = args.window
 

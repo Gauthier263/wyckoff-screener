@@ -1,5 +1,8 @@
 # Configuration du Wyckoff screener — tout est ajustable.
 exchange: binance        # tout exchange supporté par ccxt
+# Miroir de données publiques Binance (klines/tickers) quand api.binance.com est
+# géo-bloqué. Mettre "" pour taper l'API Binance directement. Sans effet hors Binance.
+mirror: data-api.binance.vision
 quote: USDT
 timeframe: 1h            # 1h ou 4h (tes choix). Override : --timeframe 4h
 top: 60                  # nombre de paires les plus liquides à scanner
@@ -48,7 +51,8 @@ divergence:
   min_rsi_div: 5.0       # écart RSI mini entre les deux pivots (points)
   double_tol_pct: 0.33   # proximité des deux pivots, en fraction de la hauteur de plage
   support_frac: 0.33     # "près de la borne" : fraction de hauteur depuis support/résistance
-  recent_bars: 8         # le 2e pivot doit tomber dans les N dernières barres (formation)
+  recent_bars: 40        # le 2e pivot doit tomber dans les N dernières barres (formation)
+                         # volontairement large pour ratisser ; à resserrer ensuite
   left: 2                # fractale : barres à gauche d'un pivot
   right: 2               # fractale : barres à droite (retard de confirmation)
 
