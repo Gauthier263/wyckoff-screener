@@ -38,23 +38,26 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
   creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
   lignes-guides verticales. Horodatage en CEST.
-- `screener/liquidity.py` — détecteur ICT de **Fair Value Gaps / liquidity voids**.
-  `detect_voids` : motif 3 bougies (gap non chevauché ; bougie centrale = *displacement*),
-  filtres `VoidThresholds` (min_gap_atr, displacement_atr, vol_ratio_min). Suit le
-  **comblement** (`fill_frac`/`fill_status` : unfilled/partial/filled) barre par barre
-  jusqu'au présent, et la **distance prix→vide** en ATR. Score = qualité (taille+volume)
-  × fraîcheur (demi-vie 8 barres) × proximité × part non comblée → un vide purgé score 0.
-  Thèse ICT : le prix revient *rééquilibrer* le vide ; on screene les vides ouverts
-  proches du prix. Chaque vide porte `why` (déplacement+comblement), `theory` (mémo ICT)
-  et `ts` (barre de confirmation, pour le chart).
-- `screener/plot.py` — `plot_voids` : rendu PNG des liquidity voids d'un symbole. Chaque
-  vide = **zone ombrée** (vert=demande/haussier, rouge=offre/baissier) de la bougie de
-  déplacement jusqu'au présent ; opacité ∝ part non comblée (vide intact = opaque, purgé =
-  effacé). Bougies en TF inférieure (`FINER_TF`), ligne de prix courant, horodatage CEST.
+- `screener/liquidity.py` — détecteur de **liquidity void de chute brutale** (ICT + mean-reversion).
+  `detect_voids` repère une **baisse subite anormale** (displacement vendeur) sur UNE barre :
+  z-score ROBUSTE du rendement (médiane+MAD, pas σ) ≤ `ret_z`, range/ATR ≥ `drop_atr`,
+  corps/range ≥ `body_frac` (one-sided), volume ≥ `vol_ratio_min` (liquidité consommée).
+  Suit la **récupération** vers le haut du vide (mesurée depuis la *clôture* de la chute :
+  `fill_frac`/`fill_status` open/partial/filled, plancher `partial_floor` anti-bruit),
+  le **snap-back** précoce (`reclaimed`, clôture > open sous `reclaim_bars`), le **gate de
+  tendance** (`in_uptrend`, clôture > MA `trend_ma` — anti couteau qui tombe) et la
+  **distance prix→vide** en ATR. Score = anomalie(z,taille,vol) × part restante × fraîcheur
+  (demi-vie 8) × proximité × bonus snap-back × pénalité downtrend → vide purgé/downtrend ↓.
+  Seuils dans `VoidThresholds` (mappés depuis config.yaml `void:`). Chaque vide porte `why`,
+  `theory` (mémo mean-reversion) et `ts` (barre de chute, pour le chart).
+- `screener/plot.py` — `plot_voids` : rendu PNG des vides de chute d'un symbole. Chaque vide
+  = **zone ombrée verte** (récupération attendue) de la barre de chute jusqu'au présent (haut
+  = niveau d'avant-chute = cible, bas = extrême) ; opacité ∝ part non récupérée. Bougies en
+  TF inférieure (`FINER_TF`), ligne de prix courant, horodatage CEST.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
-  `--void [N]` → run_void (FVG non comblés proches du prix, colonnes déplacement→thèse +
-  théorie ; `--chart` → un PNG par symbole du top via `plot_voids`), `--chart` génère le PNG.
+  `--void [N]` → run_void (vides de chute brutale encore ouverts proches du prix, colonnes
+  chute→thèse + théorie ; `--chart` → un PNG par symbole du top via `plot_voids`).
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.

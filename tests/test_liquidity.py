@@ -1,11 +1,13 @@
 """
-Tests synthétiques du détecteur de Fair Value Gaps / liquidity voids (liquidity.py).
+Tests synthétiques du détecteur de vides de chute brutale (liquidity.py).
 
-On fabrique un déplacement haussier propre laissant un gap 3 bougies (FVG), puis :
-  - on vérifie que le vide est détecté avec la bonne direction et des bornes correctes ;
-  - qu'un vide non comblé est marqué "unfilled" et scoré positivement ;
-  - qu'un retour du prix dans le gap le passe en "partial"/"filled" ;
-  - qu'une dérive plate sans déplacement ne produit aucun vide.
+On fabrique une dérive calme puis une **chute violente one-sided** (grosse barre baissière,
+volume climactique) et on vérifie que :
+  - le vide est détecté avec les bonnes bornes (haut = avant-chute, bas = extrême) ;
+  - un vide non récupéré est "open" et scoré positivement ;
+  - une remontée du prix dans le vide le passe en "partial"/"filled" (+ snap-back) ;
+  - une dérive plate (aucune chute anormale) ne produit aucun vide ;
+  - le gate de tendance (`in_uptrend`) reflète la position vs MA longue.
 Hors-ligne (pas de réseau).
 """
 import numpy as np
@@ -21,12 +23,12 @@ def _df(rows):
     return add_features(df, vol_ma=20, atr_period=14)
 
 
-def _drift(n, base, vol=1000.0, seed=0):
-    """Barres calmes proches de `base` (volume normal, spread étroit)."""
+def _drift(n, base, vol=1000.0, seed=0, step=0.0):
+    """Barres calmes proches de `base` (volume normal, spread étroit), dérive `step`/barre."""
     rng = np.random.default_rng(seed)
     rows, c = [], base
     for _ in range(n):
-        c = c + rng.normal(0, 0.4)
+        c = c + step + rng.normal(0, 0.4)
         o = c + rng.normal(0, 0.3)
         h = max(o, c) + abs(rng.normal(0, 0.3))
         l = min(o, c) - abs(rng.normal(0, 0.3))
@@ -34,56 +36,52 @@ def _drift(n, base, vol=1000.0, seed=0):
     return rows
 
 
-def test_bullish_fvg_unfilled():
-    rows = _drift(40, 100.0, seed=1)            # base pour ATR/vol_ma (spread ~1)
-    # FVG haussier : bougie 1 normale (high ~100.x), bougie 2 = déplacement large et
-    # volumique, bougie 3 ouvre nettement au-dessus (low > high de la bougie 1).
-    rows += [[100.0, 100.5, 99.6, 100.2, 1000.0]]   # bougie 1 : high = 100.5
-    rows += [[100.3, 106.0, 100.3, 105.8, 4000.0]]  # bougie 2 : déplacement (spread ~5.7)
-    rows += [[105.9, 107.0, 102.0, 106.5, 1500.0]]  # bougie 3 : low = 102.0 > 100.5 → gap
-    # le prix reste haut : vide (100.5, 102.0) non comblé
-    rows += _drift(3, 106.5, vol=900.0, seed=2)
+# z_window=20 / trend_ma=30 pour des fixtures courtes
+TH = VoidThresholds(z_window=20, trend_ma=30)
 
-    voids = detect_voids(_df(rows), lookback=60)
-    assert voids, "un FVG haussier doit être détecté"
+
+def test_drop_void_open():
+    rows = _drift(60, 100.0, seed=1)                 # base calme (ATR/MAD/MA)
+    # chute violente : ouvre à 100, s'effondre à 92, clôture 92.3, volume ×4 → one-sided
+    rows += [[100.0, 100.1, 92.0, 92.3, 4000.0]]
+    rows += _drift(3, 91.5, vol=900.0, seed=2)        # reste sous la clôture : non récupéré
+
+    voids = detect_voids(_df(rows), th=TH, lookback=40)
+    assert voids, "une chute brutale anormale doit créer un vide"
     v = voids[0]
-    assert v.direction == "bullish"
-    assert abs(v.bottom - 100.5) < 0.6 and abs(v.top - 102.0) < 0.6
-    assert v.fill_status == "unfilled"
-    assert v.score > 0
-    assert isinstance(v.ts, pd.Timestamp)        # horodatage de confirmation pour le chart
-    assert "déplacement" in v.why and v.theory
+    assert abs(v.top - 100.1) < 0.5 and abs(v.bottom - 92.0) < 0.5
+    assert v.ret_z <= -2.5 and v.vol_ratio >= 3.0 and v.body_frac >= 0.6
+    assert v.fill_status == "open" and v.score > 0
+    assert "chute" in v.why and v.theory
+    assert isinstance(v.ts, pd.Timestamp)
 
 
-def test_fvg_gets_filled_when_price_returns():
-    rows = _drift(40, 100.0, seed=3)
-    rows += [[100.0, 100.5, 99.6, 100.2, 1000.0]]
-    rows += [[100.3, 106.0, 100.3, 105.8, 4000.0]]
-    rows += [[105.9, 107.0, 102.0, 106.5, 1500.0]]   # gap (100.5, 102.0)
-    # le prix redescend traverser tout le gap → comblement complet
-    rows += [[106.0, 106.2, 100.0, 100.4, 1200.0]]
-    rows += _drift(2, 100.5, vol=900.0, seed=4)
+def test_drop_void_recovers():
+    rows = _drift(60, 100.0, seed=3)
+    rows += [[100.0, 100.1, 92.0, 92.3, 4000.0]]
+    # le prix remonte traverser tout le vide (récupération complète) + snap-back
+    rows += [[92.5, 100.5, 92.4, 100.2, 1500.0]]
+    rows += _drift(2, 100.0, vol=900.0, seed=4)
 
-    voids = detect_voids(_df(rows), lookback=60)
-    bull = [v for v in voids if v.direction == "bullish" and abs(v.bottom - 100.5) < 0.6]
-    assert bull, "le FVG doit toujours être repéré, même comblé"
-    assert bull[0].fill_status == "filled"
-    assert bull[0].score == 0.0          # vide purgé → plus de signal
-
-
-def test_bearish_fvg():
-    rows = _drift(40, 100.0, seed=5)
-    rows += [[100.0, 100.4, 99.5, 99.8, 1000.0]]     # bougie 1 : low = 99.5
-    rows += [[99.7, 99.7, 94.0, 94.2, 4000.0]]       # bougie 2 : déplacement vendeur
-    rows += [[94.1, 98.0, 93.0, 93.5, 1500.0]]       # bougie 3 : high = 98.0 < 99.5 → gap
-    rows += _drift(3, 93.5, vol=900.0, seed=6)
-
-    voids = detect_voids(_df(rows), lookback=60)
-    bear = [v for v in voids if v.direction == "bearish"]
-    assert bear, "un FVG baissier doit être détecté"
-    assert abs(bear[0].bottom - 98.0) < 0.6 and abs(bear[0].top - 99.5) < 0.6
+    voids = detect_voids(_df(rows), th=TH, lookback=40)
+    assert voids, "le vide doit rester repéré, même récupéré"
+    v = voids[0]
+    assert v.fill_status == "filled"
+    assert v.reclaimed is True            # clôture repassée au-dessus de l'open de la chute
+    assert v.score == 0.0                 # vide purgé → plus de signal
 
 
 def test_no_void_on_flat_drift():
-    voids = detect_voids(_df(_drift(80, 100.0, seed=9)), lookback=60)
+    voids = detect_voids(_df(_drift(80, 100.0, seed=9)), th=TH, lookback=40)
     assert voids == []
+
+
+def test_trend_gate_flags_downtrend():
+    # chute anormale au sein d'un downtrend établi → in_uptrend False (couteau qui tombe)
+    rows = _drift(60, 140.0, seed=5, step=-0.8)       # dérive baissière (prix < MA ? non…)
+    rows += [[float(rows[-1][3]), float(rows[-1][3]) + 0.1,
+              float(rows[-1][3]) - 8.0, float(rows[-1][3]) - 7.7, 4000.0]]
+    rows += _drift(3, float(rows[-1][3]), vol=900.0, seed=6, step=-0.5)
+    voids = detect_voids(_df(rows), th=TH, lookback=40)
+    assert voids
+    assert voids[0].in_uptrend is False

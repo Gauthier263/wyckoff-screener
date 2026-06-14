@@ -52,11 +52,16 @@ thresholds:
   pen_atr: 0.1           # pénétration mini hors borne (en ATR) pour spring/UTAD
   reclaim_clv: 0.5       # position de clôture dans la barre
 
-# --- Liquidity void / FVG (option --void, façon ICT) ---
-void_lookback: 120       # barres scannées pour les Fair Value Gaps
+# --- Liquidity void de chute brutale (option --void) ---
+void_lookback: 120       # barres scannées pour les chutes anormales
 void:
-  min_gap_atr: 0.4       # hauteur mini du gap en ATR (sous = micro-imbalance/bruit)
-  displacement_atr: 1.2  # spread/ATR mini de la bougie centrale (vrai déplacement)
-  vol_ratio_min: 1.0     # vol_ratio attendu sur le déplacement (bonus de qualité)
-  fill_threshold: 1.0    # fraction de comblement à partir de laquelle le vide est "filled"
+  ret_z: -2.5            # z-score robuste (médiane+MAD) du rendement : chute anormale
+  drop_atr: 1.8          # amplitude range/ATR mini de la barre de chute
+  body_frac: 0.6         # corps/range mini (barre one-sided, vrai displacement)
+  vol_ratio_min: 3.0     # volume ≥ ×moyenne (liquidité consommée / cascade)
+  z_window: 50           # fenêtre médiane/MAD pour le z robuste
+  trend_ma: 100          # MA longue : gate de tendance (anti couteau qui tombe)
+  reclaim_bars: 3        # fenêtre de snap-back (clôture > open de la chute)
+  partial_floor: 0.1     # récupération sous ce seuil = bruit (vide encore "open")
+  fill_threshold: 1.0    # part récupérée à partir de laquelle le vide est "filled"
   max_dist_atr: 4.0      # horizon de proximité (distance prix→vide) pour le screening

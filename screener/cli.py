@@ -139,9 +139,10 @@ def run_window(cfg: dict) -> pd.DataFrame:
 
 
 def run_void(cfg: dict) -> pd.DataFrame:
-    """Mode liquidity void (ICT) : repère les Fair Value Gaps non comblés proches du
-    prix — cibles de rééquilibrage (rebalance). Une ligne par vide retenu, avec
-    justification du déplacement et rappel théorique. Triés par score décroissant."""
+    """Mode liquidity void : repère les vides laissés par une **chute brutale anormale**
+    (displacement vendeur violent), susceptibles d'être rééquilibrés vite (snap-back),
+    encore ouverts et proches du prix. Une ligne par vide retenu, avec justification
+    (chute → thèse) et rappel théorique. Triés par score décroissant."""
     ex = data_mod.get_exchange(cfg["exchange"])
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = VoidThresholds(**cfg.get("void", {}))
@@ -159,12 +160,12 @@ def run_void(cfg: dict) -> pd.DataFrame:
                     continue
                 kept.setdefault(sym, []).append(v)
                 rows.append({
-                    "symbol": sym, "dir": v.direction, "top": round(v.top, 4),
-                    "bottom": round(v.bottom, 4), "size_atr": round(v.size_atr, 2),
-                    "age": v.created_ago, "fill": v.fill_status,
-                    "fill_%": round(v.fill_frac * 100, 0), "dist_atr": v.dist_atr,
-                    "score": v.score, "vol_x": round(v.vol_ratio, 2),
-                    "déplacement → thèse": v.why, "théorie": v.theory,
+                    "symbol": sym, "top": round(v.top, 4), "bottom": round(v.bottom, 4),
+                    "drop_atr": round(v.size_atr, 2), "ret_z": round(v.ret_z, 1),
+                    "vol_x": round(v.vol_ratio, 2), "age": v.created_ago,
+                    "status": v.fill_status, "rec_%": round(v.fill_frac * 100, 0),
+                    "dist_atr": v.dist_atr, "snap": v.reclaimed, "uptrend": v.in_uptrend,
+                    "score": v.score, "chute → thèse": v.why, "théorie": v.theory,
                 })
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)

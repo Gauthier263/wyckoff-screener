@@ -53,19 +53,17 @@ def _candles(ax, df, width):
     return x
 
 
-_VOID_COLOR = {"bullish": "#26a69a", "bearish": "#ef5350"}
+_VOID_COLOR = "#26a69a"   # zone de récupération attendue (vert demande)
 
 
 def plot_voids(
     symbol: str, analysis_tf: str, voids: list, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 500,
 ) -> str:
-    """Dessine les liquidity voids / FVG d'un symbole : chaque vide est une **zone
-    ombrée** (vert = demande/haussier, rouge = offre/baissier) s'étendant de la bougie
-    de déplacement jusqu'au présent. L'opacité reflète la part *non comblée* (un vide
-    intact ressort, un vide largement rééquilibré s'efface). Bougies en TF inférieure."""
-    from .liquidity import LiquidityVoid  # noqa: F401 (typage documentaire)
-
+    """Dessine les vides de chute brutale d'un symbole : chaque vide est une **zone
+    ombrée** s'étendant de la barre de chute jusqu'au présent (haut = niveau d'avant-chute
+    = cible de récupération, bas = extrême de la chute). L'opacité reflète la part *non
+    récupérée* (vide intact = opaque, rééquilibré = effacé). Bougies en TF inférieure."""
     if not voids:
         return out_path
     fine_tf = FINER_TF.get(analysis_tf, analysis_tf)
@@ -93,24 +91,23 @@ def plot_voids(
     _candles(axp, sub, width)
 
     for v in voids:
-        col = _VOID_COLOR[v.direction]
-        # début de zone = bougie de déplacement (une barre d'analyse avant la confirmation)
-        x0 = mdates.date2num((v.ts - td + delta).to_pydatetime())
+        x0 = mdates.date2num((v.ts + delta).to_pydatetime())   # début = barre de chute
         remaining = max(0.0, 1.0 - v.fill_frac)
         alpha = 0.14 + 0.26 * remaining           # vide intact = plus opaque
         axp.add_patch(plt.Rectangle((x0, v.bottom), x_right - x0, max(v.top - v.bottom, 1e-9),
-                                    facecolor=col, edgecolor=col, lw=1.0, alpha=alpha, zorder=1))
-        axp.axvline(x0, color=col, lw=0.6, alpha=0.3, zorder=0)
-        lbl = f"{v.direction[:4]} {v.size_atr:.1f}ATR · {v.fill_status} {v.fill_frac * 100:.0f}%"
+                                    facecolor=_VOID_COLOR, edgecolor=_VOID_COLOR,
+                                    lw=1.0, alpha=alpha, zorder=1))
+        axp.axvline(x0, color=_VOID_COLOR, lw=0.6, alpha=0.3, zorder=0)
+        lbl = f"chute {v.size_atr:.1f}ATR z{v.ret_z:.1f} · {v.fill_status} {v.fill_frac * 100:.0f}%"
         axp.text(x_right, v.mid, "  " + lbl, va="center", ha="left",
-                 fontsize=7.5, color=col, weight="bold")
+                 fontsize=7.5, color="#1b6b1b", weight="bold")
 
     last_close = float(sub["close"].iloc[-1])
     axp.axhline(last_close, color="#333", ls=":", lw=0.8, alpha=0.7)
     axp.text(x[0], last_close, f" prix {last_close:g}", va="bottom", ha="left", fontsize=8, color="#333")
 
-    axp.set_title(f"{symbol} — {len(voids)} liquidity void(s) / FVG (ICT)  |  analyse {analysis_tf}, "
-                  f"bougies {fine_tf} ({tz_label})", fontsize=11, weight="bold")
+    axp.set_title(f"{symbol} — {len(voids)} liquidity void(s) de chute brutale  |  analyse "
+                  f"{analysis_tf}, bougies {fine_tf} ({tz_label})", fontsize=11, weight="bold")
     axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
     vb = [v.bottom for v in voids] + [v.top for v in voids]
     plo, phi = min(float(sub["low"].min()), min(vb)), max(float(sub["high"].max()), max(vb))
@@ -121,8 +118,8 @@ def plot_voids(
     axv.bar(x, sub["volume"].values, width=width, color=bc, alpha=0.6)
     axv.plot(x, sub["vol_ma"].values, color="#555", lw=0.8, label="vol MA")
     for v in voids:
-        x0 = mdates.date2num((v.ts - td + delta).to_pydatetime())
-        axv.axvline(x0, color=_VOID_COLOR[v.direction], lw=0.6, alpha=0.3)
+        axv.axvline(mdates.date2num((v.ts + delta).to_pydatetime()),
+                    color=_VOID_COLOR, lw=0.6, alpha=0.3)
     axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
     axv.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)
