@@ -147,6 +147,8 @@ def run_void(cfg: dict) -> pd.DataFrame:
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = VoidThresholds(**cfg.get("void", {}))
     lookback = cfg.get("void_lookback", 120)
+    exploit = cfg.get("exploitable", False)          # ne garder que le segment rentable (backtest)
+    edist = cfg.get("exploit_dist_atr", 1.0)
 
     rows: list[dict] = []
     kept: dict[str, list] = {}                       # symbole -> vides retenus (pour le chart)
@@ -157,6 +159,9 @@ def run_void(cfg: dict) -> pd.DataFrame:
             for v in detect_voids(df, th=th, lookback=lookback):
                 # screening : on ne garde que les vides ouverts et proches du prix
                 if v.fill_status == "filled" or v.dist_atr > th.max_dist_atr:
+                    continue
+                # --exploitable : hors downtrend + prix au bord du vide (seul segment OOS+)
+                if exploit and (not v.in_uptrend or v.dist_atr > edist):
                     continue
                 kept.setdefault(sym, []).append(v)
                 rows.append({
@@ -198,7 +203,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
-        "void": {}, "void_lookback": 120,
+        "void": {}, "void_lookback": 120, "exploit_dist_atr": 1.0,
     }
     cfg.update(load_config())
 
@@ -213,7 +218,9 @@ def main() -> None:
     p.add_argument("--window", nargs="?", type=int, const=30, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
     p.add_argument("--void", nargs="?", type=int, const=120, default=None,
-                   help="mode liquidity void/FVG (ICT) : vides non comblés proches du prix (défaut 120 barres)")
+                   help="mode liquidity void : vides de chute brutale ouverts proches du prix (défaut 120 barres)")
+    p.add_argument("--exploitable", action="store_true",
+                   help="[void] ne garder que les vides exploitables (hors downtrend, prix au bord) — segment rentable en backtest")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
@@ -221,7 +228,7 @@ def main() -> None:
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+               use_cache=not args.no_cache, chart=args.chart, exploitable=args.exploitable)
     if args.window is not None:
         cfg["window"] = args.window
     if args.void is not None:

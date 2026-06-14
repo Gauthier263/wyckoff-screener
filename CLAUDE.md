@@ -62,7 +62,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--void [N]` → run_void (vides de chute brutale encore ouverts proches du prix, colonnes
-  chute→thèse + théorie ; `--chart` → un PNG par symbole du top via `plot_voids`).
+  chute→thèse + théorie ; `--chart` → un PNG par symbole du top via `plot_voids` ;
+  `--exploitable` → ne garde que le segment rentable en backtest : hors downtrend
+  (`in_uptrend`) + prix au bord du vide (`dist_atr ≤ exploit_dist_atr`, défaut 1.0)).
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
