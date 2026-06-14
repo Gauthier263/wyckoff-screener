@@ -98,35 +98,44 @@ def _robust_z(ret: pd.Series, window: int) -> pd.Series:
     return (ret - med) / scale
 
 
-def detect_voids(
-    df: pd.DataFrame, th: VoidThresholds | None = None, lookback: int = 120
-) -> list[LiquidityVoid]:
-    """Détecte les vides de chute brutale sur la fenêtre récente et suit leur récupération.
+@dataclass
+class DropSignal:
+    """Barre de chute anormale (Étage A + gate de tendance), 100 % causale : ne dépend
+    que de df[:i+1]. Partagée par le screener (detect_voids) et le backtest."""
+    i: int
+    ts: pd.Timestamp
+    top: float
+    bottom: float
+    size_atr: float
+    ret_z: float
+    vol_ratio: float
+    body_frac: float
+    in_uptrend: bool
 
-    Renvoie tous les vides détectés (chacun avec statut, distance au prix, score). Les
-    vides entièrement récupérés ont un score nul. Trié par score décroissant.
-    """
+
+def drop_signals(df: pd.DataFrame, th: VoidThresholds | None = None,
+                 start: int | None = None) -> list[DropSignal]:
+    """Repère les barres de chute brutale anormale (sans lookahead). `start` borne le
+    début du scan (défaut = z_window). Les features (z robuste, MA) sont *trailing* donc
+    un signal en `i` n'utilise que le passé — utilisable tel quel en backtest."""
     th = th or VoidThresholds()
     n = len(df)
     if n < th.z_window + 2:
         return []
-
     ret = df["ret"] if "ret" in df else df["close"].pct_change()
     z = _robust_z(ret, th.z_window).values
     sma = df["close"].rolling(th.trend_ma, min_periods=th.trend_ma // 2).mean().values
-    o, h, l, c = (df["open"].values, df["high"].values, df["low"].values, df["close"].values)
-    atr = df["atr"].values
-    vr_col = df["vol_ratio"].values
-    close_now, atr_now = float(c[-1]), float(atr[-1])
-    voids: list[LiquidityVoid] = []
+    o, h, l, c = df["open"].values, df["high"].values, df["low"].values, df["close"].values
+    atr, vr_col = df["atr"].values, df["vol_ratio"].values
 
-    start = max(th.z_window, n - lookback)
-    for i in range(start, n):
+    s = max(th.z_window, start if start is not None else th.z_window)
+    out: list[DropSignal] = []
+    for i in range(s, n):
         a = float(atr[i])
-        if not a or np.isnan(a) or c[i] >= o[i]:          # barre baissière uniquement
+        if not a or np.isnan(a) or c[i] >= o[i]:           # barre baissière uniquement
             continue
         zi = float(z[i]) if not np.isnan(z[i]) else 0.0
-        if zi > th.ret_z:                                  # chute pas assez anormale
+        if zi > th.ret_z:                                   # chute pas assez anormale
             continue
         top, bottom = float(h[i]), float(l[i])
         rng = top - bottom
@@ -137,7 +146,31 @@ def detect_voids(
         vr = float(vr_col[i]) if not np.isnan(vr_col[i]) else 1.0
         if size_atr < th.drop_atr or body_frac < th.body_frac or vr < th.vol_ratio_min:
             continue
+        in_uptrend = bool(np.isnan(sma[i]) or c[i] > sma[i])
+        out.append(DropSignal(i, df.index[i], top, bottom, size_atr, zi, vr, body_frac, in_uptrend))
+    return out
 
+
+def detect_voids(
+    df: pd.DataFrame, th: VoidThresholds | None = None, lookback: int = 120
+) -> list[LiquidityVoid]:
+    """Détecte les vides de chute brutale sur la fenêtre récente et suit leur récupération.
+
+    Renvoie tous les vides détectés (chacun avec statut, distance au prix, score). Les
+    vides entièrement récupérés ont un score nul. Trié par score décroissant.
+    """
+    th = th or VoidThresholds()
+    n = len(df)
+    sigs = drop_signals(df, th, start=max(th.z_window, n - lookback))
+    if not sigs:
+        return []
+    o, c, h = df["open"].values, df["close"].values, df["high"].values
+    close_now, atr_now = float(c[-1]), float(df["atr"].values[-1])
+    voids: list[LiquidityVoid] = []
+
+    for sg in sigs:
+        i = sg.i
+        top, bottom = sg.top, sg.bottom
         # --- Récupération : remontée vers le haut du vide (barres postérieures) ---
         # mesurée depuis la clôture de la chute (là où le prix a été laissé), pas la mèche
         ref = float(c[i])
@@ -151,7 +184,6 @@ def detect_voids(
         # snap-back précoce : clôture repassée au-dessus de l'ouverture de la chute
         end = min(i + 1 + th.reclaim_bars, n)
         reclaimed = bool(np.any(c[i + 1:end] >= o[i])) if end > i + 1 else False
-        in_uptrend = bool(np.isnan(sma[i]) or c[i] > sma[i])
 
         if close_now > top:
             dist_atr = (close_now - top) / atr_now if atr_now else np.inf
@@ -161,19 +193,20 @@ def detect_voids(
             dist_atr = 0.0
 
         created_ago = n - 1 - i
-        anomaly = (0.5 * min(abs(zi) / 4.0, 1.0)
-                   + 0.25 * min(size_atr / 3.0, 1.0)
-                   + 0.25 * min(vr / 5.0, 1.0))
+        anomaly = (0.5 * min(abs(sg.ret_z) / 4.0, 1.0)
+                   + 0.25 * min(sg.size_atr / 3.0, 1.0)
+                   + 0.25 * min(sg.vol_ratio / 5.0, 1.0))
         remaining = max(0.0, 1.0 - fill_frac)
         score = (anomaly * remaining * _recency(created_ago) * _proximity(float(dist_atr))
-                 * (1.25 if reclaimed else 1.0) * (1.0 if in_uptrend else 0.5))
+                 * (1.25 if reclaimed else 1.0) * (1.0 if sg.in_uptrend else 0.5))
 
         voids.append(LiquidityVoid(
-            ts=df.index[i], top=top, bottom=bottom, size_atr=size_atr, ret_z=zi,
-            vol_ratio=vr, body_frac=body_frac, created_ago=created_ago,
+            ts=sg.ts, top=top, bottom=bottom, size_atr=sg.size_atr, ret_z=sg.ret_z,
+            vol_ratio=sg.vol_ratio, body_frac=sg.body_frac, created_ago=created_ago,
             fill_frac=round(fill_frac, 3), fill_status=status, dist_atr=round(float(dist_atr), 2),
-            reclaimed=reclaimed, in_uptrend=in_uptrend, score=round(float(score), 4),
-            why=_why(zi, size_atr, vr, body_frac, fill_frac, status, reclaimed, in_uptrend),
+            reclaimed=reclaimed, in_uptrend=sg.in_uptrend, score=round(float(score), 4),
+            why=_why(sg.ret_z, sg.size_atr, sg.vol_ratio, sg.body_frac, fill_frac, status,
+                     reclaimed, sg.in_uptrend),
             theory=_THEORY,
         ))
 

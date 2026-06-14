@@ -36,6 +36,8 @@ class BTParams:
     rr: float = 2.0           # ratio objectif / risque
     max_hold: int = 30        # barres max en position
     cooldown: int = 0         # barres à ignorer après une sortie
+    fill_target: float = 1.0  # [void] part du vide visée (1.0 = comblement complet, 0.5 = CE)
+    require_uptrend: bool = False  # [void] n'entrer que hors downtrend (gate anti-knife)
 
 
 @dataclass
@@ -126,6 +128,59 @@ def backtest_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> li
     return backtest_features(symbol, feat, cfg, p, th)
 
 
+def backtest_void_features(symbol: str, feat: pd.DataFrame, vth: "VoidThresholds", p: BTParams,
+                           entry_start: int | None = None,
+                           entry_end: int | None = None) -> list[Trade]:
+    """Backtest de la thèse « chute brutale → comblement du vide ».
+
+    Sur chaque barre de chute anormale (signal causal `drop_signals`), on entre LONG à la
+    clôture, stop = entrée − stop_atr × ATR (protection couteau), cible = comblement du vide
+    (clôture + fill_target × (haut_du_vide − clôture)). Sortie via le même simulateur que les
+    événements Wyckoff. Les trades sont étiquetés void_up / void_down selon le gate de tendance
+    pour mesurer son apport. Pas de chevauchement, pas de lookahead.
+    """
+    from .liquidity import drop_signals
+
+    warmup = max(vth.z_window, vth.trend_ma)
+    n = len(feat)
+    sigs = drop_signals(feat, vth, start=warmup)
+    trades: list[Trade] = []
+    last_exit = -1
+    for sg in sigs:
+        t = sg.i
+        if entry_start is not None and t < entry_start:
+            continue
+        if entry_end is not None and t >= entry_end:
+            continue
+        if t <= last_exit or t >= n - 1:
+            continue
+        if p.require_uptrend and not sg.in_uptrend:
+            continue
+        atr_t = float(feat["atr"].iloc[t])
+        if not atr_t or np.isnan(atr_t):
+            continue
+        entry = float(feat["close"].iloc[t])
+        risk = p.stop_atr * atr_t
+        stop = entry - risk
+        target = entry + p.fill_target * (sg.top - entry)   # comblement (partiel) du vide
+        if target <= entry:
+            continue
+        exit_i, exit_px, outcome = _simulate_exit(feat, t, "long", entry, stop, target, p)
+        r = (exit_px - entry) / risk
+        event = "void_up" if sg.in_uptrend else "void_down"
+        trades.append(Trade(symbol, event, "long", t, entry, stop, target,
+                            exit_i, exit_px, float(r), outcome))
+        last_exit = exit_i + p.cooldown
+    return trades
+
+
+def backtest_void_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> list[Trade]:
+    from .liquidity import VoidThresholds
+    feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+    vth = VoidThresholds(**cfg.get("void", {}))
+    return backtest_void_features(symbol, feat, vth, p)
+
+
 def aggregate(trades: list[Trade]) -> pd.DataFrame:
     if not trades:
         return pd.DataFrame()
@@ -149,15 +204,16 @@ def aggregate(trades: list[Trade]) -> pd.DataFrame:
     return out
 
 
-def run_backtest(cfg: dict, p: BTParams) -> tuple[pd.DataFrame, list[Trade]]:
+def run_backtest(cfg: dict, p: BTParams, mode: str = "wyckoff") -> tuple[pd.DataFrame, list[Trade]]:
     from . import data as data_mod
     ex = data_mod.get_exchange(cfg["exchange"])
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    bt = backtest_void_symbol if mode == "void" else backtest_symbol
     all_trades: list[Trade] = []
     for sym in universe:
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
-            all_trades += backtest_symbol(sym, df, cfg, p)
+            all_trades += bt(sym, df, cfg, p)
         except Exception as e:
             import sys
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
@@ -171,11 +227,11 @@ def main() -> None:
     cfg = {
         "exchange": "binance", "quote": "USDT", "timeframe": "1h", "top": 60,
         "limit": 1000, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
-        "use_cache": True, "symbols": [], "thresholds": {},
+        "use_cache": True, "symbols": [], "thresholds": {}, "void": {},
     }
     cfg.update(load_config())
 
-    ap = argparse.ArgumentParser(description="Backtest des événements Wyckoff")
+    ap = argparse.ArgumentParser(description="Backtest Wyckoff / liquidity void")
     ap.add_argument("--timeframe", default=cfg["timeframe"])
     ap.add_argument("--symbols", nargs="*", default=cfg["symbols"])
     ap.add_argument("--top", type=int, default=cfg["top"])
@@ -183,20 +239,29 @@ def main() -> None:
     ap.add_argument("--stop-atr", type=float, default=1.0)
     ap.add_argument("--rr", type=float, default=2.0)
     ap.add_argument("--max-hold", type=int, default=30)
+    ap.add_argument("--void", action="store_true", help="backteste la thèse de comblement des vides de chute")
+    ap.add_argument("--fill-target", type=float, default=1.0, help="[void] part du vide visée (1.0=complet, 0.5=CE)")
+    ap.add_argument("--require-uptrend", action="store_true", help="[void] n'entrer que hors downtrend")
     ap.add_argument("--csv", default="backtest_trades.csv")
     ap.add_argument("--no-cache", action="store_true")
     args = ap.parse_args()
 
     cfg.update(timeframe=args.timeframe, symbols=args.symbols, top=args.top,
                limit=args.limit, use_cache=not args.no_cache)
-    p = BTParams(stop_atr=args.stop_atr, rr=args.rr, max_hold=args.max_hold)
+    p = BTParams(stop_atr=args.stop_atr, rr=args.rr, max_hold=args.max_hold,
+                 fill_target=args.fill_target, require_uptrend=args.require_uptrend)
+    mode = "void" if args.void else "wyckoff"
 
-    stats, trades = run_backtest(cfg, p)
+    stats, trades = run_backtest(cfg, p, mode=mode)
     if stats.empty:
         print("Aucun trade généré sur la période.")
         return
-    print(f"\nBacktest {cfg['timeframe']} — stop {p.stop_atr} ATR, objectif {p.rr}R, "
-          f"hold max {p.max_hold} barres — {len(trades)} trades")
+    if mode == "void":
+        print(f"\nBacktest VOID {cfg['timeframe']} — stop {p.stop_atr} ATR, cible "
+              f"{p.fill_target:.0%} du vide, hold max {p.max_hold} barres — {len(trades)} trades")
+    else:
+        print(f"\nBacktest {cfg['timeframe']} — stop {p.stop_atr} ATR, objectif {p.rr}R, "
+              f"hold max {p.max_hold} barres — {len(trades)} trades")
     print(stats.to_string(index=False))
     pd.DataFrame([t.__dict__ for t in trades]).to_csv(args.csv, index=False)
 

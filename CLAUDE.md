@@ -19,6 +19,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/backtest.py` — walk-forward sans lookahead. `backtest_features` (coeur
   réutilisable, fenêtre [entry_start, entry_end)), `backtest_symbol`, `aggregate`.
   Entrée à la clôture de t sur déclencheur frais (bars_ago==0), stop ATR + objectif R.
+  `--void` → `backtest_void_features` : teste la thèse « chute brutale → comblement du
+  vide » (entrée LONG à la clôture de la chute, stop ATR, cible = `fill_target` × hauteur
+  du vide ; trades étiquetés void_up/void_down selon le gate de tendance). Conclusion
+  empirique : l'edge n'existe que **hors downtrend** (void_up), tient en OOS ; void_down =
+  couteau qui tombe (à exclure).
 - `screener/optimize.py` — grid-search des seuils. `grid_search` (split IS/OOS),
   `metric_value` (robust = espérance − z·erreur-type ; plancher min_trades),
   `overfit_report` (verdict robuste/fragile/surajustement), `walk_forward` (k plis).
@@ -83,6 +88,7 @@ pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --void --chart     # FVG/voids ICT non comblés + PNG
+python -m screener.backtest --void --fill-target 0.5 --require-uptrend       # backtest thèse comblement
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

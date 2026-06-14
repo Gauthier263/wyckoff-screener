@@ -76,6 +76,21 @@ def test_no_void_on_flat_drift():
     assert voids == []
 
 
+def test_backtest_void_fills_win():
+    from screener.backtest import BTParams, backtest_void_features
+    rows = _drift(60, 100.0, seed=11)
+    rows += [[100.0, 100.1, 92.0, 92.3, 4000.0]]       # chute (haut du vide = 100.1)
+    rows += [[92.5, 101.0, 92.4, 100.5, 1500.0]]       # remonte combler le vide → win
+    rows += _drift(3, 100.0, vol=900.0, seed=12)
+    feat = _df(rows)
+    p = BTParams(stop_atr=1.0, fill_target=1.0, max_hold=5)
+    trades = backtest_void_features("X/USDT", feat, TH, p)
+    assert len(trades) == 1
+    t = trades[0]
+    assert t.direction == "long" and t.outcome == "win" and t.r > 0
+    assert t.event in ("void_up", "void_down")
+
+
 def test_trend_gate_flags_downtrend():
     # chute anormale au sein d'un downtrend établi → in_uptrend False (couteau qui tombe)
     rows = _drift(60, 140.0, seed=5, step=-0.8)       # dérive baissière (prix < MA ? non…)
