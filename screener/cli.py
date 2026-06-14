@@ -15,7 +15,7 @@ import pandas as pd
 import yaml
 
 from . import data as data_mod
-from .divergence import DivergenceParams, detect_double_divergence
+from .divergence import DivergenceParams, detect_double_divergence, detect_forming_entry
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
@@ -186,6 +186,55 @@ def run_divergence(cfg: dict) -> pd.DataFrame:
     return pd.DataFrame([r.as_row() for r in results])
 
 
+def run_entry(cfg: dict) -> pd.DataFrame:
+    """Mode « entrée live au 2ᵉ creux/sommet » : la barre courante teste la zone du 1er
+    creux avec divergence RSI. Sort le niveau d'achat/vente limite ET le signal de barre
+    confirmée (rejet), avec stop, ligne de cou (T1), objectif mesuré (T2) et R:R."""
+    ex = data_mod.get_exchange(cfg["exchange"], mirror=cfg.get("mirror") or None)
+    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    th = Thresholds(**cfg.get("thresholds", {}))
+    params = DivergenceParams(**cfg.get("divergence", {}))
+    look = cfg["lookback"] + cfg["buffer"]
+
+    results = []
+    for i, sym in enumerate(universe, 1):
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            if df is None or len(df) < cfg["lookback"] + cfg["buffer"] + cfg["vol_ma"]:
+                continue
+            df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"],
+                              rsi_period=params.rsi_period)
+            tr = detect_trading_range(df, lookback=cfg["lookback"], buffer=cfg["buffer"])
+            res = detect_forming_entry(sym, df, tr, th=th, params=params, lookback=look)
+            if res is None:
+                continue
+            if cfg.get("forming_only") and not res.confirmed:
+                continue  # ne garder que les barres confirmées (pas les limites en attente)
+            if cfg.get("bias") and cfg["bias"] != "both" and res.bias != cfg["bias"]:
+                continue
+            results.append(res)
+        except Exception as e:
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+        if i % 10 == 0:
+            print(f"  ...{i}/{len(universe)}", file=sys.stderr)
+
+    results.sort(key=lambda r: (r.confirmed, r.strength), reverse=True)
+    results = results[: cfg["max_results"]]
+
+    if cfg.get("chart") and results:
+        from .plot import plot_forming_entry
+        for r in results:
+            out = f"chart_{r.symbol.replace('/', '').lower()}_{cfg['timeframe']}_entry.png"
+            try:
+                plot_forming_entry(r.symbol, cfg["timeframe"], r, out, ex=ex,
+                                   rsi_period=params.rsi_period)
+                print(f"→ graphique : {out}", file=sys.stderr)
+            except Exception as e:
+                print(f"  [chart skip] {r.symbol}: {e}", file=sys.stderr)
+
+    return pd.DataFrame([r.as_row() for r in results])
+
+
 def main() -> None:
     # Console Windows en cp1252 : on force l'UTF-8 pour les symboles (→, ×, …).
     for stream in (sys.stdout, sys.stderr):
@@ -218,7 +267,9 @@ def main() -> None:
     p.add_argument("--divergence", action="store_true",
                    help="double creux/sommet + divergence RSI dans une plage ouverte par un climax")
     p.add_argument("--forming-only", action="store_true",
-                   help="(avec --divergence) ne garder que les setups en formation (ligne de cou intacte)")
+                   help="(avec --divergence) garde les setups en formation ; (avec --entry) garde les entrées confirmées")
+    p.add_argument("--entry", action="store_true",
+                   help="entrée live AU 2ᵉ creux/sommet (zone limite + barre de confirmation, stop/cible/R:R)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
@@ -231,7 +282,9 @@ def main() -> None:
     if args.window is not None:
         cfg["window"] = args.window
 
-    if args.divergence:
+    if args.entry:
+        table = run_entry(cfg)
+    elif args.divergence:
         table = run_divergence(cfg)
     elif args.window is not None:
         table = run_window(cfg)
