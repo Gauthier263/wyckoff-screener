@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# Page de relecture générée (régénérable avec `npm run revision`)
+RELECTURE.html

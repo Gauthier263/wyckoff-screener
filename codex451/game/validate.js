@@ -8,7 +8,9 @@ import { dirname, join } from "node:path";
 import { CONFIG } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const bank = JSON.parse(readFileSync(join(__dirname, "..", "data", "questions.json"), "utf8"));
+// Fichier à valider : argument optionnel, sinon data/questions.json.
+const target = process.argv[2] || join(__dirname, "..", "data", "questions.json");
+const bank = JSON.parse(readFileSync(target, "utf8"));
 
 const errors = [];
 const ids = new Set();
