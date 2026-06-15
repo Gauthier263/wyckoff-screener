@@ -3,13 +3,14 @@
 import { CONFIG } from "./config.js";
 
 // Normalise une saisie libre : minuscules, sans accents, espaces compactés,
-// ponctuation de bord retirée. Permet une auto-correction tolérante.
+// apostrophes (droites/courbes), traits d'union et ponctuation ramenés à des
+// espaces. Permet une auto-correction tolérante, robuste aux claviers tactiles.
 export function normalize(str) {
   return String(str ?? "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // enlève les accents
-    .replace(/[.,;:!?'"«»()]/g, " ")
+    .replace(/[.,;:!?'’‘"“”«»()\-–—]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
