@@ -28,6 +28,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `metric_value` (robust = espérance − z·erreur-type ; plancher min_trades),
   `overfit_report` (verdict robuste/fragile/surajustement), `walk_forward` (k plis).
   Features calculées une fois par symbole puis réutilisées sur toute la grille.
+  `--void` (`mode="void"`) optimise les seuils du détecteur de vides (`DEFAULT_VOID_GRID` :
+  ret_z, vol_ratio_min, fill_target, stop_atr) via `_make_runner` qui route vers
+  `backtest_void_features` ; force `require_uptrend=True` (segment exploitable).
 - `screener/window.py` — `detect_window_structure` : reconnaît une *séquence* Wyckoff
   ordonnée (SC→AR→ST→SOS en accumulation, BC→AR→ST→SOW en distribution) sur une
   fenêtre glissante (défaut 30 barres), indépendamment des bornes de la grande plage.

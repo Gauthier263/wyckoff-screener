@@ -27,15 +27,18 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .backtest import BTParams, Trade, backtest_features
+from .backtest import BTParams, Trade, backtest_features, backtest_void_features
 from .events import Thresholds
+from .liquidity import VoidThresholds
 
-# Clés routées vers Thresholds vs BTParams
+# Clés routées vers Thresholds (Wyckoff) / VoidThresholds (void) / BTParams
 TH_KEYS = {"climax_vol", "sos_vol", "wide_spread_atr", "narrow_spread_atr",
            "test_vol", "pen_atr", "reclaim_clv"}
-BT_KEYS = {"stop_atr", "rr", "max_hold", "cooldown"}
+VOID_KEYS = {"ret_z", "drop_atr", "body_frac", "vol_ratio_min", "z_window",
+             "trend_ma", "reclaim_bars", "partial_floor", "fill_threshold", "max_dist_atr"}
+BT_KEYS = {"stop_atr", "rr", "max_hold", "cooldown", "fill_target", "require_uptrend"}
 
-# Grille par défaut : 6 leviers à fort impact (3^6 = 729 combinaisons).
+# Grille par défaut Wyckoff : 6 leviers à fort impact (3^6 = 729 combinaisons).
 DEFAULT_GRID = {
     "climax_vol": [1.8, 2.0, 2.5],
     "sos_vol": [1.2, 1.3, 1.5],
@@ -44,6 +47,32 @@ DEFAULT_GRID = {
     "rr": [1.5, 2.0, 3.0],
     "stop_atr": [0.75, 1.0, 1.5],
 }
+
+# Grille par défaut void : les 4 leviers clés (3^4 = 81 combinaisons).
+DEFAULT_VOID_GRID = {
+    "ret_z": [-2.0, -2.5, -3.0],
+    "vol_ratio_min": [2.5, 3.0, 4.0],
+    "fill_target": [0.4, 0.5, 0.75],
+    "stop_atr": [0.75, 1.0, 1.5],
+}
+
+
+def _make_runner(combo: dict, cfg: dict, mode: str, max_hold: int):
+    """Renvoie une fonction run(sym, feat, entry_start, entry_end) -> list[Trade]
+    configurée pour le combo, en routant vers le bon backtest selon `mode`."""
+    c = dict(combo)
+    c.setdefault("max_hold", max_hold)
+    if mode == "void":
+        c.setdefault("require_uptrend", True)   # on n'optimise que le segment exploitable
+        vth = VoidThresholds(**{k: v for k, v in c.items() if k in VOID_KEYS})
+        p = BTParams(**{k: v for k, v in c.items() if k in BT_KEYS})
+        return lambda sym, feat, a=None, b=None: backtest_void_features(
+            sym, feat, vth, p, entry_start=a, entry_end=b)
+    th = Thresholds(**{k: v for k, v in c.items() if k in TH_KEYS})
+    p = BTParams(**{k: v for k, v in c.items() if k in BT_KEYS})
+    return lambda sym, feat, a=None, b=None: backtest_features(
+        sym, feat, cfg, p, th, entry_start=a, entry_end=b)
+
 
 
 # --------------------------------------------------------------------------- #
@@ -83,34 +112,25 @@ def metric_value(trades: list[Trade], kind: str, min_trades: int, z: float = 1.0
 # --------------------------------------------------------------------------- #
 # Grid-search avec split IS / OOS
 # --------------------------------------------------------------------------- #
-def _split_combo(combo: dict) -> tuple[dict, dict]:
-    th_kw = {k: v for k, v in combo.items() if k in TH_KEYS}
-    bt_kw = {k: v for k, v in combo.items() if k in BT_KEYS}
-    return th_kw, bt_kw
-
-
 def grid_search(feats: dict[str, pd.DataFrame], cfg: dict, grid: dict | None = None,
                 metric: str = "robust", min_trades: int = 30,
-                split: float = 0.6, max_hold: int = 30) -> pd.DataFrame:
-    grid = grid or DEFAULT_GRID
+                split: float = 0.6, max_hold: int = 30, mode: str = "wyckoff") -> pd.DataFrame:
+    grid = grid or (DEFAULT_VOID_GRID if mode == "void" else DEFAULT_GRID)
     keys = list(grid)
     combos = list(itertools.product(*[grid[k] for k in keys]))
-    print(f"Grid-search : {len(combos)} combinaisons × {len(feats)} symboles "
+    print(f"Grid-search {mode} : {len(combos)} combinaisons × {len(feats)} symboles "
           f"(IS={split:.0%} / OOS={1 - split:.0%})", file=sys.stderr)
 
     rows = []
     for ci, values in enumerate(combos, 1):
         combo = dict(zip(keys, values))
-        combo.setdefault("max_hold", max_hold)
-        th_kw, bt_kw = _split_combo(combo)
-        th, p = Thresholds(**th_kw), BTParams(**bt_kw)
+        run = _make_runner(combo, cfg, mode, max_hold)
 
         is_tr, oos_tr = [], []
         for sym, feat in feats.items():
-            n = len(feat)
-            cut = int(n * split)
-            is_tr += backtest_features(sym, feat, cfg, p, th, entry_end=cut)
-            oos_tr += backtest_features(sym, feat, cfg, p, th, entry_start=cut)
+            cut = int(len(feat) * split)
+            is_tr += run(sym, feat, None, cut)
+            oos_tr += run(sym, feat, cut, None)
 
         is_m = metric_value(is_tr, metric, min_trades)
         is_s, oos_s = trade_stats(is_tr), trade_stats(oos_tr)
@@ -157,13 +177,13 @@ def overfit_report(results: pd.DataFrame) -> dict:
 # --------------------------------------------------------------------------- #
 def walk_forward(feats: dict[str, pd.DataFrame], cfg: dict, grid: dict | None = None,
                  metric: str = "robust", min_trades: int = 20, folds: int = 4,
-                 train_frac: float = 0.5, max_hold: int = 30) -> pd.DataFrame:
+                 train_frac: float = 0.5, max_hold: int = 30, mode: str = "wyckoff") -> pd.DataFrame:
     """
     Découpe le temps en `folds` plis. Pour chaque pli : optimise sur une fenêtre
     d'entraînement, valide sur la fenêtre suivante (jamais vue). On agrège les
     résultats OOS de tous les plis = simulation d'une recalibration périodique.
     """
-    grid = grid or DEFAULT_GRID
+    grid = grid or (DEFAULT_VOID_GRID if mode == "void" else DEFAULT_GRID)
     keys = list(grid)
     combos = [dict(zip(keys, v)) for v in itertools.product(*[grid[k] for k in keys])]
 
@@ -176,25 +196,22 @@ def walk_forward(feats: dict[str, pd.DataFrame], cfg: dict, grid: dict | None = 
 
         best_combo, best_m = None, float("-inf")
         for combo in combos:
-            c = dict(combo); c.setdefault("max_hold", max_hold)
-            th, p = Thresholds(**_split_combo(c)[0]), BTParams(**_split_combo(c)[1])
+            run = _make_runner(combo, cfg, mode, max_hold)
             tr_trades = []
             for sym, feat in feats.items():
                 n = len(feat)
-                a, b = int(n * bounds[f]), int(n * split_frac)
-                tr_trades += backtest_features(sym, feat, cfg, p, th, entry_start=a, entry_end=b)
+                tr_trades += run(sym, feat, int(n * bounds[f]), int(n * split_frac))
             m = metric_value(tr_trades, metric, min_trades)
             if m > best_m:
-                best_m, best_combo = m, c
+                best_m, best_combo = m, combo
 
         if best_combo is None:
             continue
-        th, p = Thresholds(**_split_combo(best_combo)[0]), BTParams(**_split_combo(best_combo)[1])
+        run = _make_runner(best_combo, cfg, mode, max_hold)
         val_trades = []
         for sym, feat in feats.items():
             n = len(feat)
-            a, b = int(n * split_frac), int(n * bounds[f + 1])
-            val_trades += backtest_features(sym, feat, cfg, p, th, entry_start=a, entry_end=b)
+            val_trades += run(sym, feat, int(n * split_frac), int(n * bounds[f + 1]))
         vs = trade_stats(val_trades)
         rows.append({"fold": f + 1, **{k: best_combo[k] for k in keys},
                      "val_n": vs["n"], "val_r_moy": round(vs["r_moy"], 3),
@@ -227,40 +244,44 @@ def main() -> None:
     cfg = {
         "exchange": "binance", "quote": "USDT", "timeframe": "1h", "top": 40,
         "limit": 1500, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
-        "use_cache": True, "symbols": [], "thresholds": {},
+        "use_cache": True, "symbols": [], "thresholds": {}, "void": {},
     }
     cfg.update(load_config())
 
-    ap = argparse.ArgumentParser(description="Grid-search des seuils Wyckoff (IS/OOS)")
+    ap = argparse.ArgumentParser(description="Grid-search des seuils Wyckoff / void (IS/OOS)")
     ap.add_argument("--timeframe", default=cfg["timeframe"])
     ap.add_argument("--symbols", nargs="*", default=cfg["symbols"])
     ap.add_argument("--top", type=int, default=cfg["top"])
     ap.add_argument("--limit", type=int, default=cfg["limit"])
     ap.add_argument("--metric", choices=["robust", "expectancy", "profit_factor"], default="robust")
-    ap.add_argument("--min-trades", type=int, default=30)
+    ap.add_argument("--min-trades", type=int, default=0, help="plancher de trades (défaut 30 wyckoff / 10 void)")
     ap.add_argument("--split", type=float, default=0.6, help="fraction in-sample")
     ap.add_argument("--walk", type=int, default=0, help="nb de plis walk-forward (0 = split simple)")
+    ap.add_argument("--void", action="store_true", help="optimise les seuils du détecteur de vides de chute")
     ap.add_argument("--csv", default="optimize_results.csv")
     ap.add_argument("--no-cache", action="store_true")
     args = ap.parse_args()
 
     cfg.update(timeframe=args.timeframe, symbols=args.symbols, top=args.top,
                limit=args.limit, use_cache=not args.no_cache)
+    mode = "void" if args.void else "wyckoff"
+    min_trades = args.min_trades or (10 if mode == "void" else 30)
 
     feats = _load_feats(cfg)
     if not feats:
         print("Aucune donnée chargée."); return
 
     if args.walk and args.walk > 1:
-        wf = walk_forward(feats, cfg, metric=args.metric, min_trades=args.min_trades, folds=args.walk)
-        print("\nWalk-forward (performance OOS par pli) :")
+        wf = walk_forward(feats, cfg, metric=args.metric, min_trades=min_trades,
+                          folds=args.walk, mode=mode)
+        print(f"\nWalk-forward {mode} (performance OOS par pli) :")
         print(wf.to_string(index=False))
         if not wf.empty:
             print(f"\nR moyen OOS agrégé sur les plis : {wf['val_r_moy'].mean():.3f}")
         return
 
     results = grid_search(feats, cfg, metric=args.metric,
-                          min_trades=args.min_trades, split=args.split)
+                          min_trades=min_trades, split=args.split, mode=mode)
     if results.empty:
         print("Aucun combo au-dessus du plancher de trades."); return
 

@@ -67,3 +67,38 @@ def test_walk_forward_runs():
                       min_trades=3, folds=3)
     assert "fold" in wf.columns
     assert "val_r_moy" in wf.columns
+
+
+def _series_with_drops(n=400, period=30, seed=0):
+    """Marche aléatoire calme entrecoupée de chutes violentes périodiques (vol ×6)."""
+    rng = np.random.default_rng(seed)
+    rows, c = [], 100.0
+    for k in range(n):
+        if k > 60 and k % period == 0:                 # chute brutale one-sided
+            o, lo, cl = c, c - 12.0, c - 11.5
+            rows.append([o, o + 0.1, lo, cl, 6000.0])
+            c = cl
+        else:
+            c = c + rng.normal(0, 0.4)
+            o = c + rng.normal(0, 0.3)
+            h, l = max(o, c) + abs(rng.normal(0, 0.3)), min(o, c) - abs(rng.normal(0, 0.3))
+            rows.append([o, h, l, c, 1000 * rng.uniform(0.8, 1.1)])
+    idx = pd.date_range("2024-01-01", periods=len(rows), freq="h", tz="UTC")
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
+    return add_features(df, vol_ma=20, atr_period=14)
+
+
+def _void_feats(n_symbols=4):
+    return {f"S{s}/USDT": _series_with_drops(seed=s + 1) for s in range(n_symbols)}
+
+
+def test_grid_search_void_mode():
+    cfg = dict(lookback=80, buffer=5, vol_ma=20, atr_period=14, void={})
+    # require_uptrend=False pour garantir des trades quelle que soit la tendance synthétique
+    grid = {"ret_z": [-2.0, -2.5], "fill_target": [0.5, 0.75],
+            "z_window": [20], "require_uptrend": [False]}
+    res = grid_search(_void_feats(), cfg, grid=grid, metric="robust",
+                      min_trades=3, split=0.6, mode="void")
+    assert not res.empty
+    assert res["is_metric"].is_monotonic_decreasing
+    assert {"ret_z", "fill_target", "is_n", "oos_n", "oos_r_moy"}.issubset(res.columns)
