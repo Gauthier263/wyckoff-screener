@@ -22,6 +22,8 @@ def get_exchange(name: str = "binance"):
         # Le miroir public de market-data ne sert que le spot : on restreint le
         # chargement des marchés pour éviter les endpoints futures (géo-bloqués).
         opts["options"] = {"fetchMarkets": ["spot"]}
+    elif name == "bitget":
+        opts["options"] = {"defaultType": "swap"}   # périmètre = perpétuels (futures)
     ex = klass(opts)
 
     # ccxt embarque son propre bundle certifi ; une session requests standard honore
@@ -57,6 +59,55 @@ def build_universe(ex, quote: str = "USDT", top_n: int = 60,
         rows.append((sym, qv))
     rows.sort(key=lambda r: r[1], reverse=True)
     return [s for s, _ in rows[:top_n]]
+
+
+# Classement cosmétique des sous-jacents RWA (Real World Asset) pour la colonne "type".
+_METALS = {"XAU", "XAUT", "XAG", "XPT", "XPD", "PAXG", "COPPER"}
+_COMMOD = {"CL", "NATGAS"}
+_INDICES = {"SP500", "NDX100", "QQQ", "SPY", "SOXL", "SOXS", "TQQQ", "SQQQ",
+            "DXYZ", "KWEB", "INDA", "EWH", "EWJ", "EWT", "EWY", "DFEN"}
+
+
+def classify_market(base: str, is_rwa: bool) -> str:
+    """crypto | metal | commodity | index | stock — d'après le flag RWA Bitget + sous-jacent."""
+    if not is_rwa:
+        return "crypto"
+    if base in _METALS:
+        return "metal"
+    if base in _COMMOD:
+        return "commodity"
+    if base in _INDICES:
+        return "index"
+    return "stock"
+
+
+def build_futures_universe(ex, quote: str = "USDT", min_quote_volume: float = 5_000_000.0,
+                           exclude: tuple[str, ...] = ("UP", "DOWN", "BULL", "BEAR"),
+                           include_rwa: bool = True) -> list[tuple[str, str]]:
+    """Univers des perpétuels {BASE}/{quote}:{quote} de Bitget.
+
+    On garde **tout le RWA** (actions/métaux/indices/MP — flag `isRwa`) quel que soit son
+    volume, et **uniquement les cryptos dont le volume 24h ≥ `min_quote_volume`**.
+    Renvoie une liste de (symbole, catégorie). La catégorie vient de `classify_market`.
+    """
+    tickers = ex.fetch_tickers()
+    out: list[tuple[str, str]] = []
+    for sym, m in ex.markets.items():
+        if m.get("type") != "swap" or m.get("settle") != quote or not m.get("active", True):
+            continue
+        base = m.get("base", "")
+        is_rwa = str(m.get("info", {}).get("isRwa", "")).upper() == "YES"
+        cat = classify_market(base, is_rwa)
+        if cat == "crypto":
+            if any(tag in base for tag in exclude):           # exclut les tokens à levier
+                continue
+            qv = (tickers.get(sym) or {}).get("quoteVolume") or 0
+            if qv < min_quote_volume:                         # exclut le crypto peu liquide
+                continue
+        elif not include_rwa:
+            continue
+        out.append((sym, cat))
+    return out
 
 
 def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,

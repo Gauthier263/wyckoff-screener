@@ -214,6 +214,47 @@ def detect_voids(
     return voids
 
 
+def void_efficiency(df: pd.DataFrame, th: VoidThresholds | None = None,
+                    horizon: int = 48, last_n: int = 20,
+                    fill_levels: tuple[float, float] = (0.5, 0.9)) -> dict:
+    """Mesure si le marché a l'habitude de *combler* les vides de chute.
+
+    Pour chaque chute anormale de l'historique (toutes, gate de tendance ignoré ici),
+    on regarde la récupération maximale atteinte dans `horizon` barres, mesurée depuis la
+    clôture de la chute vers le haut du vide. On ne retient que les vides disposant d'une
+    fenêtre **complète** de `horizon` barres (sinon le comptage serait biaisé), puis les
+    `last_n` plus récents. Renvoie le nombre atteignant `fill_levels` (défaut 50 % / 90 %),
+    les pourcentages et la médiane de barres pour atteindre 90 %.
+    """
+    th = th or VoidThresholds()
+    n = len(df)
+    sigs = [s for s in drop_signals(df, th) if s.i + 1 + horizon <= n]   # fenêtre complète
+    sigs = sigs[-last_n:]
+    lo_lvl, hi_lvl = fill_levels
+    h, c = df["high"].values, df["close"].values
+    n_lo = n_hi = 0
+    bars_to_hi: list[int] = []
+    for sg in sigs:
+        i = sg.i
+        ref, span = float(c[i]), sg.top - float(c[i])
+        if span <= 0:
+            continue
+        reached = (np.maximum.accumulate(h[i + 1: i + 1 + horizon]) - ref) / span
+        if reached[-1] >= lo_lvl:
+            n_lo += 1
+        if reached[-1] >= hi_lvl:
+            n_hi += 1
+            bars_to_hi.append(int(np.argmax(reached >= hi_lvl)) + 1)
+    nv = len(sigs)
+    return {
+        "n_voids": nv,
+        "fill50": n_lo, "fill90": n_hi,
+        "pct50": round(100 * n_lo / nv, 1) if nv else 0.0,
+        "pct90": round(100 * n_hi / nv, 1) if nv else 0.0,
+        "median_bars90": int(np.median(bars_to_hi)) if bars_to_hi else None,
+    }
+
+
 def _why(z: float, size_atr: float, vr: float, body_frac: float,
          fill_frac: float, status: FillStatus, reclaimed: bool, in_uptrend: bool) -> str:
     fill_txt = {

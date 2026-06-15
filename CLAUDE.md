@@ -6,6 +6,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 ## Architecture
 - `screener/data.py` — ccxt : `build_universe()` (top paires USDT par volume),
   `fetch_ohlcv()` avec cache parquet. Import ccxt paresseux (tests hors-ligne).
+  `get_exchange` gère binance (miroir spot data-api.binance.vision, contourne le 451) et
+  bitget (`defaultType: swap`) ; session requests honorant la CA du proxy.
+  `build_futures_universe()` (Bitget) : garde tout le RWA (actions/métaux/indices/MP, flag
+  `isRwa`) + cryptos au volume ≥ seuil ; `classify_market` → crypto/metal/commodity/index/stock.
+- `screener/void_scan.py` — `scan()` : classe les paires futures par **efficacité de
+  comblement** des vides de chute. Pour chaque paire, `liquidity.void_efficiency` compte sur
+  les `last_n` derniers vides combien se récupèrent à 50 %/90 % sous `horizon` barres (fenêtre
+  complète exigée). Verdict `efficace` si ≥ `keep_pct` % atteignent 90 %. Sortie triée + CSV.
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
@@ -94,6 +102,7 @@ python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --void --chart     # FVG/voids ICT non comblés + PNG
 python -m screener.backtest --void --fill-target 0.5 --require-uptrend       # backtest thèse comblement
+python -m screener.void_scan --exchange bitget --min-volume 5e6             # paires futures efficaces (comblement)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

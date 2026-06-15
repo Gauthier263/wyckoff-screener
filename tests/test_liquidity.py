@@ -91,6 +91,36 @@ def test_backtest_void_fills_win():
     assert t.event in ("void_up", "void_down")
 
 
+def _cycles(n_cycles, recover, seed):
+    """Série : chutes brutales répétées, suivies (ou non) d'une récupération complète."""
+    rng = np.random.default_rng(seed)
+    rows, c = [], 100.0
+    for _ in range(30):                                   # calme initial (z/MA)
+        c += rng.normal(0, 0.3); o = c + rng.normal(0, 0.2)
+        h, l = max(o, c) + abs(rng.normal(0, 0.2)), min(o, c) - abs(rng.normal(0, 0.2))
+        rows.append([o, h, l, c, 1000 * rng.uniform(0.9, 1.1)])
+    for _ in range(n_cycles):
+        top = c
+        rows.append([c, c + 0.1, c - 9.0, c - 8.5, 6000.0]); c = c - 8.5   # chute
+        if recover:
+            rows.append([c, top + 1.0, c - 0.2, top + 0.5, 1500.0]); c = top + 0.5   # comble
+        for _ in range(14):                               # dérive (volume normal)
+            c += rng.normal(0, 0.3); o = c + rng.normal(0, 0.2)
+            h, l = max(o, c) + abs(rng.normal(0, 0.2)), min(o, c) - abs(rng.normal(0, 0.2))
+            rows.append([o, h, l, c, 1000 * rng.uniform(0.9, 1.1)])
+    return _df(rows)
+
+
+def test_void_efficiency_distinguishes_markets():
+    from screener.liquidity import void_efficiency
+    eff = void_efficiency(_cycles(6, recover=True, seed=1), th=TH, horizon=8, last_n=20)
+    ineff = void_efficiency(_cycles(6, recover=False, seed=2), th=TH, horizon=8, last_n=20)
+    assert eff["n_voids"] >= 5 and ineff["n_voids"] >= 5
+    assert eff["pct90"] >= 80.0          # marché qui rééquilibre
+    assert ineff["pct90"] <= 20.0        # marché qui ne récupère pas
+    assert eff["median_bars90"] is not None
+
+
 def test_trend_gate_flags_downtrend():
     # chute anormale au sein d'un downtrend établi → in_uptrend False (couteau qui tombe)
     rows = _drift(60, 140.0, seed=5, step=-0.8)       # dérive baissière (prix < MA ? non…)
