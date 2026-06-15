@@ -209,8 +209,8 @@ def walk_forward(feats: dict[str, pd.DataFrame], cfg: dict, grid: dict | None = 
 # Grille des paramètres d'entrée + cible. DP_KEYS → DivergenceParams.
 ENTRY_GRID = {
     "zone_atr": [0.4, 0.6, 0.8],
-    "min_bounce_frac": [0.15, 0.25, 0.40],
-    "entry_stop_atr": [0.4, 0.6, 0.9],
+    "min_bounce_frac": [0.15, 0.30],
+    "entry_stop_atr": [0.4, 0.8],
     "target": ["t1", "t2"],
 }
 DP_KEYS = {"zone_atr", "min_bounce_frac", "entry_stop_atr", "undercut_atr", "min_sep",

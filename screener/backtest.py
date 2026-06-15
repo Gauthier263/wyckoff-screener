@@ -147,12 +147,27 @@ def backtest_entry_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTPar
     look = cfg["lookback"] + cfg["buffer"]
     trades: list[Trade] = []
 
+    # Pré-filtre vectorisé : la détection ne peut aboutir que si la barre courante teste
+    # un extrême récent. On ne lance la détection (coûteuse) que sur ces barres-là.
+    lows, highs, atrs = feat["low"].values, feat["high"].values, feat["atr"].values
+    roll_lo = feat["low"].rolling(cfg["lookback"], min_periods=cfg["lookback"]).min().values
+    roll_hi = feat["high"].rolling(cfg["lookback"], min_periods=cfg["lookback"]).max().values
+
     t = lo
     while t < hi:
+        atr_t = float(atrs[t])
+        if not atr_t or np.isnan(atr_t):
+            t += 1
+            continue
+        near_lo = lows[t] <= roll_lo[t] + 1.0 * atr_t
+        near_hi = highs[t] >= roll_hi[t] - 1.0 * atr_t
+        if not (near_lo or (near_hi and not long_only)):
+            t += 1
+            continue
+
         sl = feat.iloc[: t + 1]
         tr = detect_trading_range(sl, lookback=cfg["lookback"], buffer=cfg["buffer"])
-        atr_t = float(feat["atr"].iloc[t])
-        if not tr.is_valid or not atr_t or np.isnan(atr_t):
+        if not tr.is_valid:
             t += 1
             continue
 
