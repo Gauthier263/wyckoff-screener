@@ -3,7 +3,7 @@
 // L'écran maître (projeté) : http://localhost:3000/
 
 import http from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import os from "node:os";
@@ -16,24 +16,46 @@ import { CONFIG } from "./game/config.js";
 import { GameEngine } from "./game/engine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const BANK_PATH = join(__dirname, "data", "questions.json");
 
 // --- Banque de questions, groupée par thème -------------------------------
-const bankRaw = JSON.parse(readFileSync(join(__dirname, "data", "questions.json"), "utf8"));
-const bankByTheme = {};
-for (const q of bankRaw.questions) {
-  (bankByTheme[q.theme] ||= []).push(q);
+let bankRaw = JSON.parse(readFileSync(BANK_PATH, "utf8"));
+function groupByTheme(questions) {
+  const by = {};
+  for (const q of questions) (by[q.theme] ||= []).push(q);
+  return by;
 }
 
 // --- App / serveur ---------------------------------------------------------
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const engine = new GameEngine(io, bankByTheme);
+const engine = new GameEngine(io, groupByTheme(bankRaw.questions));
 
+app.use(express.json({ limit: "4mb" }));
 app.use(express.static(join(__dirname, "public")));
 
 app.get("/", (_req, res) => res.sendFile(join(__dirname, "public", "host.html")));
 app.get("/play", (_req, res) => res.sendFile(join(__dirname, "public", "play.html")));
+app.get("/admin", (_req, res) => res.sendFile(join(__dirname, "public", "admin.html")));
+
+// --- Éditeur : lire / enregistrer la banque -------------------------------
+app.get("/api/bank", (_req, res) => res.json(bankRaw));
+
+app.post("/api/bank", (req, res) => {
+  const questions = req.body?.questions;
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return res.status(400).json({ ok: false, error: "Format invalide." });
+  }
+  bankRaw = { ...bankRaw, questions };
+  try {
+    writeFileSync(BANK_PATH, JSON.stringify(bankRaw, null, 2) + "\n", "utf8");
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: "Écriture impossible : " + e.message });
+  }
+  engine.setBank(groupByTheme(questions));
+  res.json({ ok: true, validated: engine.validatedCounts() });
+});
 
 // Adresse LAN + QR code, pour que les élèves rejoignent en un scan.
 function lanAddress() {
@@ -84,6 +106,9 @@ server.listen(CONFIG.port, () => {
   console.log("──────────────────────────────────────");
   console.log(`   Écran maître (projeté) : ${url}/  (ou http://localhost:${CONFIG.port}/)`);
   console.log(`   Tablettes des élèves   : ${url}/play`);
-  console.log(`   Banque : ${bankRaw.questions.length} questions, ${Object.keys(bankByTheme).length} thèmes.`);
+  console.log(`   Gérer les questions    : ${url}/admin`);
+  const valides = engine.validatedCounts()._totalValides;
+  console.log(`   Banque : ${bankRaw.questions.length} questions (${valides} validée(s) / proposée(s)).`);
+  if (valides === 0) console.log(`   ⚠ Aucune question validée : ouvre /admin pour en proposer aux élèves.`);
   console.log("──────────────────────────────────────\n");
 });

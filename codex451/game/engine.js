@@ -104,22 +104,54 @@ export class GameEngine {
     return [...this.players.values()].filter((p) => p.alive);
   }
 
+  // Nombre de questions VALIDÉES (proposables) par thème.
+  validatedCounts() {
+    const out = {};
+    for (const round of CONFIG.rounds) {
+      const pool = this.bank[round.theme] || [];
+      out[round.theme] = { total: pool.length, valides: pool.filter((q) => q.valide).length };
+    }
+    out._totalValides = Object.values(out).reduce((s, x) => s + (x.valides || 0), 0);
+    return out;
+  }
+
   // ---- Contrôles prof ----------------------------------------------------
   hostStart(opts = {}) {
     if (this.phase !== PHASES.LOBBY) return;
     if (opts.timeLimitMs) this.timeLimitMs = Number(opts.timeLimitMs);
     const racers = this.alivePlayers();
-    if (racers.length === 0) return;
+    if (racers.length === 0) {
+      this.io.to("host").emit("host:notice", { type: "erreur", message: "Aucun joueur connecté." });
+      return;
+    }
+    if (this.validatedCounts()._totalValides === 0) {
+      this.io.to("host").emit("host:notice", {
+        type: "erreur",
+        message: "Aucune question validée. Ouvre « Gérer les questions » pour en valider.",
+      });
+      return;
+    }
     this.schedule = eliminationSchedule(racers.length, CONFIG.rounds.length);
     this.roundIndex = 0;
     this.startRound();
   }
 
   startRound() {
+    // On ne propose que les questions validées par le maître ; les thèmes sans
+    // question validée sont sautés automatiquement.
+    while (this.roundIndex < CONFIG.rounds.length) {
+      const round = CONFIG.rounds[this.roundIndex];
+      const pool = (this.bank[round.theme] || []).filter((q) => q.valide);
+      pool.sort((a, b) => (a.difficulte || 1) - (b.difficulte || 1));
+      this.roundQuestions = pool.slice(0, CONFIG.questionsPerRound);
+      if (this.roundQuestions.length > 0) break;
+      this.roundIndex += 1;
+    }
+    if (this.roundIndex >= CONFIG.rounds.length) {
+      this.gameOver();
+      return;
+    }
     const round = CONFIG.rounds[this.roundIndex];
-    const pool = (this.bank[round.theme] || []).slice();
-    pool.sort((a, b) => (a.difficulte || 1) - (b.difficulte || 1));
-    this.roundQuestions = pool.slice(0, CONFIG.questionsPerRound);
     this.qIndex = 0;
     this.io.to("host").emit("roundStart", {
       roundIndex: this.roundIndex,
@@ -373,7 +405,14 @@ export class GameEngine {
       totalRounds: CONFIG.rounds.length,
       timeLimitMs: this.timeLimitMs,
       players: this.leaderboard(),
+      validated: this.validatedCounts(),
     };
+  }
+
+  // Recharge la banque après une modification via l'éditeur, et informe l'hôte.
+  setBank(bankByTheme) {
+    this.bank = bankByTheme;
+    this.io.to("host").emit("host:validated", this.validatedCounts());
   }
 }
 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CODEX 451 — Gérer les questions</title>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+  <header class="barre">
+    <div>
+      <div class="titre-jeu">🔥 CODEX 451 — Gérer les questions</div>
+      <div class="sous-titre">Valide ou modifie chaque question. Seules les questions <b>validées</b> sont proposées aux élèves.</div>
+    </div>
+    <div class="actions">
+      <span id="resume" class="resume-pill">…</span>
+      <button id="btn-tout-valider" class="btn secondaire">Tout valider</button>
+      <button id="btn-tout-devalider" class="btn fantome">Tout retirer</button>
+      <button id="btn-save" class="btn">💾 Enregistrer</button>
+      <a class="btn fantome" href="/" target="_blank" rel="noopener">↩ Écran maître</a>
+    </div>
+  </header>
+
+  <div id="etat" class="etat cache"></div>
+
+  <main id="liste">Chargement…</main>
+
+  <footer class="pied">
+    <button id="btn-save2" class="btn">💾 Enregistrer les modifications</button>
+  </footer>
+
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -22,12 +22,15 @@
           <option value="45000">45 s</option>
         </select>
       </label>
+      <a class="btn fantome" href="/admin" target="_blank" rel="noopener">⚙ Gérer les questions</a>
       <button id="btn-start" class="btn">Lancer la partie</button>
       <button id="btn-reveal" class="btn secondaire cache">Révéler</button>
       <button id="btn-next" class="btn cache">Suivant ▶</button>
       <button id="btn-reset" class="btn fantome">Réinitialiser</button>
     </div>
   </header>
+
+  <div id="host-notice" class="host-notice cache"></div>
 
   <main>
     <!-- LOBBY -->
@@ -43,6 +46,7 @@
         <div class="carte joueurs-lobby">
           <h2>Passeurs connectés — <span id="lobby-count">0</span></h2>
           <div id="lobby-liste" class="puces"></div>
+          <div id="lobby-valide" class="lobby-valide"></div>
         </div>
       </div>
     </section>

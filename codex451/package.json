@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node server.js",
     "check": "node game/validate.js",
-    "check:propositions": "node game/validate.js data/propositions.json",
     "revision": "node game/revision.js"
   },
   "engines": {

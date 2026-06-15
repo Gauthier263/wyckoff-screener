@@ -10,6 +10,12 @@
 .chrono-reglage { color: var(--gris); font-size: 0.85rem; display: flex; flex-direction: column; gap: 2px; }
 .chrono-reglage select { background: var(--cendre); color: var(--ivoire); border: 1px solid var(--cendre-clair); border-radius: 8px; padding: 4px 8px; }
 
+.host-notice { margin: 0.8rem 1.6rem 0; padding: 0.8rem 1rem; border-radius: 10px; font-weight: 700; }
+.host-notice.erreur { background: #271414; color: var(--rouge); border: 1px solid var(--rouge); }
+.lobby-valide { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--cendre-clair); color: var(--gris); font-weight: 600; }
+.lobby-valide b { color: var(--or); }
+.lobby-valide.vide b { color: var(--rouge); }
+
 main { padding: 1.4rem clamp(1rem, 4vw, 3rem); }
 .vue { animation: fade 0.25s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }

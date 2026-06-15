@@ -1,0 +1,57 @@
+/* CODEX 451 — page de gestion des questions (maître). */
+.barre {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  flex-wrap: wrap; padding: 1rem 1.6rem; border-bottom: 1px solid var(--cendre-clair);
+  background: rgba(11, 10, 9, 0.85); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(6px);
+}
+.actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.resume-pill { background: var(--cendre); border: 1px solid var(--cendre-clair); border-radius: 999px; padding: 0.4rem 0.9rem; font-weight: 700; }
+.actions a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+
+.etat { position: sticky; top: 72px; z-index: 9; margin: 0.6rem 1.6rem; padding: 0.7rem 1rem; border-radius: 10px; font-weight: 700; }
+.etat.ok { background: #14271d; color: var(--vert); border: 1px solid var(--vert); }
+.etat.err { background: #271414; color: var(--rouge); border: 1px solid var(--rouge); }
+.etat.warn { background: #2a2410; color: var(--or); border: 1px solid var(--or); }
+
+main { padding: 1rem clamp(1rem, 4vw, 3rem) 5rem; max-width: 1000px; margin: 0 auto; }
+
+.theme-bloc { margin-bottom: 2rem; }
+.theme-tete { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin: 1.2rem 0 0.6rem; }
+.theme-tete h2 { margin: 0; color: var(--or); }
+.theme-tete .compte { color: var(--gris); font-weight: 700; }
+.theme-tete .btn { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+
+.q-edit {
+  background: linear-gradient(180deg, rgba(42,37,33,0.6), rgba(22,19,15,0.7));
+  border: 1px solid var(--cendre-clair); border-left: 4px solid var(--cendre-clair);
+  border-radius: 12px; padding: 1rem 1.1rem; margin: 0.7rem 0;
+}
+.q-edit.valide { border-left-color: var(--vert); }
+.q-tete { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.q-tete .badge { background: var(--cendre); border: 1px solid var(--cendre-clair); border-radius: 6px; padding: 0.15rem 0.6rem; font-size: 0.8rem; font-weight: 700; }
+.q-tete .id { color: var(--gris); font-family: monospace; font-size: 0.8rem; }
+.q-tete .toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight: 800; user-select: none; }
+.q-tete .toggle input { width: 20px; height: 20px; accent-color: var(--vert); }
+.q-tete .toggle .lbl-on { color: var(--vert); }
+.q-tete .toggle .lbl-off { color: var(--gris); }
+
+.champ { display: grid; gap: 0.25rem; margin: 0.5rem 0; }
+.champ > label { font-size: 0.8rem; color: var(--gris); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.q-edit textarea, .q-edit input[type=text] {
+  font: inherit; background: var(--charbon); color: var(--ivoire);
+  border: 1px solid var(--cendre-clair); border-radius: 8px; padding: 0.55rem 0.7rem; width: 100%; resize: vertical;
+}
+.q-edit textarea { min-height: 2.6rem; }
+
+.opts { display: grid; gap: 0.35rem; }
+.opt-ligne { display: flex; align-items: center; gap: 0.6rem; }
+.opt-ligne input[type=radio] { width: 18px; height: 18px; accent-color: var(--vert); flex: none; }
+.opt-ligne input[type=text] { flex: 1; }
+.opt-ligne .juste { font-size: 0.75rem; color: var(--vert); font-weight: 700; width: 3.5rem; }
+
+.vf-choix { display: flex; gap: 1.2rem; align-items: center; }
+.vf-choix label { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; cursor: pointer; }
+.classer-ro { font-size: 0.9rem; color: var(--gris); background: var(--charbon); border: 1px dashed var(--cendre-clair); border-radius: 8px; padding: 0.6rem; }
+.aide { font-size: 0.78rem; color: var(--gris); }
+
+.pied { position: sticky; bottom: 0; padding: 0.8rem 1.6rem; background: rgba(11,10,9,0.9); border-top: 1px solid var(--cendre-clair); text-align: center; backdrop-filter: blur(6px); }

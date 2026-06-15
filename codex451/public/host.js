@@ -36,6 +36,29 @@ function boutons({ start, reveal, next, nextLabel }) {
 socket.on("host:state", (s) => {
   if (s.phase === "lobby") { montrer("lobby"); boutons({ start: true }); }
   if (s.timeLimitMs) $("time-select").value = String(s.timeLimitMs);
+  if (s.validated) majValide(s.validated);
+});
+
+// Compteur de questions validées (proposées aux élèves)
+socket.on("host:validated", majValide);
+function majValide(v) {
+  const total = v._totalValides || 0;
+  const el = $("lobby-valide");
+  if (!el) return;
+  el.classList.toggle("vide", total === 0);
+  el.innerHTML = total === 0
+    ? `⚠ <b>Aucune question validée.</b> Ouvre « Gérer les questions » pour en proposer aux élèves.`
+    : `<b>${total}</b> question(s) validée(s) prêtes à être jouées. <span class="hint">(Gère-les via « Gérer les questions ».)</span>`;
+}
+
+// Messages / erreurs côté maître
+socket.on("host:notice", ({ type, message }) => {
+  const el = $("host-notice");
+  el.className = "host-notice " + (type || "erreur");
+  el.textContent = message;
+  el.classList.remove("cache");
+  clearTimeout(window._noticeT);
+  window._noticeT = setTimeout(() => el.classList.add("cache"), 6000);
 });
 
 // --- Lobby : liste des joueurs --------------------------------------------

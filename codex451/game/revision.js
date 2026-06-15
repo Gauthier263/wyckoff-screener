@@ -11,7 +11,7 @@ import { CONFIG } from "./config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
-const target = process.argv[2] || join(ROOT, "data", "propositions.json");
+const target = process.argv[2] || join(ROOT, "data", "questions.json");
 const bank = JSON.parse(readFileSync(target, "utf8"));
 
 const TYPE_LBL = { qcm: "QCM", vraifaux: "Vrai / Faux", saisie: "Réponse à taper", classer: "Glisser-classer" };
