@@ -38,6 +38,8 @@ class DivergenceParams:
     equal_tol_pct: float = 0.003 # bande d'« égalité » des pivots (fraction de prix) : au-delà,
                                  # un 2e creux plus haut (resp. sommet plus bas) n'est plus une divergence
     support_frac: float = 0.33   # « près de la borne » : fraction de hauteur depuis la borne
+    min_atr_pct: float = 0.0     # volatilité mini (ATR/prix) : écarte les paires trop peu
+                                 # volatiles où les frais fixes pulvérisent le stop serré
     recent_bars: int = 8         # le 2ᵉ pivot doit tomber dans les N dernières barres
     left: int = 2                # fractale : barres à gauche d'un pivot
     right: int = 2               # fractale : barres à droite (retard de confirmation)
@@ -154,6 +156,10 @@ def _detect_side(
     height = tr.height
     if not (height and height > 0):
         return None
+    if params.min_atr_pct:
+        atr_last, close_last = float(df["atr"].iloc[-1]), float(df["close"].iloc[-1])
+        if close_last > 0 and atr_last / close_last < params.min_atr_pct:
+            return None  # paire trop peu volatile (frais > edge)
 
     sw = swing_points(win, left=params.left, right=params.right)
     flag = sw["swing_low"] if acc else sw["swing_high"]
@@ -362,6 +368,8 @@ def _entry_side(symbol: str, df: pd.DataFrame, win: pd.DataFrame, tr: TradingRan
     cur = win.iloc[-1]
     test_ext = float(cur["low"] if acc else cur["high"])
     test_close = float(cur["close"])
+    if params.min_atr_pct and test_close > 0 and atr / test_close < params.min_atr_pct:
+        return None  # trop peu volatile : setup non rentable après frais
     test_open = float(cur["open"])
     clv = float(cur["clv"])
     vr = float(cur["vol_ratio"]) if not np.isnan(cur["vol_ratio"]) else 1.0

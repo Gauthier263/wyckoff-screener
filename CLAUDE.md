@@ -50,7 +50,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   utilisable en live ET en backtest (`df[:t+1]`). `FormingEntry` sort le niveau LIMITE
   (zone du 1er creux), le STOP (au-delà du 2ᵉ creux), la ligne de cou (T1), l'objectif
   mesuré (T2), le R:R et `confirmed`. Params entrée : `min_sep, min_bounce_frac, zone_atr,
-  undercut_atr, entry_stop_atr`.
+  undercut_atr, entry_stop_atr`. `min_atr_pct` (volatilité mini ATR/prix) écarte les paires
+  quasi-peggées (stablecoins/BTC/XAUT) où les frais dépassent l'edge — appliqué aux deux
+  détecteurs. Backtest validé : T1 (ligne de cou) ≫ T2, edge OOS-robuste et net-positif
+  seulement au-dessus de ~1.5 % d'ATR.
 - `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure. Dessine les
   bougies sur une **TF inférieure** que l'analyse (`FINER_TF` : H4→H1, H1→15m, 15m→5m).
   Bornes : **plancher = climax (SC), plafond = AR** (c'est l'AR qui le définit), miroir
