@@ -1,0 +1,19 @@
+{
+  "name": "codex451",
+  "version": "1.0.0",
+  "description": "CODEX 451 — jeu de grammaire multijoueur (3e), univers Fahrenheit 451. Serveur local pour la classe.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node game/validate.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5"
+  }
+}

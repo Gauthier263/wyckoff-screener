@@ -1,0 +1,78 @@
+/* CODEX 451 — écran maître (projeté). Pensé grand écran / vidéoprojecteur. */
+.barre {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 1rem; padding: 1rem 1.6rem; flex-wrap: wrap;
+  border-bottom: 1px solid var(--cendre-clair);
+  background: rgba(11, 10, 9, 0.6);
+  position: sticky; top: 0; z-index: 5; backdrop-filter: blur(6px);
+}
+.controles { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.chrono-reglage { color: var(--gris); font-size: 0.85rem; display: flex; flex-direction: column; gap: 2px; }
+.chrono-reglage select { background: var(--cendre); color: var(--ivoire); border: 1px solid var(--cendre-clair); border-radius: 8px; padding: 4px 8px; }
+
+main { padding: 1.4rem clamp(1rem, 4vw, 3rem); }
+.vue { animation: fade 0.25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+/* Lobby */
+.lobby-grille { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; gap: 1.4rem; }
+.rejoindre { text-align: center; }
+.join-url { font-size: clamp(1.1rem, 2.4vw, 1.8rem); font-weight: 800; color: var(--or); word-break: break-all; margin: 0.5rem 0; }
+.qr { width: 240px; height: 240px; background: #fff; border-radius: 12px; padding: 8px; }
+.hint { color: var(--gris); font-size: 0.9rem; }
+.puces { display: flex; flex-wrap: wrap; gap: 0.5rem; align-content: flex-start; }
+.puce {
+  background: var(--cendre); border: 1px solid var(--cendre-clair);
+  border-radius: 999px; padding: 0.4rem 0.9rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+.puce.mort { opacity: 0.45; text-decoration: line-through; }
+.puce .pts { color: var(--or); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 800px) { .lobby-grille { grid-template-columns: 1fr; } }
+
+/* Question */
+.bandeau { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+.badge { background: var(--cendre); border: 1px solid var(--cendre-clair); border-radius: 8px; padding: 0.3rem 0.8rem; font-weight: 700; font-size: 0.95rem; }
+.badge.survivants b { color: var(--or); }
+.question-carte { margin: 1rem 0; }
+.q-prompt { font-size: clamp(1.4rem, 3vw, 2.4rem); font-weight: 800; line-height: 1.25; }
+.q-zone { margin-top: 1.2rem; display: grid; gap: 0.7rem; }
+.q-zone .opt {
+  background: var(--cendre); border: 1px solid var(--cendre-clair);
+  border-radius: 12px; padding: 0.9rem 1.1rem; font-size: 1.25rem; font-weight: 600;
+  display: flex; align-items: center; gap: 0.8rem;
+}
+.q-zone .opt .lettre { width: 2rem; height: 2rem; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--braise); color: var(--noir); font-weight: 800; }
+.reponses-compteur { text-align: center; color: var(--gris); font-size: 1.1rem; }
+.reponses-compteur b { color: var(--or); }
+
+/* Révélation */
+.r-solution { font-size: 1.5rem; font-weight: 800; color: var(--vert); margin-bottom: 0.6rem; }
+.r-explication { color: var(--ivoire); font-size: 1.15rem; line-height: 1.5; border-left: 3px solid var(--braise); padding-left: 0.9rem; margin-top: 0.6rem; }
+.r-distribution { display: grid; gap: 0.4rem; margin: 0.6rem 0; }
+.r-distribution .barre-rep { display: flex; align-items: center; gap: 0.6rem; }
+.r-distribution .lbl { width: 40%; font-weight: 600; }
+.r-distribution .jauge { height: 22px; border-radius: 6px; background: var(--cendre-clair); flex: 1; overflow: hidden; }
+.r-distribution .jauge > span { display: block; height: 100%; background: var(--braise); }
+.r-distribution .barre-rep.bonne .jauge > span { background: var(--vert); }
+.r-distribution .n { width: 2.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Leaderboard */
+.leaderboard { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.leaderboard li { display: flex; align-items: center; gap: 0.8rem; background: var(--cendre); border-radius: 10px; padding: 0.5rem 0.9rem; }
+.leaderboard li .rang { width: 2rem; font-weight: 800; color: var(--or); }
+.leaderboard li .nom { flex: 1; font-weight: 600; }
+.leaderboard li .score { color: var(--or); font-weight: 800; font-variant-numeric: tabular-nums; }
+.leaderboard li.mort { opacity: 0.4; }
+.leaderboard li.top1 { border: 1px solid var(--or); box-shadow: 0 0 18px rgba(255, 193, 77, 0.25); }
+
+/* Fin de manche */
+.round-grille { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+@media (max-width: 800px) { .round-grille { grid-template-columns: 1fr; } }
+
+/* Victoire */
+.victoire { padding: 2.5rem; }
+.phenix { font-size: 5rem; animation: vacille 1.4s ease-in-out infinite alternate; }
+.winner { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; color: var(--or); margin: 0.4rem 0 1rem; }
+.victoire .leaderboard { max-width: 520px; margin: 1.4rem auto 0; text-align: left; }

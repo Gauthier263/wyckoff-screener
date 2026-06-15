@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CODEX 451 — Écran maître</title>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="host.css" />
+</head>
+<body>
+  <header class="barre">
+    <div>
+      <div class="titre-jeu">🔥 CODEX 451</div>
+      <div class="sous-titre">Les Derniers Passeurs — écran maître</div>
+    </div>
+    <div class="controles">
+      <label class="chrono-reglage">Temps/question
+        <select id="time-select">
+          <option value="15000">15 s</option>
+          <option value="20000" selected>20 s</option>
+          <option value="30000">30 s</option>
+          <option value="45000">45 s</option>
+        </select>
+      </label>
+      <button id="btn-start" class="btn">Lancer la partie</button>
+      <button id="btn-reveal" class="btn secondaire cache">Révéler</button>
+      <button id="btn-next" class="btn cache">Suivant ▶</button>
+      <button id="btn-reset" class="btn fantome">Réinitialiser</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- LOBBY -->
+    <section id="vue-lobby" class="vue">
+      <div class="lobby-grille">
+        <div class="carte rejoindre">
+          <h2>Rejoindre la résistance</h2>
+          <p>Sur la tablette, ouvre&nbsp;:</p>
+          <div id="join-url" class="join-url">…</div>
+          <img id="qr" class="qr" alt="QR code pour rejoindre" />
+          <p class="hint">Scanne le QR ou tape l'adresse, puis choisis ton pseudo.</p>
+        </div>
+        <div class="carte joueurs-lobby">
+          <h2>Passeurs connectés — <span id="lobby-count">0</span></h2>
+          <div id="lobby-liste" class="puces"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUESTION -->
+    <section id="vue-question" class="vue cache">
+      <div class="bandeau">
+        <span id="q-round" class="badge">Manche</span>
+        <span id="q-index" class="badge">Question</span>
+        <span class="badge survivants">Vivants : <b id="q-alive">0</b></span>
+      </div>
+      <div class="chrono-piste"><div id="chrono" class="chrono-jauge"></div></div>
+      <div class="carte question-carte">
+        <div id="q-prompt" class="q-prompt"></div>
+        <div id="q-zone" class="q-zone"></div>
+      </div>
+      <div class="reponses-compteur">Réponses reçues : <b id="answered">0</b> / <span id="answered-total">0</span></div>
+    </section>
+
+    <!-- REVELATION -->
+    <section id="vue-reveal" class="vue cache">
+      <div class="carte">
+        <h2>La bonne réponse</h2>
+        <div id="r-solution" class="r-solution"></div>
+        <div id="r-distribution" class="r-distribution"></div>
+        <div id="r-explication" class="r-explication"></div>
+      </div>
+      <div class="carte">
+        <h2>Classement</h2>
+        <ol id="r-leaderboard" class="leaderboard"></ol>
+      </div>
+    </section>
+
+    <!-- FIN DE MANCHE -->
+    <section id="vue-round" class="vue cache">
+      <h2 id="round-titre" class="centre"></h2>
+      <div class="round-grille">
+        <div class="carte">
+          <h3>🔥 Effacés cette manche</h3>
+          <div id="round-elimines" class="puces"></div>
+        </div>
+        <div class="carte">
+          <h3>🕊️ Passeurs survivants — <span id="round-survivants-n">0</span></h3>
+          <div id="round-survivants" class="puces"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VICTOIRE -->
+    <section id="vue-fin" class="vue cache">
+      <div class="carte victoire centre">
+        <div class="phenix">🦅</div>
+        <h1 class="titre-jeu">Gardien du Codex</h1>
+        <div id="winner" class="winner">—</div>
+        <p class="sous-titre">La langue est sauvée. Pour cette fois.</p>
+        <ol id="fin-leaderboard" class="leaderboard"></ol>
+      </div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="host.js"></script>
+</body>
+</html>

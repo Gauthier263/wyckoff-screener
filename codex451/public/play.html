@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>CODEX 451 — Passeur</title>
+  <link rel="stylesheet" href="shared.css" />
+  <link rel="stylesheet" href="play.css" />
+</head>
+<body>
+  <!-- En-tête joueur -->
+  <header id="entete" class="entete cache">
+    <div class="moi">
+      <div class="flamme"></div>
+      <div>
+        <div id="moi-pseudo" class="moi-pseudo">—</div>
+        <div id="moi-statut" class="moi-statut">Passeur</div>
+      </div>
+    </div>
+    <div class="moi-stats">
+      <div id="moi-score" class="moi-score">0</div>
+      <div class="moi-score-lbl">points</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- CONNEXION -->
+    <section id="vue-join" class="vue centre">
+      <div class="titre-jeu">🔥 CODEX 451</div>
+      <p class="sous-titre">Rejoins les Derniers Passeurs et sauve la langue.</p>
+      <div class="carte form">
+        <label for="pseudo">Ton nom de Passeur</label>
+        <input id="pseudo" maxlength="24" placeholder="ex. Montag" autocomplete="off" />
+        <button id="btn-join" class="btn">Rejoindre la résistance</button>
+        <p id="join-err" class="err cache">Choisis un pseudo.</p>
+      </div>
+    </section>
+
+    <!-- SALLE D'ATTENTE -->
+    <section id="vue-attente" class="vue centre cache">
+      <div class="braise-grosse"></div>
+      <h2>Te voilà des nôtres, <span id="attente-pseudo"></span>.</h2>
+      <p class="sous-titre">Garde ta flamme. La partie va commencer…</p>
+    </section>
+
+    <!-- QUESTION -->
+    <section id="vue-question" class="vue cache">
+      <div class="chrono-piste"><div id="chrono" class="chrono-jauge"></div></div>
+      <div id="q-meta" class="q-meta"></div>
+      <div class="carte">
+        <div id="q-prompt" class="q-prompt"></div>
+      </div>
+      <div id="q-zone" class="q-zone"></div>
+    </section>
+
+    <!-- REPONSE ENVOYEE -->
+    <section id="vue-envoye" class="vue centre cache">
+      <div class="check">✓</div>
+      <h2>Réponse transmise</h2>
+      <p class="sous-titre">Le Codex délibère…</p>
+    </section>
+
+    <!-- REVELATION -->
+    <section id="vue-reveal" class="vue centre cache">
+      <div id="reveal-icone" class="reveal-icone"></div>
+      <h2 id="reveal-titre"></h2>
+      <div id="reveal-points" class="reveal-points"></div>
+      <div id="reveal-explication" class="carte reveal-explication"></div>
+      <div id="reveal-rang" class="reveal-rang"></div>
+    </section>
+
+    <!-- ELIMINE -->
+    <section id="vue-mort" class="vue centre cache">
+      <div class="livre-brule">📕🔥</div>
+      <h2>Ton livre a brûlé.</h2>
+      <p class="sous-titre">Tu deviens un fantôme : continue de répondre pour t'entraîner, hors classement.</p>
+      <div id="mort-score" class="reveal-points"></div>
+    </section>
+
+    <!-- FIN -->
+    <section id="vue-fin" class="vue centre cache">
+      <div id="fin-icone" class="phenix-petit">🦅</div>
+      <h2 id="fin-titre"></h2>
+      <div id="fin-detail" class="sous-titre"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="play.js"></script>
+</body>
+</html>
