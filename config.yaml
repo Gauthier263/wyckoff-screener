@@ -58,7 +58,7 @@ void:
   ret_z: -2.5            # z-score robuste (médiane+MAD) du rendement : chute anormale
   drop_atr: 1.8          # amplitude range/ATR mini de la barre de chute
   body_frac: 0.6         # corps/range mini (barre one-sided, vrai displacement)
-  vol_ratio_min: 3.0     # volume ≥ ×moyenne (liquidité consommée / cascade)
+  vol_ratio_min: 2.5     # volume ≥ ×moyenne (liquidité consommée) — 2.5 validé OOS (+ de signaux, edge stable)
   z_window: 50           # fenêtre médiane/MAD pour le z robuste
   trend_ma: 100          # MA longue : gate de tendance (anti couteau qui tombe)
   reclaim_bars: 3        # fenêtre de snap-back (clôture > open de la chute)

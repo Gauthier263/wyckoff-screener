@@ -36,7 +36,7 @@ class BTParams:
     rr: float = 2.0           # ratio objectif / risque
     max_hold: int = 30        # barres max en position
     cooldown: int = 0         # barres à ignorer après une sortie
-    fill_target: float = 1.0  # [void] part du vide visée (1.0 = comblement complet, 0.5 = CE)
+    fill_target: float = 0.4  # [void] part du vide visée (0.4 validé OOS ; 0.5 = CE théorique)
     require_uptrend: bool = False  # [void] n'entrer que hors downtrend (gate anti-knife)
 
 
@@ -240,7 +240,7 @@ def main() -> None:
     ap.add_argument("--rr", type=float, default=2.0)
     ap.add_argument("--max-hold", type=int, default=30)
     ap.add_argument("--void", action="store_true", help="backteste la thèse de comblement des vides de chute")
-    ap.add_argument("--fill-target", type=float, default=1.0, help="[void] part du vide visée (1.0=complet, 0.5=CE)")
+    ap.add_argument("--fill-target", type=float, default=0.4, help="[void] part du vide visée (0.4 validé OOS, 0.5=CE)")
     ap.add_argument("--require-uptrend", action="store_true", help="[void] n'entrer que hors downtrend")
     ap.add_argument("--csv", default="backtest_trades.csv")
     ap.add_argument("--no-cache", action="store_true")
