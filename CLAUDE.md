@@ -23,6 +23,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `metric_value` (robust = espérance − z·erreur-type ; plancher min_trades),
   `overfit_report` (verdict robuste/fragile/surajustement), `walk_forward` (k plis).
   Features calculées une fois par symbole puis réutilisées sur toute la grille.
+  `grid_search_entry` / `walk_forward_entry` (option `--entry`) : tune les params
+  d'entrée 2ᵉ creux (`zone_atr`, `min_bounce_frac`, `entry_stop_atr`) + cible T1/T2,
+  en IS/OOS, `--long-only`, frais `--cost` (par côté). `BTParams.cost` = frais+slippage
+  par côté, soustrait du R dans les deux backtests.
 - `screener/window.py` — `detect_window_structure` : reconnaît une *séquence* Wyckoff
   ordonnée (SC→AR→ST→SOS en accumulation, BC→AR→ST→SOW en distribution) sur une
   fenêtre glissante (défaut 30 barres), indépendamment des bornes de la grande plage.
@@ -97,6 +101,7 @@ python -m screener.cli --timeframe 4h --divergence --forming-only --chart   # se
 python -m screener.cli --timeframe 4h --entry --chart   # entrée live au 2ᵉ creux (limite + confirmation)
 python -m screener.backtest --entry --timeframe 4h --top 80   # backtest de l'entrée 2ᵉ creux
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
+python -m screener.optimize --entry --long-only --timeframe 4h --cost 0.0005   # tuning entrée IS/OOS
 pytest -q
 ```
 

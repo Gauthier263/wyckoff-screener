@@ -37,6 +37,7 @@ class BTParams:
     rr: float = 2.0           # ratio objectif / risque
     max_hold: int = 30        # barres max en position
     cooldown: int = 0         # barres à ignorer après une sortie
+    cost: float = 0.0         # coût par côté (frais+slippage), fraction du notionnel
 
 
 @dataclass
@@ -114,7 +115,8 @@ def backtest_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTParams,
             stop, target = entry + risk, entry - p.rr * risk
 
         exit_i, exit_px, outcome = _simulate_exit(feat, t, direction, entry, stop, target, p)
-        r = ((exit_px - entry) if direction == "long" else (entry - exit_px)) / risk
+        gross = (exit_px - entry) if direction == "long" else (entry - exit_px)
+        r = (gross - p.cost * (entry + exit_px)) / risk
         trades.append(Trade(symbol, e.name, direction, t, entry, stop, target,
                             exit_i, exit_px, float(r), outcome))
         t = exit_i + 1 + p.cooldown   # pas de chevauchement
@@ -129,14 +131,15 @@ def backtest_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> li
 
 def backtest_entry_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTParams,
                             th: Thresholds, params: DivergenceParams,
+                            target: str = "t1", long_only: bool = False,
                             entry_start: int | None = None,
                             entry_end: int | None = None) -> list[Trade]:
     """Backtest du mode « entrée au 2ᵉ creux » (detect_forming_entry), sans lookahead.
 
     À la barre t, on détecte sur df[:t+1] ; si la barre courante est une entrée
     CONFIRMÉE (rejet + divergence dans la zone), on entre à la clôture de t. Stop = juste
-    au-delà du 2ᵉ creux (fourni par le détecteur), objectif = ligne de cou (T1). Résultat
-    en R = (sortie − entrée) / risque, risque = |entrée − stop|."""
+    au-delà du 2ᵉ creux. Cible : `target` = "t1" (ligne de cou) ou "t2" (objectif mesuré).
+    `long_only` ignore les double tops. Frais `p.cost` par côté. Résultat en R."""
     warmup = cfg["lookback"] + cfg["buffer"] + cfg["vol_ma"]
     n = len(feat)
     lo = max(warmup, entry_start if entry_start is not None else warmup)
@@ -157,21 +160,26 @@ def backtest_entry_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTPar
         if res is None or not res.confirmed:
             t += 1
             continue
+        if long_only and res.bias != "accumulation":
+            t += 1
+            continue
 
         direction = "long" if res.bias == "accumulation" else "short"
         entry = float(feat["close"].iloc[t])
-        stop, target = res.stop, res.target
+        stop = res.stop
+        tgt = res.target if target == "t1" else res.measured
         risk = abs(entry - stop)
         # garde-fou : géométrie cohérente (stop du bon côté, objectif au-delà de l'entrée)
-        ok = (direction == "long" and stop < entry < target) or \
-             (direction == "short" and target < entry < stop)
+        ok = (direction == "long" and stop < entry < tgt) or \
+             (direction == "short" and tgt < entry < stop)
         if not risk or not ok:
             t += 1
             continue
 
-        exit_i, exit_px, outcome = _simulate_exit(feat, t, direction, entry, stop, target, p)
-        r = ((exit_px - entry) if direction == "long" else (entry - exit_px)) / risk
-        trades.append(Trade(symbol, res.pattern, direction, t, entry, stop, target,
+        exit_i, exit_px, outcome = _simulate_exit(feat, t, direction, entry, stop, tgt, p)
+        gross = (exit_px - entry) if direction == "long" else (entry - exit_px)
+        r = (gross - p.cost * (entry + exit_px)) / risk
+        trades.append(Trade(symbol, res.pattern, direction, t, entry, stop, tgt,
                             exit_i, exit_px, float(r), outcome))
         t = exit_i + 1 + p.cooldown
     return trades
