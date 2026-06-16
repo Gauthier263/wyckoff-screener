@@ -209,7 +209,16 @@ def _detect_side(
     seg = win.iloc[p1_pos:p2_pos + 1]
     neckline = float(seg["high"].max() if acc else seg["low"].min())
 
+    # invalidation : si le prix est repassé NETTEMENT sous le 2ᵉ creux (resp. au-dessus du
+    # 2ᵉ sommet), le double n'est plus valide — c'est une cassure, pas un setup fiable.
+    atr_last = float(df["atr"].iloc[-1])
     last_close = float(df["close"].iloc[-1])
+    buf = 0.5 * atr_last if atr_last and not np.isnan(atr_last) else 0.0
+    if acc and last_close < min(p1.price, p2.price) - buf:
+        return None
+    if (not acc) and last_close > max(p1.price, p2.price) + buf:
+        return None
+
     is_forming = (last_close < neckline) if acc else (last_close > neckline)
 
     # score : divergence, proximité, qualité climax, récence, assèchement volume

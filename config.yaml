@@ -49,7 +49,7 @@ atr_period: 14
 # --- Double creux / double sommet + divergence RSI (option --divergence) ---
 divergence:
   rsi_period: 14         # période du RSI (doit matcher le RSI des features)
-  min_rsi_div: 8.0       # écart RSI mini entre les deux pivots (points) — divergence franche
+  min_rsi_div: 5.0       # écart RSI mini entre les deux pivots (points) — divergence réelle
   double_tol_pct: 0.12   # ampleur max de l'undercut du 2e pivot, en fraction de hauteur
   equal_tol_pct: 0.003   # bande d'"égalité" des pivots (fraction de prix) : au-delà, un 2e
                          # creux plus haut (resp. sommet plus bas) n'est plus une divergence
