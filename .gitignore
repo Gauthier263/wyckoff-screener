@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 watchlist.csv
+decouple_*.csv
 chart_*.png
 .venv/
 *.parquet
