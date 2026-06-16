@@ -121,7 +121,8 @@ def run_window(cfg: dict) -> pd.DataFrame:
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
-            oi = data_mod.fetch_open_interest(sym, cfg["timeframe"], cfg["limit"]) if cfg.get("oi", True) else None
+            oi = data_mod.fetch_open_interest(sym, cfg["timeframe"], cfg["limit"],
+                                              source=cfg.get("oi_source", "agg")) if cfg.get("oi", True) else None
             struct = detect_window_structure(df, lookback=lookback, th=th, oi=oi)
             if not struct.is_valid:
                 continue
@@ -157,6 +158,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
+        "oi_source": "agg",
     }
     cfg.update(load_config())
 
@@ -173,12 +175,15 @@ def main() -> None:
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
+    p.add_argument("--oi-source", choices=["agg", "okx", "gate"], default=cfg["oi_source"],
+                   help="source d'OI : agg (OKX+Gate, défaut), okx, ou gate")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi)
+               use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
+               oi_source=args.oi_source)
     if args.window is not None:
         cfg["window"] = args.window
 
