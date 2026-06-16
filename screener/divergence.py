@@ -38,6 +38,8 @@ class DivergenceParams:
     equal_tol_pct: float = 0.003 # bande d'« égalité » des pivots (fraction de prix) : au-delà,
                                  # un 2e creux plus haut (resp. sommet plus bas) n'est plus une divergence
     support_frac: float = 0.33   # « près de la borne » : fraction de hauteur depuis la borne
+    near_peg_atr_pct: float = 0.0 # exclut les paires quasi-peggées (ATR/prix sous ce seuil) :
+                                 # qualité de détection (écarte les stablecoins), pas de rendement
     recent_bars: int = 8         # le 2ᵉ pivot doit tomber dans les N dernières barres
     left: int = 2                # fractale : barres à gauche d'un pivot
     right: int = 2               # fractale : barres à droite (retard de confirmation)
@@ -148,6 +150,10 @@ def _detect_side(
     height = tr.height
     if not (height and height > 0):
         return None
+    if params.near_peg_atr_pct:
+        atr_last, close_last = float(df["atr"].iloc[-1]), float(df["close"].iloc[-1])
+        if close_last > 0 and atr_last / close_last < params.near_peg_atr_pct:
+            return None  # paire quasi-peggée (stablecoin) : double bottom sans intérêt
 
     sw = swing_points(win, left=params.left, right=params.right)
     flag = sw["swing_low"] if acc else sw["swing_high"]
