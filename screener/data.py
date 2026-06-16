@@ -110,6 +110,33 @@ def build_futures_universe(ex, quote: str = "USDT", min_quote_volume: float = 5_
     return out
 
 
+def fetch_ohlcv_history(ex, symbol: str, timeframe: str = "1h", total: int = 3000,
+                        page: int = 200) -> pd.DataFrame:
+    """Récupère un historique profond en **paginant** vers l'avant (Bitget plafonne à ~200
+    bougies/appel quand `since` est fixé). Remonte `total` barres avant maintenant.
+    Renvoie le même format que `fetch_ohlcv` (index ts UTC). Pas de cache."""
+    tf_ms = ex.parse_timeframe(timeframe) * 1000
+    now = ex.milliseconds()
+    since = now - total * tf_ms
+    rows: list = []
+    guard = 0
+    while since < now and guard < total // page + 5:
+        guard += 1
+        batch = ex.fetch_ohlcv(symbol, timeframe, since=since, limit=page)
+        if not batch:
+            break
+        rows += batch
+        nxt = batch[-1][0] + tf_ms
+        if nxt <= since:
+            break
+        since = nxt
+    seen: set = set()
+    uniq = [r for r in rows if not (r[0] in seen or seen.add(r[0]))]
+    df = pd.DataFrame(uniq, columns=["ts", "open", "high", "low", "close", "volume"])
+    df["ts"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
+    return df.set_index("ts")
+
+
 def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
                 use_cache: bool = True, max_age_s: int = 1800) -> pd.DataFrame:
     os.makedirs(CACHE_DIR, exist_ok=True)
