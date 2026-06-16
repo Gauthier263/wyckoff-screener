@@ -15,6 +15,7 @@ import pandas as pd
 import yaml
 
 from . import data as data_mod
+from .decouple import run_decouple
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
@@ -164,6 +165,11 @@ def main() -> None:
     p.add_argument("--window", nargs="?", type=int, const=30, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
+    p.add_argument("--decouple", action="store_true",
+                   help="classe les paires les plus découplées de la beta crypto (BTC+ETH) "
+                        "avec dynamique autonome")
+    p.add_argument("--limit", type=int, default=None,
+                   help="barres OHLCV par paire (défaut 1000 en mode --decouple)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
@@ -173,8 +179,15 @@ def main() -> None:
                use_cache=not args.no_cache, chart=args.chart)
     if args.window is not None:
         cfg["window"] = args.window
+    if args.limit is not None:
+        cfg["limit"] = args.limit
 
-    if args.window is not None:
+    if args.decouple:
+        cfg.setdefault("limit", 300)
+        if args.limit is None:           # le découplage a besoin de davantage d'historique
+            cfg["limit"] = max(cfg["limit"], 1000)
+        table = run_decouple(cfg)
+    elif args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)

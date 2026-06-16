@@ -38,6 +38,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
   creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
   lignes-guides verticales. Horodatage en CEST.
+- `screener/decouple.py` — `rank_decoupled` : classe les paires les plus *découplées*
+  de la « beta crypto » (panier équipondéré BTC+ETH) qui ont une *dynamique autonome*.
+  Décorrélation = régression des log-rendements sur le panier (corr, r2, corr_p90
+  glissant car « tout corrèle » en krach). Dynamique = rendement neutralisé du marché
+  `r − beta·b` (garde l'alpha) : `idio_ret_%` cumulé + `idio_ir`. Colonne `rs_btc_%` =
+  perf cumulée de `{BASE}/BTC` quand la paire existe (force relative *réelle* vs BTC).
+  Exclut panier (BTC/ETH), stablecoins et séries figées (illiquides). Score =
+  `(1 − |corr|) × idio_ir` ; défaut : ne garde que la dynamique autonome haussière.
+  Cœur pur hors-ligne (`rank_decoupled(frames, ...)`) + `run_decouple(cfg)` en ligne.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
@@ -65,6 +74,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
+python -m screener.cli --exchange bitget --timeframe 4h --decouple --top 80  # découplage beta crypto
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
