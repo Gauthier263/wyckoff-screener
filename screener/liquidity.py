@@ -252,6 +252,7 @@ def void_efficiency(df: pd.DataFrame, th: VoidThresholds | None = None,
         "pct50": round(100 * n_lo / nv, 1) if nv else 0.0,
         "pct90": round(100 * n_hi / nv, 1) if nv else 0.0,
         "median_bars90": int(np.median(bars_to_hi)) if bars_to_hi else None,
+        "mean_bars90": round(float(np.mean(bars_to_hi)), 1) if bars_to_hi else None,
     }
 
 
