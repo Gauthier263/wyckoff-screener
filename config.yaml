@@ -54,8 +54,6 @@ divergence:
   equal_tol_pct: 0.003   # bande d'"égalité" des pivots (fraction de prix) : au-delà, un 2e
                          # creux plus haut (resp. sommet plus bas) n'est plus une divergence
   support_frac: 0.33     # "près de la borne" : fraction de hauteur depuis support/résistance
-  min_atr_pct: 0.015     # volatilité mini (ATR/prix) : écarte les paires quasi-peggées
-                         # (stablecoins, BTC, XAUT…) où les frais > l'edge (validé en backtest)
   recent_bars: 12        # le 2e pivot doit tomber dans les N dernières barres (formation)
   left: 2                # fractale : barres à gauche d'un pivot
   right: 2               # fractale : barres à droite (retard de confirmation)

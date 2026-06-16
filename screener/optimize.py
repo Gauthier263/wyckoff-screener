@@ -27,8 +27,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .backtest import BTParams, Trade, backtest_entry_features, backtest_features
-from .divergence import DivergenceParams
+from .backtest import BTParams, Trade, backtest_features
 from .events import Thresholds
 
 # Clés routées vers Thresholds vs BTParams
@@ -204,113 +203,6 @@ def walk_forward(feats: dict[str, pd.DataFrame], cfg: dict, grid: dict | None = 
 
 
 # --------------------------------------------------------------------------- #
-# Optimisation du mode « entrée au 2ᵉ creux » (tuning + IS/OOS + frais)
-# --------------------------------------------------------------------------- #
-# Grille des paramètres d'entrée + cible. DP_KEYS → DivergenceParams.
-ENTRY_GRID = {
-    "zone_atr": [0.4, 0.6, 0.8],
-    "min_bounce_frac": [0.15, 0.30],
-    "entry_stop_atr": [0.4, 0.8],
-    "target": ["t1", "t2"],
-}
-DP_KEYS = {"zone_atr", "min_bounce_frac", "entry_stop_atr", "undercut_atr", "min_sep",
-           "rsi_period", "min_rsi_div", "double_tol_pct", "equal_tol_pct", "support_frac",
-           "recent_bars", "left", "right"}
-
-
-def _entry_trades(feats, cfg, base_dp, combo, p, th, long_only, a=None, b=None):
-    dp_kw = {**base_dp, **{k: v for k, v in combo.items() if k in DP_KEYS}}
-    params = DivergenceParams(**dp_kw)
-    target = combo.get("target", "t1")
-    trades = []
-    for sym, feat in feats.items():
-        trades += backtest_entry_features(sym, feat, cfg, p, th, params, target=target,
-                                          long_only=long_only, entry_start=a, entry_end=b)
-    return trades
-
-
-def grid_search_entry(feats: dict[str, pd.DataFrame], cfg: dict, p: BTParams,
-                      grid: dict | None = None, metric: str = "robust",
-                      min_trades: int = 20, split: float = 0.6,
-                      long_only: bool = True) -> pd.DataFrame:
-    """Tune les paramètres d'entrée (zone/bounce/stop + cible T1/T2) avec split IS/OOS."""
-    grid = grid or ENTRY_GRID
-    base_dp = dict(cfg.get("divergence", {}))
-    keys = list(grid)
-    combos = [dict(zip(keys, v)) for v in itertools.product(*[grid[k] for k in keys])]
-    print(f"Tuning entrée : {len(combos)} combinaisons × {len(feats)} symboles "
-          f"(IS={split:.0%}/OOS={1 - split:.0%}, frais {p.cost*1e4:.0f} bps/côté, "
-          f"{'long only' if long_only else 'long+short'})", file=sys.stderr)
-    th = Thresholds(**cfg.get("thresholds", {}))
-
-    rows = []
-    for ci, combo in enumerate(combos, 1):
-        # cut par symbole géré dans backtest via entry_start/end (fractions → indices)
-        is_tr, oos_tr = [], []
-        for sym, feat in feats.items():
-            cut = int(len(feat) * split)
-            dp_kw = {**base_dp, **{k: v for k, v in combo.items() if k in DP_KEYS}}
-            params = DivergenceParams(**dp_kw)
-            tgt = combo["target"]
-            is_tr += backtest_entry_features(sym, feat, cfg, p, th, params, target=tgt,
-                                             long_only=long_only, entry_end=cut)
-            oos_tr += backtest_entry_features(sym, feat, cfg, p, th, params, target=tgt,
-                                              long_only=long_only, entry_start=cut)
-        is_m = metric_value(is_tr, metric, min_trades)
-        is_s, oos_s = trade_stats(is_tr), trade_stats(oos_tr)
-        rows.append({**combo,
-                     "is_metric": round(is_m, 4) if np.isfinite(is_m) else None,
-                     "is_n": is_s["n"], "is_r_moy": round(is_s["r_moy"], 3),
-                     "is_win%": round(is_s["win"], 1),
-                     "oos_n": oos_s["n"], "oos_r_moy": round(oos_s["r_moy"], 3),
-                     "oos_win%": round(oos_s["win"], 1),
-                     "oos_pf": round(oos_s["pf"], 2) if np.isfinite(oos_s["pf"]) else None})
-        if ci % 10 == 0:
-            print(f"  ...{ci}/{len(combos)}", file=sys.stderr)
-
-    df = pd.DataFrame(rows)
-    df = df[df["is_metric"].notna()].sort_values("is_metric", ascending=False)
-    return df.reset_index(drop=True)
-
-
-def walk_forward_entry(feats: dict[str, pd.DataFrame], cfg: dict, p: BTParams,
-                       grid: dict | None = None, metric: str = "robust",
-                       min_trades: int = 15, folds: int = 3, train_frac: float = 0.5,
-                       long_only: bool = True) -> pd.DataFrame:
-    """Walk-forward du mode entrée : optimise sur l'entraînement, valide sur l'inédit."""
-    grid = grid or ENTRY_GRID
-    base_dp = dict(cfg.get("divergence", {}))
-    keys = list(grid)
-    combos = [dict(zip(keys, v)) for v in itertools.product(*[grid[k] for k in keys])]
-    th = Thresholds(**cfg.get("thresholds", {}))
-    bounds = np.linspace(0, 1, folds + 1)
-    rows = []
-    for f in range(folds):
-        split_frac = bounds[f] + train_frac * (bounds[f + 1] - bounds[f])
-        best_combo, best_m = None, float("-inf")
-        for combo in combos:
-            tr_trades = []
-            for sym, feat in feats.items():
-                a, b = int(len(feat) * bounds[f]), int(len(feat) * split_frac)
-                tr_trades += _entry_trades(feats={sym: feat}, cfg=cfg, base_dp=base_dp,
-                                           combo=combo, p=p, th=th, long_only=long_only, a=a, b=b)
-            m = metric_value(tr_trades, metric, min_trades)
-            if m > best_m:
-                best_m, best_combo = m, combo
-        if best_combo is None:
-            continue
-        val = []
-        for sym, feat in feats.items():
-            a, b = int(len(feat) * split_frac), int(len(feat) * bounds[f + 1])
-            val += _entry_trades(feats={sym: feat}, cfg=cfg, base_dp=base_dp,
-                                 combo=best_combo, p=p, th=th, long_only=long_only, a=a, b=b)
-        vs = trade_stats(val)
-        rows.append({"fold": f + 1, **best_combo, "val_n": vs["n"],
-                     "val_r_moy": round(vs["r_moy"], 3), "val_win%": round(vs["win"], 1)})
-    return pd.DataFrame(rows)
-
-
-# --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 def _load_feats(cfg: dict) -> dict[str, pd.DataFrame]:
@@ -341,7 +233,7 @@ def main() -> None:
     }
     cfg.update(load_config())
 
-    ap = argparse.ArgumentParser(description="Grid-search Wyckoff (seuils événements ou entrée 2ᵉ creux)")
+    ap = argparse.ArgumentParser(description="Grid-search des seuils Wyckoff (IS/OOS)")
     ap.add_argument("--timeframe", default=cfg["timeframe"])
     ap.add_argument("--symbols", nargs="*", default=cfg["symbols"])
     ap.add_argument("--top", type=int, default=cfg["top"])
@@ -351,10 +243,6 @@ def main() -> None:
     ap.add_argument("--min-trades", type=int, default=30)
     ap.add_argument("--split", type=float, default=0.6, help="fraction in-sample")
     ap.add_argument("--walk", type=int, default=0, help="nb de plis walk-forward (0 = split simple)")
-    ap.add_argument("--entry", action="store_true", help="optimise le mode « entrée au 2ᵉ creux »")
-    ap.add_argument("--long-only", action="store_true", help="(entrée) ne garder que les longs")
-    ap.add_argument("--cost", type=float, default=0.0, help="coût par côté (frais+slippage), ex. 0.0005")
-    ap.add_argument("--max-hold", type=int, default=30)
     ap.add_argument("--csv", default="optimize_results.csv")
     ap.add_argument("--no-cache", action="store_true")
     args = ap.parse_args()
@@ -365,31 +253,6 @@ def main() -> None:
     feats = _load_feats(cfg)
     if not feats:
         print("Aucune donnée chargée."); return
-
-    if args.entry:
-        p = BTParams(max_hold=args.max_hold, cost=args.cost)
-        if args.walk and args.walk > 1:
-            wf = walk_forward_entry(feats, cfg, p, metric=args.metric,
-                                    min_trades=max(10, args.min_trades // 2),
-                                    folds=args.walk, long_only=args.long_only)
-            print("\nWalk-forward entrée (perf OOS par pli) :")
-            print(wf.to_string(index=False))
-            if not wf.empty:
-                print(f"\nR moyen OOS agrégé : {wf['val_r_moy'].mean():.3f}")
-            return
-        results = grid_search_entry(feats, cfg, p, metric=args.metric,
-                                    min_trades=args.min_trades, split=args.split,
-                                    long_only=args.long_only)
-        if results.empty:
-            print("Aucun combo au-dessus du plancher de trades."); return
-        print("\nTop 10 réglages d'entrée (classés sur la métrique IN-SAMPLE) :")
-        print(results.head(10).to_string(index=False))
-        rep = overfit_report(results)
-        print("\n--- Verdict out-of-sample ---")
-        for k, v in rep.items():
-            print(f"  {k}: {v}")
-        results.to_csv(args.csv, index=False)
-        return
 
     if args.walk and args.walk > 1:
         wf = walk_forward(feats, cfg, metric=args.metric, min_trades=args.min_trades, folds=args.walk)

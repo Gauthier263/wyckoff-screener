@@ -10,10 +10,8 @@ Hors-ligne, aucune dépendance réseau.
 import numpy as np
 import pandas as pd
 
-from screener.divergence import (
-    DivergenceParams, detect_double_divergence, detect_forming_entry,
-)
-from screener.features import TradingRange, add_features, detect_trading_range
+from screener.divergence import DivergenceParams, detect_double_divergence
+from screener.features import add_features, detect_trading_range
 
 
 def _df(rows):
@@ -153,51 +151,4 @@ def test_no_divergence_on_higher_low():
     tr = detect_trading_range(df, lookback=30, buffer=5)
     res = detect_double_divergence("TEST/USDT", df, tr,
                                    params=DivergenceParams(recent_bars=8), lookback=45)
-    assert res is None
-
-
-def _entry_rows(last_low=93.6, last=(94.0, 95.3, 95.0)):
-    """Double bottom EN FORMATION : SC (1er creux) → rally (ligne de cou) → descente
-    douce → la DERNIÈRE barre teste la zone du plancher. `last`=(open,high,close) et
-    `last_low` pilotent la barre de test (rejet/zone)."""
-    rows = _drift(30, 100.0, seed=1)
-    rows += [[100.0, 100.3, 98.8, 99.0, 1100.0],
-             [99.0, 99.2, 97.5, 97.8, 1200.0],
-             [97.8, 98.0, 96.0, 96.2, 1300.0]]
-    rows += [[96.2, 96.5, 93.5, 95.8, 3600.0]]                 # SC = 1er creux (93.5)
-    rows += [[95.8, 98.0, 95.6, 97.9, 1200.0],
-             [97.9, 100.0, 97.7, 99.8, 1100.0],
-             [99.8, 103.0, 99.6, 102.8, 1300.0]]               # rally → ligne de cou ~103
-    rows += [[102.8, 103.0, 101.0, 101.2, 900.0],
-             [101.2, 101.4, 99.0, 99.2, 800.0],
-             [99.2, 99.4, 97.0, 97.2, 800.0],
-             [97.2, 97.4, 95.5, 95.7, 750.0]]                  # descente douce (reste > support)
-    o, h, c = last
-    rows += [[o, h, last_low, c, 600.0]]                       # barre COURANTE = test du plancher
-    return rows
-
-
-def _tr():
-    return TradingRange(low=93.5, high=103.0, mid=98.25, height=9.5, height_atr=5.0, is_valid=True)
-
-
-def test_forming_entry_confirmed():
-    df = _df(_entry_rows())                       # test à 93.6, clôture haute (rejet)
-    res = detect_forming_entry("T/USDT", df, _tr(),
-                               params=DivergenceParams(min_rsi_div=5), lookback=60)
-    assert res is not None
-    assert res.bias == "accumulation" and res.pattern == "double bottom"
-    assert res.climax == "SC"
-    assert res.confirmed                          # rejet haussier présent sur la barre
-    assert res.rsi_div >= 5
-    assert res.stop < res.test_ext                # stop sous le 2e creux
-    assert res.target > res.test_close            # cible (ligne de cou) au-dessus de l'entrée
-    assert res.rr > 0
-
-
-def test_forming_entry_none_when_not_testing_support():
-    # dernière barre en plein milieu de plage (ne teste pas le plancher) → pas d'entrée
-    df = _df(_entry_rows(last_low=98.0, last=(98.5, 99.0, 98.8)))
-    res = detect_forming_entry("T/USDT", df, _tr(),
-                               params=DivergenceParams(min_rsi_div=5), lookback=60)
     assert res is None

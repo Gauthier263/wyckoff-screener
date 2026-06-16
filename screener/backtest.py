@@ -23,7 +23,6 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .divergence import DivergenceParams, detect_forming_entry
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range
 
@@ -37,7 +36,6 @@ class BTParams:
     rr: float = 2.0           # ratio objectif / risque
     max_hold: int = 30        # barres max en position
     cooldown: int = 0         # barres à ignorer après une sortie
-    cost: float = 0.0         # coût par côté (frais+slippage), fraction du notionnel
 
 
 @dataclass
@@ -115,8 +113,7 @@ def backtest_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTParams,
             stop, target = entry + risk, entry - p.rr * risk
 
         exit_i, exit_px, outcome = _simulate_exit(feat, t, direction, entry, stop, target, p)
-        gross = (exit_px - entry) if direction == "long" else (entry - exit_px)
-        r = (gross - p.cost * (entry + exit_px)) / risk
+        r = ((exit_px - entry) if direction == "long" else (entry - exit_px)) / risk
         trades.append(Trade(symbol, e.name, direction, t, entry, stop, target,
                             exit_i, exit_px, float(r), outcome))
         t = exit_i + 1 + p.cooldown   # pas de chevauchement
@@ -127,85 +124,6 @@ def backtest_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> li
     feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
     th = Thresholds(**cfg.get("thresholds", {}))
     return backtest_features(symbol, feat, cfg, p, th)
-
-
-def backtest_entry_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTParams,
-                            th: Thresholds, params: DivergenceParams,
-                            target: str = "t1", long_only: bool = False,
-                            entry_start: int | None = None,
-                            entry_end: int | None = None) -> list[Trade]:
-    """Backtest du mode « entrée au 2ᵉ creux » (detect_forming_entry), sans lookahead.
-
-    À la barre t, on détecte sur df[:t+1] ; si la barre courante est une entrée
-    CONFIRMÉE (rejet + divergence dans la zone), on entre à la clôture de t. Stop = juste
-    au-delà du 2ᵉ creux. Cible : `target` = "t1" (ligne de cou) ou "t2" (objectif mesuré).
-    `long_only` ignore les double tops. Frais `p.cost` par côté. Résultat en R."""
-    warmup = cfg["lookback"] + cfg["buffer"] + cfg["vol_ma"]
-    n = len(feat)
-    lo = max(warmup, entry_start if entry_start is not None else warmup)
-    hi = entry_end if entry_end is not None else n
-    look = cfg["lookback"] + cfg["buffer"]
-    trades: list[Trade] = []
-
-    # Pré-filtre vectorisé : la détection ne peut aboutir que si la barre courante teste
-    # un extrême récent. On ne lance la détection (coûteuse) que sur ces barres-là.
-    lows, highs, atrs = feat["low"].values, feat["high"].values, feat["atr"].values
-    roll_lo = feat["low"].rolling(cfg["lookback"], min_periods=cfg["lookback"]).min().values
-    roll_hi = feat["high"].rolling(cfg["lookback"], min_periods=cfg["lookback"]).max().values
-
-    t = lo
-    while t < hi:
-        atr_t = float(atrs[t])
-        if not atr_t or np.isnan(atr_t):
-            t += 1
-            continue
-        near_lo = lows[t] <= roll_lo[t] + 1.0 * atr_t
-        near_hi = highs[t] >= roll_hi[t] - 1.0 * atr_t
-        if not (near_lo or (near_hi and not long_only)):
-            t += 1
-            continue
-
-        sl = feat.iloc[: t + 1]
-        tr = detect_trading_range(sl, lookback=cfg["lookback"], buffer=cfg["buffer"])
-        if not tr.is_valid:
-            t += 1
-            continue
-
-        res = detect_forming_entry(symbol, sl, tr, th=th, params=params, lookback=look)
-        if res is None or not res.confirmed:
-            t += 1
-            continue
-        if long_only and res.bias != "accumulation":
-            t += 1
-            continue
-
-        direction = "long" if res.bias == "accumulation" else "short"
-        entry = float(feat["close"].iloc[t])
-        stop = res.stop
-        tgt = res.target if target == "t1" else res.measured
-        risk = abs(entry - stop)
-        # garde-fou : géométrie cohérente (stop du bon côté, objectif au-delà de l'entrée)
-        ok = (direction == "long" and stop < entry < tgt) or \
-             (direction == "short" and tgt < entry < stop)
-        if not risk or not ok:
-            t += 1
-            continue
-
-        exit_i, exit_px, outcome = _simulate_exit(feat, t, direction, entry, stop, tgt, p)
-        gross = (exit_px - entry) if direction == "long" else (entry - exit_px)
-        r = (gross - p.cost * (entry + exit_px)) / risk
-        trades.append(Trade(symbol, res.pattern, direction, t, entry, stop, tgt,
-                            exit_i, exit_px, float(r), outcome))
-        t = exit_i + 1 + p.cooldown
-    return trades
-
-
-def backtest_entry_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> list[Trade]:
-    feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"],
-                        rsi_period=cfg.get("divergence", {}).get("rsi_period", 14))
-    th = Thresholds(**cfg.get("thresholds", {}))
-    params = DivergenceParams(**cfg.get("divergence", {}))
-    return backtest_entry_features(symbol, feat, cfg, p, th, params)
 
 
 def aggregate(trades: list[Trade]) -> pd.DataFrame:
@@ -231,16 +149,15 @@ def aggregate(trades: list[Trade]) -> pd.DataFrame:
     return out
 
 
-def run_backtest(cfg: dict, p: BTParams, entry: bool = False) -> tuple[pd.DataFrame, list[Trade]]:
+def run_backtest(cfg: dict, p: BTParams) -> tuple[pd.DataFrame, list[Trade]]:
     from . import data as data_mod
     ex = data_mod.get_exchange(cfg["exchange"], mirror=cfg.get("mirror") or None)
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
-    fn = backtest_entry_symbol if entry else backtest_symbol
     all_trades: list[Trade] = []
     for sym in universe:
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
-            all_trades += fn(sym, df, cfg, p)
+            all_trades += backtest_symbol(sym, df, cfg, p)
         except Exception as e:
             import sys
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
@@ -258,14 +175,12 @@ def main() -> None:
     }
     cfg.update(load_config())
 
-    ap = argparse.ArgumentParser(description="Backtest Wyckoff (événements ou entrée 2ᵉ creux)")
+    ap = argparse.ArgumentParser(description="Backtest des événements Wyckoff")
     ap.add_argument("--timeframe", default=cfg["timeframe"])
     ap.add_argument("--symbols", nargs="*", default=cfg["symbols"])
     ap.add_argument("--top", type=int, default=cfg["top"])
     ap.add_argument("--limit", type=int, default=cfg["limit"])
     ap.add_argument("--mirror", default=cfg.get("mirror", ""))
-    ap.add_argument("--entry", action="store_true",
-                    help="backteste le mode « entrée au 2ᵉ creux » (double bottom/top + divergence)")
     ap.add_argument("--stop-atr", type=float, default=1.0)
     ap.add_argument("--rr", type=float, default=2.0)
     ap.add_argument("--max-hold", type=int, default=30)
@@ -277,14 +192,12 @@ def main() -> None:
                limit=args.limit, mirror=args.mirror, use_cache=not args.no_cache)
     p = BTParams(stop_atr=args.stop_atr, rr=args.rr, max_hold=args.max_hold)
 
-    stats, trades = run_backtest(cfg, p, entry=args.entry)
+    stats, trades = run_backtest(cfg, p)
     if stats.empty:
         print("Aucun trade généré sur la période.")
         return
-    mode = "entrée 2ᵉ creux (stop sous le creux, cible ligne de cou)" if args.entry \
-        else f"stop {p.stop_atr} ATR, objectif {p.rr}R"
-    print(f"\nBacktest {cfg['timeframe']} — {mode}, hold max {p.max_hold} barres — "
-          f"{len(trades)} trades")
+    print(f"\nBacktest {cfg['timeframe']} — stop {p.stop_atr} ATR, objectif {p.rr}R, "
+          f"hold max {p.max_hold} barres — {len(trades)} trades")
     print(stats.to_string(index=False))
     pd.DataFrame([t.__dict__ for t in trades]).to_csv(args.csv, index=False)
 
