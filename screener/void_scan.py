@@ -34,10 +34,19 @@ def scan(cfg: dict) -> pd.DataFrame:
               f"(RWA gardés, crypto ≥ {cfg['min_volume']:.0f} {cfg['quote']})", file=sys.stderr)
 
     th = VoidThresholds(**cfg.get("void", {}))
+    hist = cfg.get("history", 0)
     rows: list[dict] = []
     for i, (sym, cat) in enumerate(universe, 1):
         try:
-            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            if hist and hist > 0:
+                df = data_mod.fetch_ohlcv_history(ex, sym, cfg["timeframe"], total=hist)
+                # repli : paire listée après la fenêtre → l'historique profond peut être vide
+                if len(df) < cfg["limit"]:
+                    alt = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], False)
+                    if len(alt) > len(df):
+                        df = alt
+            else:
+                df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
             e = void_efficiency(df, th=th, horizon=cfg["horizon"], last_n=cfg["last_n"])
             if e["n_voids"] >= cfg["min_voids"]:          # plancher de significativité
@@ -66,6 +75,7 @@ def main() -> None:
         "exchange": "bitget", "quote": "USDT", "timeframe": "1h", "limit": 1000,
         "vol_ma": 20, "atr_period": 14, "use_cache": True, "symbols": [], "void": {},
         "min_volume": 5_000_000.0, "horizon": 48, "last_n": 20, "min_voids": 5, "keep_pct": 60.0,
+        "history": 0,
     }
     cfg.update(load_config())
 
@@ -79,6 +89,8 @@ def main() -> None:
     ap.add_argument("--last-n", type=int, default=cfg["last_n"], help="nb de vides analysés/paire")
     ap.add_argument("--min-voids", type=int, default=cfg["min_voids"], help="plancher de vides pour classer")
     ap.add_argument("--keep-pct", type=float, default=cfg["keep_pct"], help="%%90 mini pour 'efficace'")
+    ap.add_argument("--history", type=int, default=cfg["history"],
+                    help="historique profond paginé (nb de barres, ex. 3000) ; 0 = fetch récent simple")
     ap.add_argument("--csv", default="void_efficiency.csv")
     ap.add_argument("--no-cache", action="store_true")
     args = ap.parse_args()
@@ -86,7 +98,7 @@ def main() -> None:
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, symbols=args.symbols,
                limit=args.limit, min_volume=args.min_volume, horizon=args.horizon,
                last_n=args.last_n, min_voids=args.min_voids, keep_pct=args.keep_pct,
-               use_cache=not args.no_cache)
+               history=args.history, use_cache=not args.no_cache)
 
     table = scan(cfg)
     if table.empty:
