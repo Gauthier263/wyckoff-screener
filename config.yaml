@@ -32,6 +32,15 @@ optimize:
     rr: [1.5, 2.0, 3.0]
     stop_atr: [0.75, 1.0, 1.5]
 
+# --- Order Blocks ICT (option --ob-screen) ---
+ob_min_tests: 5          # plancher d'OB testés pour qu'une paire soit classable
+ob:
+  displacement_atr: 2.0  # course nette de l'impulsion (le « k »), en ATR
+  impulse_window: 3      # barres max pour réaliser l'impulsion
+  zone: body             # body (open↔close) | wick (low↔high)
+  reaction_R: 1.5        # rebond « réussi » : MFE en ATR au retest
+  max_wait: 40           # barres max d'attente d'une mitigation (sinon non testé)
+
 # Liste manuelle (prioritaire sur `top` si non vide)
 symbols: []
 # symbols: [BTC/USDT, ETH/USDT, SOL/USDT]

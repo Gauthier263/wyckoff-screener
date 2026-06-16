@@ -18,6 +18,7 @@ from . import data as data_mod
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
+from .ob_screen import run_ob_screen
 from .score import SymbolResult, score_symbol
 from .window import detect_window_structure
 
@@ -150,6 +151,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "ob": {}, "ob_min_tests": 5,
     }
     cfg.update(load_config())
 
@@ -164,6 +166,8 @@ def main() -> None:
     p.add_argument("--window", nargs="?", type=int, const=30, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
+    p.add_argument("--ob-screen", action="store_true",
+                   help="shortliste les paires par respect des Order Blocks ICT")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
@@ -174,7 +178,9 @@ def main() -> None:
     if args.window is not None:
         cfg["window"] = args.window
 
-    if args.window is not None:
+    if args.ob_screen:
+        table = run_ob_screen(cfg)
+    elif args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)

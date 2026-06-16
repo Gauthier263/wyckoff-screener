@@ -38,9 +38,21 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
   creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
   lignes-guides verticales. Horodatage en CEST.
+- `screener/orderblocks.py` — Order Blocks au sens **ICT** (empreinte institutionnelle).
+  `detect_order_blocks` : dernière bougie de sens opposé avant une impulsion (displacement
+  ≥ `displacement_atr`×ATR, k·ATR seul). Zone = corps (open↔close) ou mèches. Causal.
+  `evaluate_order_block` : 1re mitigation (retour dans la zone), puis verdict — *respecté*
+  (rebond MFE ≥ `reaction_R`×ATR avant invalidation), *cassé* (clôture du **corps** au
+  travers), *tiède* (retesté sans trancher), *non_testé*. Le **MFE brut est stocké** →
+  seuil rejouable a posteriori. Seuils dans `OBThresholds`.
+- `screener/ob_screen.py` — `screen_symbol`/`run_ob_screen` : classe l'univers par
+  **taux de respect** des OB. Score robuste = taux pénalisé par l'erreur-type (plancher
+  `ob_min_tests`), même esprit que `optimize.metric_value`. Colonnes : n_ob, n_test,
+  respect%, avg_R/med_R (amplitude rebond), swing% (a atteint l'extrême de l'impulsion),
+  fresh_OB (dernier OB non mité = niveau à surveiller en live).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
-  `--chart` génère le PNG.
+  `--chart` génère le PNG, `--ob-screen` → run_ob_screen (shortlist Order Blocks ICT).
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
@@ -65,6 +77,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
+python -m screener.cli --exchange bitget --timeframe 4h --ob-screen   # shortlist Order Blocks ICT
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
