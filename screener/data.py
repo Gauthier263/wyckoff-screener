@@ -17,6 +17,17 @@ def get_exchange(name: str = "binance"):
 
     klass = getattr(ccxt, name)
     ex = klass({"enableRateLimit": True})
+    # ccxt impose le bundle certifi à requests, qui ignore alors REQUESTS_CA_BUNDLE.
+    # Derrière un proxy d'egress (CA d'entreprise), on repointe sur le bundle système.
+    # Derrière un proxy d'egress (CA d'entreprise), ccxt force certifi et ignore
+    # REQUESTS_CA_BUNDLE. ccxt calcule `verify = self.verify and self.validateServerSsl` :
+    # c'est donc `validateServerSsl` qui doit porter le chemin du bundle système.
+    ca = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if ca and os.path.exists(ca):
+        ex.verify = ca
+        ex.validateServerSsl = ca
+        if getattr(ex, "session", None) is not None:
+            ex.session.verify = ca
     ex.load_markets()
     return ex
 
