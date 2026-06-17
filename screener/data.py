@@ -77,17 +77,42 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
 OI_VENUES = ("okx", "gate")
 
 
-def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4) -> "pd.Series | None":
+def _archive_days(now, days=4, start=None, end=None, cap=400) -> list:
+    """Liste des dates 'YYYY-MM-DD' à récupérer (jours *passés* uniquement, ≤ veille).
+
+    Mode intervalle si `start`/`end` fournis (historique lointain) ; sinon les `days`
+    derniers jours. Borné à `cap` jours. Fonction pure (testable hors-ligne).
+    """
+    def _naive(ts):
+        ts = pd.Timestamp(ts)
+        return ts.tz_convert("UTC").tz_localize(None) if ts.tzinfo else ts
+
+    last = _naive(now).normalize() - pd.Timedelta(days=1)      # archive en retard ~1j
+    if start is not None or end is not None:
+        e = min(_naive(end).normalize() if end is not None else last, last)
+        s = _naive(start).normalize() if start is not None else e - pd.Timedelta(days=days - 1)
+    else:
+        e, s = last, last - pd.Timedelta(days=days - 1)
+    if s > e:
+        return []
+    rng = pd.date_range(s, e, freq="D")[-cap:]
+    return [d.strftime("%Y-%m-%d") for d in rng]
+
+
+def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4,
+                             start=None, end=None) -> "pd.Series | None":
     """OI Binance (perp USDⓂ) depuis l'archive `data.binance.vision` — fichiers *metrics*
     quotidiens (`sum_open_interest_value`, USD, pas de 5 min). Même miroir non géo-bloqué
-    que le spot, donc accessible là où `fapi` renvoie 451. **Retard ~1 jour** (le fichier
-    du jour courant n'est publié qu'après clôture UTC). Série indexée ts UTC, ou None.
+    que le spot, donc accessible là où `fapi` renvoie 451. **Retard ~1 jour**.
 
-    Les zips (jours *passés*, donc immuables) sont mis en **cache disque** (`.cache/
-    binance_oi/`) — les runs suivants ne re-téléchargent rien.
+    `start`/`end` (timestamps) ciblent un **intervalle historique** (ex. mars) ; sinon les
+    `days` derniers jours. Binance ne publie ces metrics qu'en *quotidien* (pas de fichier
+    mensuel) → on balaie les jours, **téléchargements parallélisés** et **cache disque**
+    (`.cache/binance_oi/`, fichiers passés immuables). Série indexée ts UTC, ou None.
     """
     import io
     import zipfile
+    from concurrent.futures import ThreadPoolExecutor
 
     import requests  # apporté par ccxt ; respecte REQUESTS_CA_BUNDLE (CA egress)
 
@@ -95,25 +120,24 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4) -> "pd.Ser
     sym = f"{base}{quote}"
     cache_dir = os.path.join(CACHE_DIR, "binance_oi")
     os.makedirs(cache_dir, exist_ok=True)
-    today = pd.Timestamp.now(tz="UTC").normalize()
-    parts = []
-    for i in range(1, days + 1):
-        d = (today - pd.Timedelta(days=i)).strftime("%Y-%m-%d")
+    dates = _archive_days(pd.Timestamp.now(tz="UTC"), days=days, start=start, end=end)
+
+    def _one(d):
         fname = f"{sym}-metrics-{d}.zip"
         path = os.path.join(cache_dir, fname)
         content = None
-        if os.path.exists(path):                       # cache hit (fichier passé = immuable)
+        if os.path.exists(path):                       # cache hit (jour passé = immuable)
             try:
                 with open(path, "rb") as f:
                     content = f.read()
             except Exception:
                 content = None
-        if content is None:                            # miss → téléchargement + écriture cache
-            url = (f"https://data.binance.vision/data/futures/um/daily/metrics/{sym}/{fname}")
+        if content is None:
+            url = f"https://data.binance.vision/data/futures/um/daily/metrics/{sym}/{fname}"
             try:
                 r = requests.get(url, timeout=20)
                 if r.status_code != 200:
-                    continue
+                    return None
                 content = r.content
                 try:
                     with open(path, "wb") as f:
@@ -121,18 +145,23 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4) -> "pd.Ser
                 except Exception:
                     pass  # cache best-effort
             except Exception:
-                continue
+                return None
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
             df = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])))
-            s = pd.Series(df["sum_open_interest_value"].astype(float).values,
-                          index=pd.to_datetime(df["create_time"], utc=True))
-            parts.append(s)
+            return pd.Series(df["sum_open_interest_value"].astype(float).values,
+                             index=pd.to_datetime(df["create_time"], utc=True))
         except Exception:
-            continue
+            return None
+
+    if not dates:
+        return None
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        parts = [s for s in pool.map(_one, dates) if s is not None]
     if not parts:
         return None
-    return pd.concat(parts).sort_index()
+    out = pd.concat(parts).sort_index()
+    return out[~out.index.duplicated(keep="last")]
 
 
 def _oi_series(ex, symbol: str, timeframe: str, limit: int) -> "pd.Series | None":
@@ -179,24 +208,31 @@ def _coingecko_oi(symbol: str, venue: str = "Binance (Futures)") -> "float | Non
     return None
 
 
-def _binance_oi_series(symbol: str, timeframe: str, limit: int) -> "pd.Series | None":
+def _binance_oi_series(symbol: str, timeframe: str, limit: int,
+                       start=None, end=None) -> "pd.Series | None":
     """OI Binance résolu sur la grille `timeframe` : archive 5 min (data.binance.vision)
-    resamplée, puis point courant CoinGecko ajouté en bout pour combler le retard ~1j."""
-    tf_min = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(timeframe, 60)
-    days = int(min(8, max(2, (limit * tf_min) / 1440 + 1)))   # borne les téléchargements
-    s5 = fetch_binance_oi_archive(symbol, days=days)
+    resamplée. `start`/`end` ciblent un intervalle historique ; sinon span déduit de `limit`.
+    Point courant CoinGecko ajouté en bout pour combler le retard ~1j (sauf fenêtre passée)."""
+    if start is not None or end is not None:
+        s5 = fetch_binance_oi_archive(symbol, start=start, end=end)
+    else:
+        tf_min = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(timeframe, 60)
+        days = int(min(8, max(2, (limit * tf_min) / 1440 + 1)))   # borne les téléchargements
+        s5 = fetch_binance_oi_archive(symbol, days=days)
     if s5 is None:
         return None
     freq = _TF_FREQ.get(timeframe, "1h")
     bn = s5.resample(freq).last().dropna()
-    cur = _coingecko_oi(symbol)                                # comble le gap du jour
-    if cur is not None:
-        bn.loc[pd.Timestamp.now(tz="UTC").floor(freq)] = cur
-        bn = bn.sort_index()
+    if end is None:                                            # gap du jour (live uniquement)
+        cur = _coingecko_oi(symbol)
+        if cur is not None:
+            bn.loc[pd.Timestamp.now(tz="UTC").floor(freq)] = cur
+            bn = bn.sort_index()
     return bn if len(bn) else None
 
 
-def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str) -> "pd.Series | None":
+def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
+                  start=None, end=None) -> "pd.Series | None":
     """Somme (USD) de l'OI multi-venues, alignée sur l'union des horodatages.
 
     `source` : 'agg' (OKX+Gate), 'agg3' (Binance archive + OKX + Gate), 'okx', 'gate'.
@@ -216,22 +252,23 @@ def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str) -> "pd.S
             continue
     if source == "agg3":
         try:
-            series.append(_binance_oi_series(symbol, timeframe, limit))  # None si archive KO → repli
+            series.append(_binance_oi_series(symbol, timeframe, limit, start, end))  # None → repli
         except Exception:
             pass
     return _combine_oi(series)
 
 
 def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
-                        source: str = "agg") -> "pd.DataFrame | None":
+                        source: str = "agg", start=None, end=None) -> "pd.DataFrame | None":
     """Historique d'Open Interest (perp) aligné sur les barres, indexé ts UTC (col `oi`).
 
     OI = donnée *futures* ; Binance `fapi` et Bybit sont géo-restreints ici. `source` :
     'agg' (OKX+Gate), 'agg3' (Binance archive + OKX + Gate, repli auto sur agg si l'archive
-    tombe), 'okx', 'gate'. Tolérant aux pannes : None si indisponible (analyse sans OI).
+    tombe), 'okx', 'gate'. `start`/`end` ciblent l'OI Binance d'un **intervalle historique**
+    (ex. mars, via les quotidiens d'archive). Tolérant : None si indisponible (analyse sans OI).
     """
     try:
-        agg = _aggregate_oi(symbol, timeframe, limit, source)
+        agg = _aggregate_oi(symbol, timeframe, limit, source, start, end)
         return None if agg is None else pd.DataFrame({"oi": agg})
     except Exception:
         return None

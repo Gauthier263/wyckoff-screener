@@ -12,9 +12,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   l'**OI Binance** via l'archive `data.binance.vision` (metrics 5m, non géo-bloqué ;
   `fapi`/Bybit le sont) + un point **CoinGecko** courant pour combler le retard ~1j, avec
   **repli auto** sur `agg` si l'archive tombe. Fusion via `_combine_oi` (carry → pas de
-  « falaise »). `fetch_open_interest_ohlc()` — **bougies OHLC d'OI agrégé** (agrège l'OI 5m
-  puis resample). `fetch_binance_oi_archive()` — OI Binance brut depuis l'archive. Import
-  ccxt paresseux (tests hors-ligne).
+  « falaise »). `start`/`end` ciblent l'OI Binance d'un **intervalle historique** (ex. mars)
+  via les quotidiens d'archive (téléchargements parallélisés + cache disque immuable).
+  `fetch_open_interest_ohlc()` — **bougies OHLC d'OI agrégé**. `fetch_binance_oi_archive()` —
+  OI Binance brut (mode `days` ou `start`/`end`). Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
