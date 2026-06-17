@@ -11,9 +11,10 @@ Scénario synthétique :
 import numpy as np
 import pandas as pd
 
-from screener.data import build_universe
+from screener.data import build_universe, scan_universe
 from screener.decouple import (
     crypto_beta,
+    human,
     is_tokenized_stock,
     log_returns,
     most_decoupled,
@@ -165,6 +166,32 @@ def test_build_universe_excludes_tokenized_and_leverage():
     assert "ETHUP/USDT" not in uni    # levier écarté
     assert "SOL/BTC" not in uni       # quote != USDT
     assert uni == ["BTC/USDT", "HYPE/USDT"]   # triées par volume décroissant
+
+
+def test_scan_universe_returns_volumes():
+    uni, vol = scan_universe(_FakeEx(), quote="USDT", top_n=10)
+    assert uni == ["BTC/USDT", "HYPE/USDT"]
+    assert vol["HYPE"] == 50 and vol["BTC"] == 100
+    assert "rNVDA" not in vol         # action tokenisée absente de la map volume
+
+
+def test_volume_and_mcap_columns():
+    frames = _build()
+    vol = {"AUTO": 1_500_000.0, "COUP": 900_000.0}
+    mc = {"AUTO": 250_000_000.0}      # clé en majuscules (ticker)
+    out = rank_decoupled(frames, rolling=30, min_score=-10, vol_map=vol, mcap_map=mc)
+    row = out.set_index("symbol").loc["AUTO/USDT"]
+    assert row["vol_24h"] == 1_500_000.0
+    assert row["mcap"] == 250_000_000.0
+    assert np.isnan(out.set_index("symbol").loc["COUP/USDT"]["mcap"])  # absent → NaN
+
+
+def test_human_formatter():
+    assert human(2_400_000) == "2.4M"
+    assert human(16_400_000_000) == "16.4B"
+    assert human(168_400) == "168.4K"
+    assert human(float("nan")) == "—"
+    assert human(0) == "—"
 
 
 def test_crypto_beta_falls_back_to_btc():

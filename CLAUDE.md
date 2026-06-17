@@ -50,9 +50,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `max_idio_ret` (plafond %, écarte les pumps déjà consommés type LAB +11000%). Score =
   `(1 − |corr|) × idio_ir` ; défaut : ne garde que la dynamique autonome haussière.
   Deux vues : `most_decoupled` (vrais découplés tradables) et `strongest_dynamics`
-  (meilleure dérive propre). Cœur pur hors-ligne (`rank_decoupled(frames, ...)`) +
-  `run_decouple(cfg)` en ligne. NB : filtrer les actions tokenisées *avant* le tri par
-  volume de l'univers (sinon le top liquidité est saturé d'actions, toutes écartées).
+  (meilleure dérive propre). Colonnes optionnelles `vol_24h` (volume quote 24h via
+  `data.scan_universe`) et `mcap` (market cap CoinGecko via `data.fetch_market_caps`,
+  flag `--mcap`) ; formatées K/M/B par `human()` à l'affichage. Cœur pur hors-ligne
+  (`rank_decoupled(frames, ..., vol_map, mcap_map)`) + `run_decouple(cfg)` en ligne.
+  NB : filtrer les actions tokenisées *avant* le tri par volume de l'univers (sinon le
+  top liquidité est saturé d'actions, toutes écartées).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
@@ -81,7 +84,7 @@ pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
 python -m screener.cli --exchange bitget --timeframe 4h --decouple --top 80  # découplage beta crypto
-python -m screener.cli --exchange bitget --decouple --view decoupled         # vue : vrais découplés (ou dynamics)
+python -m screener.cli --exchange bitget --decouple --view decoupled --mcap   # vue + volume 24h & market cap
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

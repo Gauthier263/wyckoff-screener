@@ -170,6 +170,8 @@ def main() -> None:
                         "avec dynamique autonome")
     p.add_argument("--view", choices=["score", "decoupled", "dynamics"], default="score",
                    help="--decouple : classement global (score), famille découplée ou forte dynamique")
+    p.add_argument("--mcap", action="store_true",
+                   help="--decouple : ajoute la colonne market cap (CoinGecko)")
     p.add_argument("--limit", type=int, default=None,
                    help="barres OHLCV par paire (défaut 1000 en mode --decouple)")
     p.add_argument("--no-cache", action="store_true")
@@ -178,7 +180,8 @@ def main() -> None:
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart, view=args.view)
+               use_cache=not args.no_cache, chart=args.chart, view=args.view,
+               mcap=args.mcap)
     if args.window is not None:
         cfg["window"] = args.window
     if args.limit is not None:

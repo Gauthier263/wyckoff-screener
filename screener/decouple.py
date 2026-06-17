@@ -124,12 +124,15 @@ def _metrics(r: pd.Series, bench: pd.Series, rolling: int,
 def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
                    rolling: int = 60, rs_frames: dict[str, pd.DataFrame] | None = None,
                    min_score: float = 0.0, min_bars: int = 180,
-                   max_idio_ret: float = 1000.0) -> pd.DataFrame:
+                   max_idio_ret: float = 1000.0, vol_map: dict[str, float] | None = None,
+                   mcap_map: dict[str, float] | None = None) -> pd.DataFrame:
     """Cœur pur (hors-ligne) : à partir des OHLCV par symbole, renvoie le tableau
     classé par découplage × dynamique autonome.
 
     frames    : {symbol -> OHLCV} incluant BTC/{quote} et idéalement ETH/{quote}.
     rs_frames : {base -> OHLCV de BASE/BTC} optionnel (force relative directe).
+    vol_map   : {base -> volume quote 24h} optionnel → colonne `vol_24h`.
+    mcap_map  : {TICKER -> market cap USD} optionnel → colonne `mcap`.
     min_bars  : historique effectif minimal (écarte les listings trop récents).
     max_idio_ret : plafond de rendement idiosyncratique en % (écarte les pumps
                    déjà consommés / cotations aberrantes). Garde-fous + exclusions
@@ -139,6 +142,8 @@ def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
     bench = crypto_beta(returns, quote=quote)
     bench_syms = {f"BTC/{quote}", f"ETH/{quote}"}
     rs_frames = rs_frames or {}
+    vol_map = vol_map or {}
+    mcap_map = mcap_map or {}
 
     rows: list[dict] = []
     for sym, r in returns.items():
@@ -158,6 +163,8 @@ def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
             m["rs_btc_%"] = round(rs_ret, 1)
         else:
             m["rs_btc_%"] = np.nan
+        m["vol_24h"] = float(vol_map[base]) if base in vol_map else np.nan
+        m["mcap"] = float(mcap_map[base.upper()]) if base.upper() in mcap_map else np.nan
 
         rows.append({"symbol": sym, **m})
 
@@ -166,9 +173,20 @@ def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
     out = pd.DataFrame(rows)
     out = out[out["score"] >= min_score]
     out = out.sort_values("score", ascending=False).reset_index(drop=True)
-    cols = ["symbol", "score", "corr", "r2", "corr_p90", "beta",
-            "idio_ret_%", "idio_ir", "rs_btc_%", "n"]
+    cols = ["symbol", "score", "corr", "r2", "corr_p90", "beta", "idio_ret_%",
+            "idio_ir", "rs_btc_%", "vol_24h", "mcap", "n"]
     return out[cols]
+
+
+def human(x: float) -> str:
+    """Formate un grand nombre en K/M/B (— si absent)."""
+    if x is None or (isinstance(x, float) and np.isnan(x)) or x == 0:
+        return "—"
+    x = float(x)
+    for unit, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
+        if abs(x) >= div:
+            return f"{x / div:.1f}{unit}"
+    return f"{x:.0f}"
 
 
 def most_decoupled(ranked: pd.DataFrame, corr_max: float = 0.30,
@@ -215,14 +233,17 @@ def run_decouple(cfg: dict) -> pd.DataFrame:
     limit = cfg.get("limit", 1000)
     tf = cfg["timeframe"]
 
-    universe = list(cfg["symbols"]) if cfg.get("symbols") else \
-        data_mod.build_universe(ex, quote=quote, top_n=cfg["top"])
+    if cfg.get("symbols"):
+        universe, vol_map = list(cfg["symbols"]), {}
+    else:
+        universe, vol_map = data_mod.scan_universe(ex, quote=quote, top_n=cfg["top"])
     # On s'assure que la référence beta crypto est présente.
     for ref in (f"BTC/{quote}", f"ETH/{quote}"):
         if ref not in universe:
             universe.append(ref)
     print(f"Univers : {len(universe)} paires — découplage beta crypto (BTC+ETH) {tf}",
           file=sys.stderr)
+    mcap_map = data_mod.fetch_market_caps() if cfg.get("mcap") else None
 
     markets = getattr(ex, "markets", {}) or {}
     frames: dict[str, pd.DataFrame] = {}
@@ -241,6 +262,12 @@ def run_decouple(cfg: dict) -> pd.DataFrame:
 
     out = rank_decoupled(frames, quote=quote, rolling=cfg.get("roll", 60),
                          rs_frames=rs_frames, min_bars=cfg.get("min_bars", 180),
-                         max_idio_ret=cfg.get("max_idio_ret", 1000.0))
-    return select_view(out, view=cfg.get("view", "score"),
-                       top=cfg.get("max_results", 25))
+                         max_idio_ret=cfg.get("max_idio_ret", 1000.0),
+                         vol_map=vol_map, mcap_map=mcap_map)
+    res = select_view(out, view=cfg.get("view", "score"),
+                      top=cfg.get("max_results", 25))
+    # Formatage humain des colonnes monétaires pour l'affichage / CSV watchlist.
+    for col in ("vol_24h", "mcap"):
+        if col in res.columns:
+            res[col] = res[col].map(human)
+    return res
