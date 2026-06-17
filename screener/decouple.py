@@ -193,6 +193,16 @@ def strongest_dynamics(ranked: pd.DataFrame, top: int = 15) -> pd.DataFrame:
     return ranked.sort_values("idio_ir", ascending=False).head(top).reset_index(drop=True)
 
 
+def select_view(ranked: pd.DataFrame, view: str = "score", top: int = 25) -> pd.DataFrame:
+    """Aiguille vers une des deux familles tradables, ou le classement global.
+    view : "score" (défaut, découplage × dynamique) | "decoupled" | "dynamics"."""
+    if view == "decoupled":
+        return most_decoupled(ranked, top=top)
+    if view == "dynamics":
+        return strongest_dynamics(ranked, top=top)
+    return ranked.head(top).reset_index(drop=True)
+
+
 def run_decouple(cfg: dict) -> pd.DataFrame:
     """Orchestration en ligne : récupère les OHLCV via ccxt puis classe l'univers.
     Les paires {BASE}/BTC sont récupérées quand elles existent (force relative)."""
@@ -232,4 +242,5 @@ def run_decouple(cfg: dict) -> pd.DataFrame:
     out = rank_decoupled(frames, quote=quote, rolling=cfg.get("roll", 60),
                          rs_frames=rs_frames, min_bars=cfg.get("min_bars", 180),
                          max_idio_ret=cfg.get("max_idio_ret", 1000.0))
-    return out.head(cfg.get("max_results", 25))
+    return select_view(out, view=cfg.get("view", "score"),
+                       top=cfg.get("max_results", 25))

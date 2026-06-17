@@ -23,7 +23,11 @@ def get_exchange(name: str = "binance"):
 
 def build_universe(ex, quote: str = "USDT", top_n: int = 60,
                    exclude: tuple[str, ...] = ("UP", "DOWN", "BULL", "BEAR")) -> list[str]:
-    """Retourne les `top_n` symboles spot {BASE}/{quote} les plus échangés."""
+    """Retourne les `top_n` symboles spot {BASE}/{quote} les plus échangés.
+    Exclut tokens à levier et actions tokenisées (rAAPL… : suivent la bourse) — sinon
+    le top liquidité en est saturé et le screener de découplage les écarte toutes ensuite."""
+    from .decouple import is_tokenized_stock
+
     tickers = ex.fetch_tickers()
     rows = []
     for sym, t in tickers.items():
@@ -31,6 +35,8 @@ def build_universe(ex, quote: str = "USDT", top_n: int = 60,
             continue
         base = sym.split("/")[0]
         if any(tag in base for tag in exclude):  # exclut les tokens à effet de levier
+            continue
+        if is_tokenized_stock(base):              # actions tokenisées : hors univers crypto
             continue
         qv = t.get("quoteVolume") or 0
         rows.append((sym, qv))

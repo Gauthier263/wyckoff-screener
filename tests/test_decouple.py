@@ -11,12 +11,14 @@ Scénario synthétique :
 import numpy as np
 import pandas as pd
 
+from screener.data import build_universe
 from screener.decouple import (
     crypto_beta,
     is_tokenized_stock,
     log_returns,
     most_decoupled,
     rank_decoupled,
+    select_view,
     strongest_dynamics,
 )
 
@@ -135,6 +137,34 @@ def test_two_families_views():
     assert "AUTO/USDT" in set(dec["symbol"])      # décorrélé + dynamique positive
     assert "COUP/USDT" not in set(dec["symbol"])  # trop corrélé pour la famille découplée
     assert dyn.iloc[0]["symbol"] == "AUTO/USDT"   # meilleure dérive propre
+
+
+def test_select_view_dispatch():
+    ranked = rank_decoupled(_build(), rolling=30, min_score=-10)
+    assert select_view(ranked, "score", top=2).equals(ranked.head(2).reset_index(drop=True))
+    assert "AUTO/USDT" in set(select_view(ranked, "dynamics", top=5)["symbol"])
+    dec = select_view(ranked, "decoupled", top=5)
+    assert "COUP/USDT" not in set(dec["symbol"])   # corr ~0.99 écarté de la vue découplée
+
+
+class _FakeEx:
+    """Exchange minimal : seul fetch_tickers est utilisé par build_universe."""
+    def fetch_tickers(self):
+        return {
+            "BTC/USDT": {"quoteVolume": 100},
+            "rNVDA/USDT": {"quoteVolume": 9999},   # action tokenisée très liquide
+            "HYPE/USDT": {"quoteVolume": 50},
+            "ETHUP/USDT": {"quoteVolume": 80},     # token à levier
+            "SOL/BTC": {"quoteVolume": 70},        # mauvaise quote
+        }
+
+
+def test_build_universe_excludes_tokenized_and_leverage():
+    uni = build_universe(_FakeEx(), quote="USDT", top_n=10)
+    assert "rNVDA/USDT" not in uni    # action tokenisée écartée malgré le volume
+    assert "ETHUP/USDT" not in uni    # levier écarté
+    assert "SOL/BTC" not in uni       # quote != USDT
+    assert uni == ["BTC/USDT", "HYPE/USDT"]   # triées par volume décroissant
 
 
 def test_crypto_beta_falls_back_to_btc():

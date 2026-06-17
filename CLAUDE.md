@@ -81,6 +81,7 @@ pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
 python -m screener.cli --exchange bitget --timeframe 4h --decouple --top 80  # découplage beta crypto
+python -m screener.cli --exchange bitget --decouple --view decoupled         # vue : vrais découplés (ou dynamics)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

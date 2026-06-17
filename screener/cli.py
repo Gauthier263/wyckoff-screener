@@ -168,6 +168,8 @@ def main() -> None:
     p.add_argument("--decouple", action="store_true",
                    help="classe les paires les plus découplées de la beta crypto (BTC+ETH) "
                         "avec dynamique autonome")
+    p.add_argument("--view", choices=["score", "decoupled", "dynamics"], default="score",
+                   help="--decouple : classement global (score), famille découplée ou forte dynamique")
     p.add_argument("--limit", type=int, default=None,
                    help="barres OHLCV par paire (défaut 1000 en mode --decouple)")
     p.add_argument("--no-cache", action="store_true")
@@ -176,7 +178,7 @@ def main() -> None:
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+               use_cache=not args.no_cache, chart=args.chart, view=args.view)
     if args.window is not None:
         cfg["window"] = args.window
     if args.limit is not None:
