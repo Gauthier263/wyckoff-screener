@@ -77,6 +77,41 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
 OI_VENUES = ("okx", "gate")
 
 
+def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4) -> "pd.Series | None":
+    """OI Binance (perp USDⓂ) depuis l'archive `data.binance.vision` — fichiers *metrics*
+    quotidiens (`sum_open_interest_value`, USD, pas de 5 min). Même miroir non géo-bloqué
+    que le spot, donc accessible là où `fapi` renvoie 451. **Retard ~1 jour** (le fichier
+    du jour courant n'est publié qu'après clôture UTC). Série indexée ts UTC, ou None.
+    """
+    import io
+    import zipfile
+
+    import requests  # apporté par ccxt ; respecte REQUESTS_CA_BUNDLE (CA egress)
+
+    base, quote = symbol.split("/")
+    sym = f"{base}{quote}"
+    today = pd.Timestamp.utcnow().normalize()
+    parts = []
+    for i in range(1, days + 1):
+        d = (today - pd.Timedelta(days=i)).strftime("%Y-%m-%d")
+        url = (f"https://data.binance.vision/data/futures/um/daily/metrics/"
+               f"{sym}/{sym}-metrics-{d}.zip")
+        try:
+            r = requests.get(url, timeout=20)
+            if r.status_code != 200:
+                continue
+            zf = zipfile.ZipFile(io.BytesIO(r.content))
+            df = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])))
+            s = pd.Series(df["sum_open_interest_value"].astype(float).values,
+                          index=pd.to_datetime(df["create_time"], utc=True))
+            parts.append(s)
+        except Exception:
+            continue
+    if not parts:
+        return None
+    return pd.concat(parts).sort_index()
+
+
 def _oi_series(ex, symbol: str, timeframe: str, limit: int) -> "pd.Series | None":
     """Série d'Open Interest (valeur USD) d'un exchange ccxt, indexée ts UTC."""
     base, quote = symbol.split("/")
