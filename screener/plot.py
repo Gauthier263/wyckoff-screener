@@ -71,50 +71,65 @@ def _candles(ax, df, width):
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
+    oi_source: str = "agg3", oi_ohlc=None,
 ) -> str:
-    """Dessine la structure `struct` (détectée en `analysis_tf`) avec des bougies en
-    TF inférieure, sur l'intervalle couvert par les événements."""
-    fine_tf = FINER_TF.get(analysis_tf, analysis_tf)
+    """Dessine la structure `struct` détectée en `analysis_tf`, **dans la même TF** (bougies
+    `analysis_tf`), sur l'intervalle couvert par les événements. Trois panneaux : cours,
+    volume (avec moyenne + étiquettes d'événements) et Open Interest agrégé (bougies, **même
+    TF que le cours**). Le panneau OI est omis si l'OI est indisponible."""
     ex = ex or data_mod.get_exchange("binance")
-    fine = data_mod.fetch_ohlcv(ex, symbol, fine_tf, limit, use_cache=False)
+    df = data_mod.fetch_ohlcv(ex, symbol, analysis_tf, limit, use_cache=False)
 
     # bornes temporelles : du climax au dernier événement, avec un peu de marge
     ts = [e.ts for e in struct.events]
     span = max(ts) - min(ts)
-    pad = span * 0.12 if span.total_seconds() else pd.Timedelta(hours=2)
-    sub = fine.loc[min(ts) - pad: max(ts) + pad].copy()
-    if len(sub) < 3:
-        sub = fine.iloc[-60:].copy()
-    sub.index = sub.index + pd.Timedelta(hours=tz_hours)
+    pad = span * 0.12 if span.total_seconds() else _TF_TD.get(analysis_tf, pd.Timedelta(hours=1)) * 3
+    sub_utc = df.loc[min(ts) - pad: max(ts) + pad].copy()
+    if len(sub_utc) < 3:
+        sub_utc = df.iloc[-60:].copy()
+    delta = pd.Timedelta(hours=tz_hours)
+    sub = sub_utc.copy()
+    sub.index = sub.index + delta
 
     from .features import add_features
     sub = add_features(sub)
 
+    # Open Interest agrégé, BOUGIES À LA MÊME TF que le cours, sur la même fenêtre.
+    if oi_ohlc is None:
+        try:
+            oi_ohlc = data_mod.fetch_open_interest_ohlc(
+                symbol, analysis_tf, source=oi_source,
+                start=sub_utc.index[0], end=sub_utc.index[-1])
+        except Exception:
+            oi_ohlc = None
+    has_oi = oi_ohlc is not None and len(oi_ohlc) > 0
+    if has_oi:
+        oi_ohlc = oi_ohlc.copy()
+        oi_ohlc.index = oi_ohlc.index + delta
+        oi_ohlc = (oi_ohlc[(oi_ohlc.index >= sub.index[0]) & (oi_ohlc.index <= sub.index[-1])] / 1e9)
+        has_oi = len(oi_ohlc) > 0
+
     x = mdates.date2num(sub.index.to_pydatetime())
     width = (x[1] - x[0]) * 0.7 if len(x) > 1 else 0.01
-    fig, (axp, axv) = plt.subplots(2, 1, figsize=(13, 7.5), sharex=True,
-                                   gridspec_kw={"height_ratios": [3, 1], "hspace": 0.05})
+    if has_oi:
+        fig, (axp, axv, axo) = plt.subplots(3, 1, figsize=(13.5, 9.2), sharex=True,
+                                            gridspec_kw={"height_ratios": [3, 1, 1.4], "hspace": 0.06})
+    else:
+        fig, (axp, axv) = plt.subplots(2, 1, figsize=(13.5, 7.5), sharex=True,
+                                       gridspec_kw={"height_ratios": [3, 1], "hspace": 0.06})
+        axo = None
+    panels = [axp, axv] + ([axo] if has_oi else [])
     fig.patch.set_facecolor("white")
     _candles(axp, sub, width)
 
     acc = struct.bias == "accumulation"
     ev = {e.name: e for e in struct.events}
-    td = _TF_TD.get(analysis_tf, pd.Timedelta(hours=1))
-    delta = pd.Timedelta(hours=tz_hours)
 
-    # Place chaque marqueur sur l'extrême RÉEL de la barre d'analyse, retrouvé dans
-    # les bougies fines couvrant la période [ts, ts+td) -> alignement exact creux/cassure.
+    # Bougies même TF que les événements → marqueur posé sur l'extrême réel de LA barre.
     def locate(e):
         want = _wanted_extreme(e.name, acc)
-        start = e.ts + delta
-        seg = sub.loc[start: start + td - pd.Timedelta(seconds=1)]
-        if len(seg) == 0:
-            return mdates.date2num(start.to_pydatetime()), (e.bar_low if want == "low" else e.bar_high)
-        if want == "low":
-            t, price = seg["low"].idxmin(), float(seg["low"].min())
-        else:
-            t, price = seg["high"].idxmax(), float(seg["high"].max())
-        return mdates.date2num(t.to_pydatetime()), price
+        return (mdates.date2num((e.ts + delta).to_pydatetime()),
+                e.bar_high if want == "high" else e.bar_low)
 
     pts = {name: locate(e) for name, e in ev.items()}
 
@@ -160,9 +175,8 @@ def plot_window_structure(
         y = price + (gap if up else -gap)
         dy = 30 if up else -38
         # Trait vertical fin et discret, teinté de la couleur de l'événement (vert/bleu…),
-        # identique sur le cours et le volume, pour délimiter les phases (même x ; les deux
-        # panneaux partagent l'axe X).
-        for axx in (axp, axv):
+        # identique sur tous les panneaux (cours/volume/OI) pour délimiter les phases.
+        for axx in panels:
             axx.axvline(xe, color=col, ls=":", lw=0.7, alpha=0.4, zorder=0)
         axp.annotate(name, (xe, y), textcoords="offset points", xytext=(0, dy),
                      ha="center", fontsize=10, weight="bold", color=col,
@@ -170,7 +184,7 @@ def plot_window_structure(
 
     seq = " → ".join(e.name for e in struct.events)
     axp.set_title(f"{symbol} — structure {struct.bias.upper()} ({seq})  |  analyse {analysis_tf}, "
-                  f"bougies {fine_tf} ({tz_label})", fontsize=11, weight="bold")
+                  f"bougies {analysis_tf} ({tz_label})", fontsize=11, weight="bold")
     axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
     # marge verticale pour que les marqueurs/étiquettes ne mordent pas le titre
     plo, phi = float(sub["low"].min()), float(sub["high"].max())
@@ -193,7 +207,25 @@ def plot_window_structure(
                      xytext=(0, 10), ha="center", va="bottom", fontsize=7.5, weight="bold", color=col)
     axv.set_ylim(0, vmax * 1.42)
     axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
-    axv.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
+
+    # Panneau Open Interest agrégé — bougies à la MÊME TF (vert = OI↑/positions ouvertes,
+    # rouge = OI↓/positions fermées).
+    if has_oi:
+        xo = mdates.date2num(oi_ohlc.index.to_pydatetime())
+        ow = (xo[1] - xo[0]) * 0.7 if len(xo) > 1 else width
+        for xi, (_, r) in zip(xo, oi_ohlc.iterrows()):
+            c = "#26a69a" if r["close"] >= r["open"] else "#ef5350"
+            axo.vlines(xi, r["low"], r["high"], color=c, lw=0.8, zorder=1)
+            lo, hi = sorted((r["open"], r["close"]))
+            axo.add_patch(plt.Rectangle((xi - ow / 2, lo), ow, max(hi - lo, 1e-9),
+                                        facecolor=c, edgecolor=c, zorder=2))
+        olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
+        axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
+        axo.set_ylabel("OI agg. (Md$)"); axo.grid(True, alpha=0.2)
+        axo.annotate(f"OI agrégé {oi_source} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)",
+                     (0.5, 0.04), xycoords="axes fraction", ha="center", fontsize=7, color="#666")
+
+    panels[-1].xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)
     fig.savefig(out_path, dpi=130, bbox_inches="tight")
     plt.close(fig)

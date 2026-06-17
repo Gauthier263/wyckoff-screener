@@ -280,14 +280,22 @@ _TF_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
 
 
 def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 300,
-                             source: str = "agg", fine: str = "5m") -> "pd.DataFrame | None":
-    """Bougies OHLC d'Open Interest agrégé : on agrège l'OI *fin* (5m) multi-venues puis on
-    le resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs de la période).
-    Retourne un DataFrame [open, high, low, close] (Md$ bruts en USD) indexé ts UTC, ou None.
+                             source: str = "agg", fine: str | None = None,
+                             start=None, end=None) -> "pd.DataFrame | None":
+    """Bougies OHLC d'Open Interest agrégé : on agrège l'OI *fin* multi-venues puis on le
+    resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs de la période).
+    Retourne un DataFrame [open, high, low, close] (USD) indexé ts UTC, ou None.
+
+    `fine` (granularité source) est choisie selon `timeframe` : 5m pour les TF fines, 1h
+    pour les TF ≥ 4h (couvre ~12 j sur OKX/Gate). `start`/`end` ciblent une fenêtre historique.
     """
     try:
-        fine_limit = min(1000, max(limit * 12, 300))   # ~12 obs 5m par barre 1h
-        agg = _aggregate_oi(symbol, fine, fine_limit, source)
+        if fine is None:
+            fine = "5m" if timeframe in ("5m", "15m", "30m", "1h") else "1h"
+        fine_min = {"5m": 5, "1h": 60}.get(fine, 5)
+        tf_min = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(timeframe, 60)
+        fine_limit = min(1000, max(int(limit * tf_min / fine_min), 300))
+        agg = _aggregate_oi(symbol, fine, fine_limit, source, start, end)
         if agg is None:
             return None
         freq = _TF_FREQ.get(timeframe, "1h")

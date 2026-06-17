@@ -48,14 +48,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   bon côté de la borne). Événements triés par horodatage avant rendu. `detect_window_structure`
   accepte un `oi` (Open Interest) réaligné sur les barres : confirme l'AR (débouclage → OI
   en repli) et annote `WindowEvent.oi_chg` (ΔOI % sur ~3 barres). `--no-oi` pour désactiver.
-- `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure. Dessine les
-  bougies sur une **TF inférieure** que l'analyse (`FINER_TF` : H4→H1, H1→15m, 15m→5m).
-  Bornes : **plancher = climax (SC), plafond = AR** (c'est l'AR qui le définit), miroir
-  en distribution (plafond = BC, plancher = AR). Les marqueurs sont *recalés sur
-  l'extrême réel* de chaque barre d'analyse, retrouvé dans les bougies fines de la
-  période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
-  creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
-  lignes-guides verticales. Horodatage en CEST.
+- `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure, **3 panneaux**
+  (cours / volume / Open Interest). Bougies **dans la MÊME TF que l'analyse** (H4→bougies H4,
+  etc. — pas de TF inférieure). Bornes : **plancher = climax (SC), plafond = AR** (miroir en
+  distribution : plafond = BC, plancher = AR ; sans AR → extrême de séquence). Marqueurs sur
+  l'extrême réel de la barre (`_wanted_extreme` : SC/ST→creux, AR/SOS→sommet). Panneau
+  **volume** : barres + **moyenne (vol MA)** + **étiquette de chaque événement** (nom +
+  ×vol_ratio). Panneau **OI** : bougies d'OI agrégé (`fetch_open_interest_ohlc`, source
+  `agg3`) **à la MÊME TF que le cours** (vert = OI↑, rouge = OI↓), omis si OI indispo. Traits
+  verticaux d'événement (teintés) sur les 3 panneaux. Horodatage en CEST.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
@@ -73,8 +74,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
     lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
     dans le fil** (outil d'envoi de fichier) — Gauthier veut le voir sans cliquer.
-  - Bougies en TF inférieure à l'analyse : analyse H1 → bougies 15m, analyse H4 →
-    bougies H1 (voir `FINER_TF`).
+  - **Bougies dans la MÊME TF que l'analyse** (analyse H4 → bougies H4, H1 → bougies H1).
+  - Toujours : panneau **volume avec moyenne (vol MA) + étiquettes d'événements** (nom +
+    ×vol_ratio), et panneau **OI à la MÊME TF que le cours** (jamais une TF d'OI différente).
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
     confirment la thèse, et rappeler ce que dit la théorie sur cet événement dans le
     schéma (accumulation / distribution) — colonne dédiée.
