@@ -24,6 +24,24 @@ from .orderblocks import OBThresholds, analyze_order_blocks
 _FR = {"bullish": "haussier", "bearish": "baissier"}
 
 
+def _fmt_vol(x) -> str:
+    """Volume 24 h (quoteVolume, en USDT) en notation compacte."""
+    if x is None or x != x:
+        return "—"
+    for unit, div in (("B", 1e9), ("M", 1e6), ("K", 1e3)):
+        if abs(x) >= div:
+            return f"{x / div:.1f}{unit}"
+    return f"{x:.0f}"
+
+
+def _volume_map(ex) -> dict:
+    """symbole → quoteVolume 24 h (USDT). Vide si l'appel échoue."""
+    try:
+        return {s: (t.get("quoteVolume") or float("nan")) for s, t in ex.fetch_tickers().items()}
+    except Exception:
+        return {}
+
+
 @dataclass
 class OBStats:
     symbol: str
@@ -36,10 +54,12 @@ class OBStats:
     fresh: str              # dernier OB non encore mité (signal live)
     score: float            # respect_rate pénalisé par l'erreur-type (borne basse)
     kind: str = "crypto"    # "crypto" | "xstock" (action tokenisée Bitget)
+    volume: float = float("nan")  # quoteVolume 24 h (USDT)
 
     def as_row(self) -> dict:
         return {
             "symbol": self.symbol,
+            "txn_vol": _fmt_vol(self.volume),
             "n_ob": self.n_ob,
             "n_test": self.n_test,
             "respect%": round(self.respect_rate, 1),
@@ -73,7 +93,7 @@ def _respect_rate(obs) -> tuple[float, int]:
 
 
 def fresh_order_blocks(symbol: str, feat: pd.DataFrame, th: OBThresholds,
-                       kind: str = "crypto") -> list[dict]:
+                       kind: str = "crypto", volume: float = float("nan")) -> list[dict]:
     """Renvoie une ligne par OB **non encore mité** (niveau vierge à surveiller en live).
 
     `dist%` = distance du dernier prix à la zone, du bon côté (prix au-dessus d'un OB
@@ -94,6 +114,7 @@ def fresh_order_blocks(symbol: str, feat: pd.DataFrame, th: OBThresholds,
         dist = (price - o.top) if o.bias == "bullish" else (o.bottom - price)
         rows.append({
             "symbol": symbol,
+            "txn_vol": _fmt_vol(volume),
             "bias": _FR[o.bias],
             "zone": f"{_fmt(o.bottom)}–{_fmt(o.top)}",
             "price": _fmt(price),
@@ -108,7 +129,7 @@ def fresh_order_blocks(symbol: str, feat: pd.DataFrame, th: OBThresholds,
 
 
 def screen_symbol(symbol: str, feat: pd.DataFrame, th: OBThresholds,
-                  min_tests: int = 5) -> OBStats | None:
+                  min_tests: int = 5, volume: float = float("nan")) -> OBStats | None:
     obs = analyze_order_blocks(feat, th)
     if not obs:
         return None
@@ -138,6 +159,7 @@ def screen_symbol(symbol: str, feat: pd.DataFrame, th: OBThresholds,
         swing_rate=100 * np.mean([o.hit_swing for o in tested]) if n_test else 0.0,
         fresh=fresh,
         score=100 * _robust_score(p, n_test, min_tests),
+        volume=volume,
     )
 
 
@@ -164,13 +186,14 @@ def run_ob_screen(cfg: dict) -> dict[str, pd.DataFrame]:
               file=sys.stderr)
     th = OBThresholds(**cfg.get("ob", {}))
     min_tests = cfg.get("ob_min_tests", 5)
+    volmap = _volume_map(ex)
 
     results: list[OBStats] = []
     for i, sym in enumerate(universe, 1):
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
-            s = screen_symbol(sym, feat, th, min_tests)
+            s = screen_symbol(sym, feat, th, min_tests, volume=volmap.get(sym, float("nan")))
             if s and s.n_test > 0:
                 s.kind = "xstock" if data_mod.is_tokenized_stock(ex, sym) else "crypto"
                 results.append(s)
@@ -204,6 +227,7 @@ def run_ob_fresh(cfg: dict) -> dict[str, pd.DataFrame]:
         print(f"Univers : {len(universe)} paires {cfg['quote']} {mt or 'spot'} sur "
               f"{cfg['exchange']} — OB frais à retester {cfg['timeframe']}", file=sys.stderr)
     th = OBThresholds(**cfg.get("ob", {}))
+    volmap = _volume_map(ex)
 
     rows: list[dict] = []
     for i, sym in enumerate(universe, 1):
@@ -211,7 +235,7 @@ def run_ob_fresh(cfg: dict) -> dict[str, pd.DataFrame]:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
             kind = "xstock" if data_mod.is_tokenized_stock(ex, sym) else "crypto"
-            rows += fresh_order_blocks(sym, feat, th, kind)
+            rows += fresh_order_blocks(sym, feat, th, kind, volume=volmap.get(sym, float("nan")))
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
         if i % 10 == 0:
