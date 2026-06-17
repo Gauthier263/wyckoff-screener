@@ -125,41 +125,87 @@ def _oi_series(ex, symbol: str, timeframe: str, limit: int) -> "pd.Series | None
     return s if len(s) else None
 
 
-def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str) -> "pd.Series | None":
-    """Somme (USD) de l'OI sur plusieurs venues, alignée sur l'union des horodatages.
-
-    `source` : 'agg' (OKX+Gate), 'okx', 'gate'. openInterestValue est en USD partout,
-    donc additionnable. Tolérant : ignore une venue en panne.
-    """
-    import ccxt  # import paresseux
-
-    venues = {"okx": ("okx",), "gate": ("gate",)}.get(source, OI_VENUES)
-    series = []
-    for name in venues:
-        try:
-            ex = getattr(ccxt, name)({"enableRateLimit": True})
-            ex.load_markets()
-            s = _oi_series(ex, symbol, timeframe, limit)
-            if s is not None:
-                series.append(s.rename(name))
-        except Exception:
-            continue
+def _combine_oi(series: list) -> "pd.Series | None":
+    """Somme plusieurs séries d'OI (USD) sur l'union des horodatages, chaque venue étant
+    *carry-forward/back* avant la somme → pas de « falaise » quand une venue (ex. Binance,
+    en retard d'archive) ne couvre pas les périodes récentes."""
+    series = [s for s in series if s is not None and len(s)]
     if not series:
         return None
     if len(series) == 1:
         return series[0]
-    # union des horodatages, chaque venue complétée (carry) avant la somme
     df = pd.concat(series, axis=1).sort_index().ffill().bfill()
     return df.sum(axis=1)
+
+
+def _coingecko_oi(symbol: str, venue: str = "Binance (Futures)") -> "float | None":
+    """OI courant (USD) d'une venue via CoinGecko (snapshot temps réel, sans historique).
+    Sert à combler le gap du jour de l'archive Binance. None si indispo."""
+    try:
+        import requests
+
+        base, quote = symbol.split("/")
+        want = f"{base}{quote}"
+        d = requests.get("https://api.coingecko.com/api/v3/derivatives"
+                         "?include_tickers=unexpired", timeout=15).json()
+        for x in d:
+            if x.get("market") == venue and str(x.get("symbol")) == want and x.get("open_interest"):
+                return float(x["open_interest"])
+    except Exception:
+        return None
+    return None
+
+
+def _binance_oi_series(symbol: str, timeframe: str, limit: int) -> "pd.Series | None":
+    """OI Binance résolu sur la grille `timeframe` : archive 5 min (data.binance.vision)
+    resamplée, puis point courant CoinGecko ajouté en bout pour combler le retard ~1j."""
+    tf_min = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(timeframe, 60)
+    days = int(min(8, max(2, (limit * tf_min) / 1440 + 1)))   # borne les téléchargements
+    s5 = fetch_binance_oi_archive(symbol, days=days)
+    if s5 is None:
+        return None
+    freq = _TF_FREQ.get(timeframe, "1h")
+    bn = s5.resample(freq).last().dropna()
+    cur = _coingecko_oi(symbol)                                # comble le gap du jour
+    if cur is not None:
+        bn.loc[pd.Timestamp.now(tz="UTC").floor(freq)] = cur
+        bn = bn.sort_index()
+    return bn if len(bn) else None
+
+
+def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str) -> "pd.Series | None":
+    """Somme (USD) de l'OI multi-venues, alignée sur l'union des horodatages.
+
+    `source` : 'agg' (OKX+Gate), 'agg3' (Binance archive + OKX + Gate), 'okx', 'gate'.
+    `agg3` ajoute l'OI Binance (archive + point CoinGecko) ; si l'archive est indisponible,
+    il **se replie automatiquement** sur OKX+Gate. openInterestValue est en USD partout.
+    """
+    import ccxt  # import paresseux
+
+    ccxt_venues = {"okx": ("okx",), "gate": ("gate",)}.get(source, OI_VENUES)
+    series = []
+    for name in ccxt_venues:
+        try:
+            ex = getattr(ccxt, name)({"enableRateLimit": True})
+            ex.load_markets()
+            series.append(_oi_series(ex, symbol, timeframe, limit))
+        except Exception:
+            continue
+    if source == "agg3":
+        try:
+            series.append(_binance_oi_series(symbol, timeframe, limit))  # None si archive KO → repli
+        except Exception:
+            pass
+    return _combine_oi(series)
 
 
 def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
                         source: str = "agg") -> "pd.DataFrame | None":
     """Historique d'Open Interest (perp) aligné sur les barres, indexé ts UTC (col `oi`).
 
-    OI = donnée *futures* ; Binance `fapi` et Bybit sont géo-restreints ici. Source par
-    défaut = **agrégat OKX + Gate** (valeurs USD sommées). Tolérant aux pannes : renvoie
-    None si indisponible — l'analyse fonctionne alors sans OI.
+    OI = donnée *futures* ; Binance `fapi` et Bybit sont géo-restreints ici. `source` :
+    'agg' (OKX+Gate), 'agg3' (Binance archive + OKX + Gate, repli auto sur agg si l'archive
+    tombe), 'okx', 'gate'. Tolérant aux pannes : None si indisponible (analyse sans OI).
     """
     try:
         agg = _aggregate_oi(symbol, timeframe, limit, source)

@@ -158,7 +158,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
-        "oi_source": "agg",
+        "oi_source": "agg3",
     }
     cfg.update(load_config())
 
@@ -175,8 +175,8 @@ def main() -> None:
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
-    p.add_argument("--oi-source", choices=["agg", "okx", "gate"], default=cfg["oi_source"],
-                   help="source d'OI : agg (OKX+Gate, défaut), okx, ou gate")
+    p.add_argument("--oi-source", choices=["agg3", "agg", "okx", "gate"], default=cfg["oi_source"],
+                   help="source d'OI : agg3 (Binance+OKX+Gate, défaut), agg (OKX+Gate), okx, gate")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 

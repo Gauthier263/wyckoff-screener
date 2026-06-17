@@ -7,10 +7,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/data.py` — ccxt : `build_universe()` (top paires USDT par volume),
   `fetch_ohlcv()` avec cache parquet. `get_exchange("binance")` route les endpoints
   publics vers le miroir `data-api.binance.vision` (spot, non géo-restreint).
-  `fetch_open_interest()` — historique d'OI (perp) **agrégé OKX+Gate** (valeurs USD sommées ;
-  `fapi` Binance et Bybit géo-bloqués). `source=agg|okx|gate`, tolérant aux pannes (None si
-  indispo). `fetch_open_interest_ohlc()` — **bougies OHLC d'OI agrégé** (agrège l'OI 5m puis
-  resample). Import ccxt paresseux (tests hors-ligne).
+  `fetch_open_interest()` — historique d'OI (perp) **agrégé multi-venues** (valeurs USD
+  sommées). `source=agg3|agg|okx|gate` : `agg`=OKX+Gate ; **`agg3`** (défaut CLI) ajoute
+  l'**OI Binance** via l'archive `data.binance.vision` (metrics 5m, non géo-bloqué ;
+  `fapi`/Bybit le sont) + un point **CoinGecko** courant pour combler le retard ~1j, avec
+  **repli auto** sur `agg` si l'archive tombe. Fusion via `_combine_oi` (carry → pas de
+  « falaise »). `fetch_open_interest_ohlc()` — **bougies OHLC d'OI agrégé** (agrège l'OI 5m
+  puis resample). `fetch_binance_oi_archive()` — OI Binance brut depuis l'archive. Import
+  ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
