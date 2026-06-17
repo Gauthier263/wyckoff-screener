@@ -44,9 +44,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   glissant car « tout corrèle » en krach). Dynamique = rendement neutralisé du marché
   `r − beta·b` (garde l'alpha) : `idio_ret_%` cumulé + `idio_ir`. Colonne `rs_btc_%` =
   perf cumulée de `{BASE}/BTC` quand la paire existe (force relative *réelle* vs BTC).
-  Exclut panier (BTC/ETH), stablecoins et séries figées (illiquides). Score =
+  Exclut panier (BTC/ETH), stablecoins, **actions tokenisées** (`is_tokenized_stock` :
+  préfixe `r`+MAJ comme rAAPL/rNVDA, ou `pre`+MAJ — elles suivent la bourse) et séries
+  figées (illiquides). Garde-fous : `min_bars` (historique effectif minimal) et
+  `max_idio_ret` (plafond %, écarte les pumps déjà consommés type LAB +11000%). Score =
   `(1 − |corr|) × idio_ir` ; défaut : ne garde que la dynamique autonome haussière.
-  Cœur pur hors-ligne (`rank_decoupled(frames, ...)`) + `run_decouple(cfg)` en ligne.
+  Deux vues : `most_decoupled` (vrais découplés tradables) et `strongest_dynamics`
+  (meilleure dérive propre). Cœur pur hors-ligne (`rank_decoupled(frames, ...)`) +
+  `run_decouple(cfg)` en ligne. NB : filtrer les actions tokenisées *avant* le tri par
+  volume de l'univers (sinon le top liquidité est saturé d'actions, toutes écartées).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.

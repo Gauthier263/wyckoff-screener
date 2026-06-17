@@ -11,7 +11,14 @@ Scénario synthétique :
 import numpy as np
 import pandas as pd
 
-from screener.decouple import crypto_beta, log_returns, rank_decoupled
+from screener.decouple import (
+    crypto_beta,
+    is_tokenized_stock,
+    log_returns,
+    most_decoupled,
+    rank_decoupled,
+    strongest_dynamics,
+)
 
 
 def _frame(returns: np.ndarray, index: pd.DatetimeIndex, start: float = 100.0) -> pd.DataFrame:
@@ -77,6 +84,57 @@ def test_relative_strength_column():
     assert not np.isnan(row["rs_btc_%"])
     # Pas de paire /BTC fournie pour COUP → colonne NaN.
     assert np.isnan(out.set_index("symbol").loc["COUP/USDT"]["rs_btc_%"])
+
+
+def _build_plus():
+    """_build() + une action tokenisée, un pump aberrant et un listing récent."""
+    frames = _build()
+    rng = np.random.default_rng(11)
+    n = 300
+    idx = pd.date_range("2025-01-01", periods=n + 1, freq="4h", tz="UTC")
+    frames["rNVDA/USDT"] = _frame(0.003 + rng.normal(0, 0.02, n), idx)    # action tokenisée
+    frames["MOON/USDT"] = _frame(0.05 + rng.normal(0, 0.02, n), idx)      # pump aberrant
+    frames["NEW/USDT"] = _frame(0.004 + rng.normal(0, 0.02, 100), idx)    # historique court
+    return frames
+
+
+def test_is_tokenized_stock():
+    assert is_tokenized_stock("rAAPL")
+    assert is_tokenized_stock("rNVDA")
+    assert is_tokenized_stock("preOPAI")
+    assert is_tokenized_stock("NVDAON")       # straggler curé
+    assert not is_tokenized_stock("BTC")
+    assert not is_tokenized_stock("RSR")       # crypto en majuscules
+    assert not is_tokenized_stock("rsETH")     # casse mixte crypto (LST)
+    assert not is_tokenized_stock("SOL")
+
+
+def test_tokenized_stock_excluded():
+    out = rank_decoupled(_build_plus(), rolling=30, min_score=-10)
+    assert "rNVDA/USDT" not in set(out["symbol"])
+
+
+def test_outlier_idio_return_capped():
+    frames = _build_plus()
+    assert "MOON/USDT" not in set(rank_decoupled(frames, rolling=30, min_score=-10)["symbol"])
+    loose = rank_decoupled(frames, rolling=30, min_score=-10, max_idio_ret=1e12)
+    assert "MOON/USDT" in set(loose["symbol"])    # sans plafond, l'aberration revient
+
+
+def test_min_history_guard():
+    frames = _build_plus()
+    assert "NEW/USDT" not in set(rank_decoupled(frames, rolling=30, min_score=-10)["symbol"])
+    short = rank_decoupled(frames, rolling=30, min_score=-10, min_bars=50)
+    assert "NEW/USDT" in set(short["symbol"])     # seuil abaissé → réintégré
+
+
+def test_two_families_views():
+    ranked = rank_decoupled(_build(), rolling=30, min_score=-10)
+    dec = most_decoupled(ranked, corr_max=0.5, corr_p90_max=1.0)
+    dyn = strongest_dynamics(ranked, top=5)
+    assert "AUTO/USDT" in set(dec["symbol"])      # décorrélé + dynamique positive
+    assert "COUP/USDT" not in set(dec["symbol"])  # trop corrélé pour la famille découplée
+    assert dyn.iloc[0]["symbol"] == "AUTO/USDT"   # meilleure dérive propre
 
 
 def test_crypto_beta_falls_back_to_btc():

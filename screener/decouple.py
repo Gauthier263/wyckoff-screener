@@ -35,8 +35,27 @@ import pandas as pd
 # Stablecoins / actifs peggés : corrélation faible mais aucune dynamique propre.
 STABLES = {
     "USDT", "USDC", "TUSD", "DAI", "FDUSD", "USDE", "USDD", "PYUSD",
-    "BUSD", "GUSD", "USDP", "EURT", "EURS", "USTC",
+    "BUSD", "GUSD", "USDP", "EURT", "EURS", "USTC", "USD1",
 }
+
+# Variantes d'actions tokenisées / pré-marché qui échappent au motif principal.
+STOCK_TOKEN_EXTRA = {"NVDAON"}
+
+
+def is_tokenized_stock(base: str) -> bool:
+    """Actions tokenisées listées sur Bitget — elles suivent la bourse, pas le
+    crypto, et squattent donc le classement « décorrélé de BTC » par construction.
+
+    Motif Bitget : préfixe `r` + ticker en majuscules (rAAPL, rNVDA, rSOXX…), ou
+    préfixe `pre` + majuscules pour le pré-marché (preOPAI…). Les jetons crypto
+    sont en majuscules (RSR, RNDR…) ou en casse mixte sans `r`/`pre` initial
+    (rsETH, weETH…), donc non capturés.
+    """
+    if len(base) >= 2 and base[0] == "r" and base[1].isalpha() and base[1:].isupper():
+        return True
+    if len(base) > 3 and base[:3] == "pre" and base[3:].isupper():
+        return True
+    return base in STOCK_TOKEN_EXTRA
 
 
 def log_returns(df: pd.DataFrame) -> pd.Series:
@@ -54,10 +73,16 @@ def crypto_beta(returns: dict[str, pd.Series], quote: str = "USDT") -> pd.Series
     return frame.mean(axis=1)
 
 
-def _metrics(r: pd.Series, bench: pd.Series, rolling: int) -> dict | None:
-    """Métriques de décorrélation + dynamique autonome sur l'index commun."""
+def _metrics(r: pd.Series, bench: pd.Series, rolling: int,
+             min_bars: int, max_idio_ret: float) -> dict | None:
+    """Métriques de décorrélation + dynamique autonome sur l'index commun.
+
+    Garde-fous : historique effectif minimal (`min_bars`, écarte les listings
+    trop récents) et plafond de rendement idiosyncratique (`max_idio_ret` en %,
+    écarte les pumps déjà consommés / cotations aberrantes type +11000%).
+    """
     common = pd.concat([r.rename("r"), bench.rename("b")], axis=1).dropna()
-    if len(common) < max(rolling, 30):
+    if len(common) < max(rolling, min_bars):
         return None
     r_, b_ = common["r"], common["b"]
 
@@ -75,6 +100,9 @@ def _metrics(r: pd.Series, bench: pd.Series, rolling: int) -> dict | None:
     # autonome — cumulée (idio_ret) et son information ratio (idio_ir).
     idio = r_ - beta * b_
     idio_ret = float(np.expm1(idio.sum()) * 100)               # % cumulé
+    # Pump déjà consommé / cotation aberrante : on écarte (non reproductible).
+    if not np.isfinite(idio_ret) or abs(idio_ret) > max_idio_ret:
+        return None
     idio_ir = float(idio.mean() / idio.std(ddof=1)) if idio.std(ddof=1) else 0.0
 
     roll = r_.rolling(rolling).corr(b_).dropna()
@@ -95,12 +123,17 @@ def _metrics(r: pd.Series, bench: pd.Series, rolling: int) -> dict | None:
 
 def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
                    rolling: int = 60, rs_frames: dict[str, pd.DataFrame] | None = None,
-                   min_score: float = 0.0) -> pd.DataFrame:
+                   min_score: float = 0.0, min_bars: int = 180,
+                   max_idio_ret: float = 1000.0) -> pd.DataFrame:
     """Cœur pur (hors-ligne) : à partir des OHLCV par symbole, renvoie le tableau
     classé par découplage × dynamique autonome.
 
     frames    : {symbol -> OHLCV} incluant BTC/{quote} et idéalement ETH/{quote}.
     rs_frames : {base -> OHLCV de BASE/BTC} optionnel (force relative directe).
+    min_bars  : historique effectif minimal (écarte les listings trop récents).
+    max_idio_ret : plafond de rendement idiosyncratique en % (écarte les pumps
+                   déjà consommés / cotations aberrantes). Garde-fous + exclusions
+                   (stablecoins, actions tokenisées) appliqués avant tout classement.
     """
     returns = {s: log_returns(df) for s, df in frames.items() if len(df) > 2}
     bench = crypto_beta(returns, quote=quote)
@@ -112,9 +145,10 @@ def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
         if sym in bench_syms:
             continue
         base = sym.split("/")[0]
-        if base in STABLES:
+        if base in STABLES or is_tokenized_stock(base):
             continue
-        m = _metrics(r, bench, rolling=rolling)
+        m = _metrics(r, bench, rolling=rolling, min_bars=min_bars,
+                     max_idio_ret=max_idio_ret)
         if m is None:
             continue
 
@@ -135,6 +169,28 @@ def rank_decoupled(frames: dict[str, pd.DataFrame], quote: str = "USDT",
     cols = ["symbol", "score", "corr", "r2", "corr_p90", "beta",
             "idio_ret_%", "idio_ir", "rs_btc_%", "n"]
     return out[cols]
+
+
+def most_decoupled(ranked: pd.DataFrame, corr_max: float = 0.30,
+                   corr_p90_max: float = 0.45, top: int = 15) -> pd.DataFrame:
+    """Famille « vraiment découplée » : faible corrélation *et* qui le reste en
+    régime de stress (corr_p90 bas), avec dynamique propre positive. Triée par
+    score (découplage × dynamique) pour surfacer les plus *tradables* — les
+    quasi-stables sans dynamique tombent en bas."""
+    if ranked.empty:
+        return ranked
+    sub = ranked[(ranked["corr"].abs() <= corr_max)
+                 & (ranked["corr_p90"] <= corr_p90_max)
+                 & (ranked["idio_ir"] > 0)]
+    return sub.sort_values("score", ascending=False).head(top).reset_index(drop=True)
+
+
+def strongest_dynamics(ranked: pd.DataFrame, top: int = 15) -> pd.DataFrame:
+    """Famille « forte dynamique autonome » : meilleure dérive propre (information
+    ratio idiosyncratique), indépendamment du degré de corrélation."""
+    if ranked.empty:
+        return ranked
+    return ranked.sort_values("idio_ir", ascending=False).head(top).reset_index(drop=True)
 
 
 def run_decouple(cfg: dict) -> pd.DataFrame:
@@ -174,5 +230,6 @@ def run_decouple(cfg: dict) -> pd.DataFrame:
             print(f"  ...{i}/{len(universe)}", file=sys.stderr)
 
     out = rank_decoupled(frames, quote=quote, rolling=cfg.get("roll", 60),
-                         rs_frames=rs_frames)
+                         rs_frames=rs_frames, min_bars=cfg.get("min_bars", 180),
+                         max_idio_ret=cfg.get("max_idio_ret", 1000.0))
     return out.head(cfg.get("max_results", 25))
