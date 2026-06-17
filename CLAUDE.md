@@ -57,7 +57,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   bascule sur les futures perpétuels (`get_exchange(market_type=...)`).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
-  `--chart` génère le PNG, `--ob-screen` → run_ob_screen (shortlist Order Blocks ICT).
+  `--chart` génère le PNG, `--ob-screen` → run_ob_screen (shortlist Order Blocks ICT),
+  `--ob-fresh` → run_ob_fresh (watchlist des OB non mités à surveiller pour un retest,
+  triés par fraîcheur ; colonnes zone, dist% prix→zone, respect% du symbole).
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.

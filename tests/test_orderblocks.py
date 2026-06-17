@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from screener.features import add_features
-from screener.ob_screen import screen_symbol
+from screener.ob_screen import fresh_order_blocks, screen_symbol
 from screener.orderblocks import OBThresholds, analyze_order_blocks, detect_order_blocks
 
 COLS = ["open", "high", "low", "close", "volume"]
@@ -104,6 +104,20 @@ def test_bearish_ob_respected():
     assert ob.bias == "bearish"
     assert abs(ob.top - 101.0) < 1e-6 and abs(ob.bottom - 100.0) < 1e-6
     assert ob.outcome == "respecté", (ob.outcome, ob.mfe_R)
+
+
+def test_fresh_order_blocks_lists_pending():
+    feat = _with(_OB_AND_IMPULSE + [
+        [103.5, 104.5, 103.0, 104.2, 1000.0],  # le prix s'éloigne et ne revient jamais
+        [104.2, 105.0, 103.8, 104.8, 1000.0],
+    ])
+    rows = fresh_order_blocks("TEST/USDT", feat, OBThresholds(), kind="crypto")
+    fresh = [r for r in rows if r["bias"] == "haussier" and r["zone"].startswith("99")]
+    assert fresh, rows
+    r = fresh[0]
+    assert r["dist%"] > 0          # prix au-dessus de la zone (pas encore retestée)
+    assert r["bars_ago"] >= 1
+    assert r["_kind"] == "crypto"
 
 
 def test_screen_symbol_aggregates():

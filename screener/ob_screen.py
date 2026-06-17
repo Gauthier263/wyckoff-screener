@@ -59,6 +59,54 @@ def _robust_score(p: float, n: int, min_tests: int, z: float = 1.0) -> float:
     return float(max(0.0, p - z * se))
 
 
+def _fmt(x: float) -> str:
+    return f"{x:.6g}"
+
+
+def _respect_rate(obs) -> tuple[float, int]:
+    """Taux de respect (%) et nombre d'OB testés, à partir d'une liste d'OrderBlock."""
+    tested = [o for o in obs if o.tested]
+    if not tested:
+        return float("nan"), 0
+    p = sum(1 for o in tested if o.outcome == "respecté") / len(tested)
+    return 100 * p, len(tested)
+
+
+def fresh_order_blocks(symbol: str, feat: pd.DataFrame, th: OBThresholds,
+                       kind: str = "crypto") -> list[dict]:
+    """Renvoie une ligne par OB **non encore mité** (niveau vierge à surveiller en live).
+
+    `dist%` = distance du dernier prix à la zone, du bon côté (prix au-dessus d'un OB
+    haussier-support, sous un OB baissier-résistance) : plus elle est faible, plus le
+    retest est imminent. `respect%` rappelle la fiabilité historique des OB du symbole.
+    """
+    obs = analyze_order_blocks(feat, th)
+    n = len(feat)
+    price = float(feat["close"].iloc[-1])
+    respect, n_test = _respect_rate(obs)
+    rows = []
+    for o in obs:
+        if o.outcome != "non_testé":
+            continue
+        bars_ago = n - 1 - o.idx
+        if bars_ago > th.max_wait:               # trop ancien = niveau périmé
+            continue
+        dist = (price - o.top) if o.bias == "bullish" else (o.bottom - price)
+        rows.append({
+            "symbol": symbol,
+            "bias": _FR[o.bias],
+            "zone": f"{_fmt(o.bottom)}–{_fmt(o.top)}",
+            "price": _fmt(price),
+            "bars_ago": bars_ago,
+            "displ_ATR": round(o.displacement, 2),
+            "dist%": round(100 * dist / price, 2),
+            "respect%": round(respect, 1) if respect == respect else None,
+            "n_test": n_test,
+            "_kind": kind,
+        })
+    return rows
+
+
 def screen_symbol(symbol: str, feat: pd.DataFrame, th: OBThresholds,
                   min_tests: int = 5) -> OBStats | None:
     obs = analyze_order_blocks(feat, th)
@@ -136,4 +184,44 @@ def run_ob_screen(cfg: dict) -> dict[str, pd.DataFrame]:
     for kind in ("crypto", "xstock"):
         grp = [s for s in results if s.kind == kind][: cfg["max_results"]]
         out["xstocks" if kind == "xstock" else kind] = pd.DataFrame([s.as_row() for s in grp])
+    return out
+
+
+def run_ob_fresh(cfg: dict) -> dict[str, pd.DataFrame]:
+    """Watchlist des OB frais (non mités) à surveiller pour un retest, triés par fraîcheur.
+    Deux tableaux séparés crypto / hors-crypto, comme `run_ob_screen`."""
+    from . import data as data_mod
+
+    mt = cfg.get("market")
+    ex = data_mod.get_exchange(cfg["exchange"], mt)
+    if cfg["symbols"]:
+        universe = cfg["symbols"]
+    else:
+        universe = (data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"],
+                                            kind="crypto", market_type=mt)
+                    + data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"],
+                                              kind="xstock", market_type=mt))
+        print(f"Univers : {len(universe)} paires {cfg['quote']} {mt or 'spot'} sur "
+              f"{cfg['exchange']} — OB frais à retester {cfg['timeframe']}", file=sys.stderr)
+    th = OBThresholds(**cfg.get("ob", {}))
+
+    rows: list[dict] = []
+    for i, sym in enumerate(universe, 1):
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+            kind = "xstock" if data_mod.is_tokenized_stock(ex, sym) else "crypto"
+            rows += fresh_order_blocks(sym, feat, th, kind)
+        except Exception as e:
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+        if i % 10 == 0:
+            print(f"  ...{i}/{len(universe)}", file=sys.stderr)
+
+    out = {}
+    for kind in ("crypto", "xstock"):
+        grp = [r for r in rows if r["_kind"] == kind]
+        df = pd.DataFrame([{k: v for k, v in r.items() if k != "_kind"} for r in grp])
+        if not df.empty:
+            df = df.sort_values(["bars_ago", "dist%"]).head(cfg["max_results"]).reset_index(drop=True)
+        out["xstocks" if kind == "xstock" else kind] = df
     return out

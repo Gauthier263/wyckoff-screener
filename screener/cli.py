@@ -18,7 +18,7 @@ from . import data as data_mod
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
-from .ob_screen import run_ob_screen
+from .ob_screen import run_ob_fresh, run_ob_screen
 from .score import SymbolResult, score_symbol
 from .window import detect_window_structure
 
@@ -170,6 +170,8 @@ def main() -> None:
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--ob-screen", action="store_true",
                    help="shortliste les paires par respect des Order Blocks ICT")
+    p.add_argument("--ob-fresh", action="store_true",
+                   help="watchlist des OB frais (non mités) à surveiller pour un retest")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
@@ -180,17 +182,24 @@ def main() -> None:
     if args.window is not None:
         cfg["window"] = args.window
 
-    if args.ob_screen:
-        tables = run_ob_screen(cfg)
+    if args.ob_screen or args.ob_fresh:
+        if args.ob_fresh:
+            tables = run_ob_fresh(cfg)
+            headline, empty_msg, prefix = ("OB frais à retester",
+                                           "(aucun OB frais)", "ob_fresh")
+        else:
+            tables = run_ob_screen(cfg)
+            headline, empty_msg, prefix = ("respect des Order Blocks ICT",
+                                           "(aucune paire au-dessus du plancher d'OB testés)", "ob")
         titles = {"crypto": "Cryptos", "xstocks": "Hors-crypto (RWA / xStocks)"}
         for name, table in tables.items():
-            print(f"\n=== {titles.get(name, name)} — respect des Order Blocks ICT ===")
+            print(f"\n=== {titles.get(name, name)} — {headline} ===")
             if table.empty:
-                print("  (aucune paire au-dessus du plancher d'OB testés)")
+                print(f"  {empty_msg}")
                 continue
             with pd.option_context("display.max_rows", None, "display.width", 200):
                 print(table.to_string(index=False))
-            out = f"ob_{name}.csv"
+            out = f"{prefix}_{name}.csv"
             table.to_csv(out, index=False)
             print(f"→ {out}", file=sys.stderr)
         return
