@@ -3,7 +3,7 @@ exchange: binance        # tout exchange supporté par ccxt
 quote: USDT
 timeframe: 1h            # 1h ou 4h (tes choix). Override : --timeframe 4h
 top: 60                  # nombre de paires les plus liquides à scanner
-limit: 300              # barres OHLCV récupérées par paire
+limit: 1000             # barres OHLCV récupérées par paire (profondeur pour les stats OB)
 max_results: 25         # taille de la watchlist finale
 bias: both              # both | accumulation | distribution
 use_cache: true

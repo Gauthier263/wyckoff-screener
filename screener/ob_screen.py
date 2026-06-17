@@ -35,6 +35,7 @@ class OBStats:
     swing_rate: float       # % de testés ayant atteint l'extrême de l'impulsion
     fresh: str              # dernier OB non encore mité (signal live)
     score: float            # respect_rate pénalisé par l'erreur-type (borne basse)
+    kind: str = "crypto"    # "crypto" | "xstock" (action tokenisée Bitget)
 
     def as_row(self) -> dict:
         return {
@@ -92,15 +93,23 @@ def screen_symbol(symbol: str, feat: pd.DataFrame, th: OBThresholds,
     )
 
 
-def run_ob_screen(cfg: dict) -> pd.DataFrame:
-    """Charge l'univers, classe les paires par respect des Order Blocks ICT."""
+def run_ob_screen(cfg: dict) -> dict[str, pd.DataFrame]:
+    """Charge l'univers, classe les paires par respect des Order Blocks ICT.
+
+    Renvoie deux tableaux séparés : 'crypto' et 'xstocks' (actions tokenisées Bitget),
+    car ces dernières — fortement teneur-de-marché — dominent artificiellement le respect
+    des OB et écraseraient les vraies cryptos dans un classement unique.
+    """
     from . import data as data_mod
 
     ex = data_mod.get_exchange(cfg["exchange"])
-    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
-    if not cfg["symbols"]:
+    if cfg["symbols"]:
+        universe = cfg["symbols"]
+    else:
+        universe = (data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"], kind="crypto")
+                    + data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"], kind="xstock"))
         print(f"Univers : {len(universe)} paires {cfg['quote']} sur {cfg['exchange']} "
-              f"— Order Blocks ICT {cfg['timeframe']}", file=sys.stderr)
+              f"(crypto + xStocks) — Order Blocks ICT {cfg['timeframe']}", file=sys.stderr)
     th = OBThresholds(**cfg.get("ob", {}))
     min_tests = cfg.get("ob_min_tests", 5)
 
@@ -111,6 +120,7 @@ def run_ob_screen(cfg: dict) -> pd.DataFrame:
             feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
             s = screen_symbol(sym, feat, th, min_tests)
             if s and s.n_test > 0:
+                s.kind = "xstock" if data_mod.is_tokenized_stock(ex, sym) else "crypto"
                 results.append(s)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
@@ -118,5 +128,8 @@ def run_ob_screen(cfg: dict) -> pd.DataFrame:
             print(f"  ...{i}/{len(universe)}", file=sys.stderr)
 
     results.sort(key=lambda s: s.score, reverse=True)
-    results = results[: cfg["max_results"]]
-    return pd.DataFrame([s.as_row() for s in results])
+    out = {}
+    for kind in ("crypto", "xstock"):
+        grp = [s for s in results if s.kind == kind][: cfg["max_results"]]
+        out["xstocks" if kind == "xstock" else kind] = pd.DataFrame([s.as_row() for s in grp])
+    return out

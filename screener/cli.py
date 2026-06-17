@@ -179,8 +179,21 @@ def main() -> None:
         cfg["window"] = args.window
 
     if args.ob_screen:
-        table = run_ob_screen(cfg)
-    elif args.window is not None:
+        tables = run_ob_screen(cfg)
+        titles = {"crypto": "Cryptos", "xstocks": "Actions tokenisées (xStocks)"}
+        for name, table in tables.items():
+            print(f"\n=== {titles.get(name, name)} — respect des Order Blocks ICT ===")
+            if table.empty:
+                print("  (aucune paire au-dessus du plancher d'OB testés)")
+                continue
+            with pd.option_context("display.max_rows", None, "display.width", 200):
+                print(table.to_string(index=False))
+            out = f"ob_{name}.csv"
+            table.to_csv(out, index=False)
+            print(f"→ {out}", file=sys.stderr)
+        return
+
+    if args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)

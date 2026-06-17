@@ -49,7 +49,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **taux de respect** des OB. Score robuste = taux pénalisé par l'erreur-type (plancher
   `ob_min_tests`), même esprit que `optimize.metric_value`. Colonnes : n_ob, n_test,
   respect%, avg_R/med_R (amplitude rebond), swing% (a atteint l'extrême de l'impulsion),
-  fresh_OB (dernier OB non mité = niveau à surveiller en live).
+  fresh_OB (dernier OB non mité = niveau à surveiller en live). Sort **deux tableaux
+  séparés** crypto / xStocks (`data.build_universe(kind=...)`) : sur Bitget les actions
+  tokenisées (info.areaSymbol) ont un quoteVolume aberrant et, fortement market-makées,
+  écraseraient les vraies cryptos dans un classement unique.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG, `--ob-screen` → run_ob_screen (shortlist Order Blocks ICT).

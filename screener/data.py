@@ -33,8 +33,15 @@ def get_exchange(name: str = "binance"):
 
 
 def build_universe(ex, quote: str = "USDT", top_n: int = 60,
-                   exclude: tuple[str, ...] = ("UP", "DOWN", "BULL", "BEAR")) -> list[str]:
-    """Retourne les `top_n` symboles spot {BASE}/{quote} les plus échangés."""
+                   exclude: tuple[str, ...] = ("UP", "DOWN", "BULL", "BEAR"),
+                   kind: str = "crypto") -> list[str]:
+    """Retourne les `top_n` symboles {BASE}/{quote} les plus échangés.
+
+    `kind` filtre la nature de l'actif (Bitget marque les actions tokenisées par
+    info.areaSymbol) : "crypto" (défaut, exclut les xStocks), "xstock" (uniquement
+    les xStocks), "all" (aucun filtre). Indispensable sur Bitget où les xStocks
+    affichent un quoteVolume aberrant qui les place en tête du classement.
+    """
     tickers = ex.fetch_tickers()
     rows = []
     for sym, t in tickers.items():
@@ -43,10 +50,22 @@ def build_universe(ex, quote: str = "USDT", top_n: int = 60,
         base = sym.split("/")[0]
         if any(tag in base for tag in exclude):  # exclut les tokens à effet de levier
             continue
+        if kind != "all":
+            is_x = is_tokenized_stock(ex, sym)
+            if (kind == "crypto") == is_x:       # crypto→exclut xStock ; xstock→ne garde qu'eux
+                continue
         qv = t.get("quoteVolume") or 0
         rows.append((sym, qv))
     rows.sort(key=lambda r: r[1], reverse=True)
     return [s for s, _ in rows[:top_n]]
+
+
+def is_tokenized_stock(ex, symbol: str) -> bool:
+    """True si `symbol` est une action tokenisée (xStock Bitget), pas une crypto.
+    Bitget marque ces marchés par info.areaSymbol == 'yes'. Sur les autres exchanges
+    le champ est absent → False (tout est considéré crypto)."""
+    m = ex.markets.get(symbol) or {}
+    return str((m.get("info") or {}).get("areaSymbol", "")).lower() == "yes"
 
 
 def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
