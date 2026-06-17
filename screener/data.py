@@ -82,6 +82,9 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4) -> "pd.Ser
     quotidiens (`sum_open_interest_value`, USD, pas de 5 min). Même miroir non géo-bloqué
     que le spot, donc accessible là où `fapi` renvoie 451. **Retard ~1 jour** (le fichier
     du jour courant n'est publié qu'après clôture UTC). Série indexée ts UTC, ou None.
+
+    Les zips (jours *passés*, donc immuables) sont mis en **cache disque** (`.cache/
+    binance_oi/`) — les runs suivants ne re-téléchargent rien.
     """
     import io
     import zipfile
@@ -90,17 +93,37 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4) -> "pd.Ser
 
     base, quote = symbol.split("/")
     sym = f"{base}{quote}"
-    today = pd.Timestamp.utcnow().normalize()
+    cache_dir = os.path.join(CACHE_DIR, "binance_oi")
+    os.makedirs(cache_dir, exist_ok=True)
+    today = pd.Timestamp.now(tz="UTC").normalize()
     parts = []
     for i in range(1, days + 1):
         d = (today - pd.Timedelta(days=i)).strftime("%Y-%m-%d")
-        url = (f"https://data.binance.vision/data/futures/um/daily/metrics/"
-               f"{sym}/{sym}-metrics-{d}.zip")
-        try:
-            r = requests.get(url, timeout=20)
-            if r.status_code != 200:
+        fname = f"{sym}-metrics-{d}.zip"
+        path = os.path.join(cache_dir, fname)
+        content = None
+        if os.path.exists(path):                       # cache hit (fichier passé = immuable)
+            try:
+                with open(path, "rb") as f:
+                    content = f.read()
+            except Exception:
+                content = None
+        if content is None:                            # miss → téléchargement + écriture cache
+            url = (f"https://data.binance.vision/data/futures/um/daily/metrics/{sym}/{fname}")
+            try:
+                r = requests.get(url, timeout=20)
+                if r.status_code != 200:
+                    continue
+                content = r.content
+                try:
+                    with open(path, "wb") as f:
+                        f.write(content)
+                except Exception:
+                    pass  # cache best-effort
+            except Exception:
                 continue
-            zf = zipfile.ZipFile(io.BytesIO(r.content))
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(content))
             df = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])))
             s = pd.Series(df["sum_open_interest_value"].astype(float).values,
                           index=pd.to_datetime(df["create_time"], utc=True))
