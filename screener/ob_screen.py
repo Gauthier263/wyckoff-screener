@@ -102,14 +102,18 @@ def run_ob_screen(cfg: dict) -> dict[str, pd.DataFrame]:
     """
     from . import data as data_mod
 
-    ex = data_mod.get_exchange(cfg["exchange"])
+    mt = cfg.get("market")
+    ex = data_mod.get_exchange(cfg["exchange"], mt)
     if cfg["symbols"]:
         universe = cfg["symbols"]
     else:
-        universe = (data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"], kind="crypto")
-                    + data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"], kind="xstock"))
-        print(f"Univers : {len(universe)} paires {cfg['quote']} sur {cfg['exchange']} "
-              f"(crypto + xStocks) — Order Blocks ICT {cfg['timeframe']}", file=sys.stderr)
+        universe = (data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"],
+                                            kind="crypto", market_type=mt)
+                    + data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"],
+                                              kind="xstock", market_type=mt))
+        print(f"Univers : {len(universe)} paires {cfg['quote']} {mt or 'spot'} sur "
+              f"{cfg['exchange']} (crypto + hors-crypto) — Order Blocks ICT {cfg['timeframe']}",
+              file=sys.stderr)
     th = OBThresholds(**cfg.get("ob", {}))
     min_tests = cfg.get("ob_min_tests", 5)
 

@@ -50,9 +50,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `ob_min_tests`), même esprit que `optimize.metric_value`. Colonnes : n_ob, n_test,
   respect%, avg_R/med_R (amplitude rebond), swing% (a atteint l'extrême de l'impulsion),
   fresh_OB (dernier OB non mité = niveau à surveiller en live). Sort **deux tableaux
-  séparés** crypto / xStocks (`data.build_universe(kind=...)`) : sur Bitget les actions
-  tokenisées (info.areaSymbol) ont un quoteVolume aberrant et, fortement market-makées,
-  écraseraient les vraies cryptos dans un classement unique.
+  séparés** crypto / hors-crypto (`data.build_universe(kind=...)`) : sur Bitget le hors-crypto
+  (spot info.areaSymbol, futures info.isRwa) a un quoteVolume aberrant et, fortement
+  market-maké, écraserait les vraies cryptos. La liste crypto exclut aussi les
+  stablecoins/pegs (`data.STABLE_PEG`, range-bound par construction). `--market swap`
+  bascule sur les futures perpétuels (`get_exchange(market_type=...)`).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG, `--ob-screen` → run_ob_screen (shortlist Order Blocks ICT).
@@ -80,7 +82,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG
-python -m screener.cli --exchange bitget --timeframe 4h --ob-screen   # shortlist Order Blocks ICT
+python -m screener.cli --exchange bitget --timeframe 4h --ob-screen   # shortlist Order Blocks ICT (spot)
+python -m screener.cli --exchange bitget --market swap --timeframe 4h --ob-screen   # futures perpétuels
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```

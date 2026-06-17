@@ -11,12 +11,23 @@ import pandas as pd
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".cache")
 
+# Stablecoins et actifs adossés (or tokenisé) : range-bound par construction, leur fort
+# « respect » d'OB ne traduit pas une présence directionnelle → exclus de la liste crypto.
+STABLE_PEG = {
+    "USDT", "USDC", "DAI", "TUSD", "FDUSD", "USDE", "USDD", "RLUSD", "PYUSD", "USD1",
+    "BUSD", "USDP", "USDY", "GUSD", "LUSD", "SUSD", "EURT", "EURC", "EURI", "AEUR",
+    "XAUT", "PAXG",  # or tokenisé
+}
 
-def get_exchange(name: str = "binance"):
+
+def get_exchange(name: str = "binance", market_type: str | None = None):
     import ccxt  # import paresseux : pas requis pour les tests hors-ligne
 
     klass = getattr(ccxt, name)
-    ex = klass({"enableRateLimit": True})
+    opts = {"enableRateLimit": True}
+    if market_type:  # "spot" | "swap" (futures perpétuels) | ...
+        opts["options"] = {"defaultType": market_type}
+    ex = klass(opts)
     # ccxt impose le bundle certifi à requests, qui ignore alors REQUESTS_CA_BUNDLE.
     # Derrière un proxy d'egress (CA d'entreprise), on repointe sur le bundle système.
     # Derrière un proxy d'egress (CA d'entreprise), ccxt force certifi et ignore
@@ -34,25 +45,31 @@ def get_exchange(name: str = "binance"):
 
 def build_universe(ex, quote: str = "USDT", top_n: int = 60,
                    exclude: tuple[str, ...] = ("UP", "DOWN", "BULL", "BEAR"),
-                   kind: str = "crypto") -> list[str]:
-    """Retourne les `top_n` symboles {BASE}/{quote} les plus échangés.
+                   kind: str = "crypto", market_type: str | None = None) -> list[str]:
+    """Retourne les `top_n` symboles de quote `quote` les plus échangés.
 
-    `kind` filtre la nature de l'actif (Bitget marque les actions tokenisées par
-    info.areaSymbol) : "crypto" (défaut, exclut les xStocks), "xstock" (uniquement
-    les xStocks), "all" (aucun filtre). Indispensable sur Bitget où les xStocks
-    affichent un quoteVolume aberrant qui les place en tête du classement.
+    `kind` filtre la nature de l'actif (Bitget marque le hors-crypto par info.areaSymbol
+    en spot, info.isRwa en futures) : "crypto" (défaut : exclut hors-crypto **et**
+    stablecoins/pegs), "xstock" (uniquement le hors-crypto), "all" (aucun filtre).
+    Indispensable sur Bitget où ces actifs affichent un quoteVolume aberrant qui les
+    place en tête du classement. `market_type` ("spot"/"swap") restreint au type de marché.
     """
     tickers = ex.fetch_tickers()
     rows = []
     for sym, t in tickers.items():
-        if not sym.endswith(f"/{quote}"):
+        m = ex.markets.get(sym)
+        if not m or m.get("quote") != quote:
             continue
-        base = sym.split("/")[0]
+        if market_type and m.get("type") != market_type:
+            continue
+        base = m.get("base") or ""
         if any(tag in base for tag in exclude):  # exclut les tokens à effet de levier
             continue
         if kind != "all":
             is_x = is_tokenized_stock(ex, sym)
-            if (kind == "crypto") == is_x:       # crypto→exclut xStock ; xstock→ne garde qu'eux
+            if (kind == "crypto") == is_x:        # crypto→exclut hors-crypto ; xstock→ne garde qu'eux
+                continue
+            if kind == "crypto" and base in STABLE_PEG:
                 continue
         qv = t.get("quoteVolume") or 0
         rows.append((sym, qv))
@@ -61,11 +78,13 @@ def build_universe(ex, quote: str = "USDT", top_n: int = 60,
 
 
 def is_tokenized_stock(ex, symbol: str) -> bool:
-    """True si `symbol` est une action tokenisée (xStock Bitget), pas une crypto.
-    Bitget marque ces marchés par info.areaSymbol == 'yes'. Sur les autres exchanges
-    le champ est absent → False (tout est considéré crypto)."""
-    m = ex.markets.get(symbol) or {}
-    return str((m.get("info") or {}).get("areaSymbol", "")).lower() == "yes"
+    """True si `symbol` est un actif hors-crypto (action/RWA tokenisé), pas une crypto.
+    Bitget marque ces marchés par info.areaSymbol == 'yes' (spot) ou info.isRwa == 'YES'
+    (futures). Sur les autres exchanges ces champs sont absents → False (tout crypto)."""
+    info = (ex.markets.get(symbol) or {}).get("info") or {}
+    if str(info.get("areaSymbol", "")).lower() == "yes":
+        return True
+    return str(info.get("isRwa", "")).lower() in ("yes", "true", "1")
 
 
 def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,

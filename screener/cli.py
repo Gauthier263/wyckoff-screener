@@ -151,12 +151,14 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
-        "ob": {}, "ob_min_tests": 5,
+        "ob": {}, "ob_min_tests": 5, "market": None,
     }
     cfg.update(load_config())
 
     p = argparse.ArgumentParser(description="Wyckoff crypto screener (accumulation/distribution)")
     p.add_argument("--exchange", default=cfg["exchange"])
+    p.add_argument("--market", choices=["spot", "swap"], default=cfg["market"],
+                   help="type de marché (swap = futures perpétuels)")
     p.add_argument("--timeframe", default=cfg["timeframe"], help="1h, 4h, ...")
     p.add_argument("--top", type=int, default=cfg["top"])
     p.add_argument("--symbols", nargs="*", default=cfg["symbols"])
@@ -172,15 +174,15 @@ def main() -> None:
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 
-    cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
-               symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+    cfg.update(exchange=args.exchange, market=args.market, timeframe=args.timeframe,
+               top=args.top, symbols=args.symbols, bias=args.bias,
+               max_results=args.max_results, use_cache=not args.no_cache, chart=args.chart)
     if args.window is not None:
         cfg["window"] = args.window
 
     if args.ob_screen:
         tables = run_ob_screen(cfg)
-        titles = {"crypto": "Cryptos", "xstocks": "Actions tokenisées (xStocks)"}
+        titles = {"crypto": "Cryptos", "xstocks": "Hors-crypto (RWA / xStocks)"}
         for name, table in tables.items():
             print(f"\n=== {titles.get(name, name)} — respect des Order Blocks ICT ===")
             if table.empty:
