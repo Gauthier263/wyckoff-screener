@@ -5,4 +5,5 @@ watchlist.csv
 chart_*.png
 .venv/
 *.parquet
+scripts/monitor.env
 .claude/settings.local.json

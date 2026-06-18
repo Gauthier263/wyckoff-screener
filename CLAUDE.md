@@ -38,9 +38,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   période (`_wanted_extreme` : SC/ST→creux, AR→sommet, SOS→cassure) → alignement exact
   creux/cassure. Le panneau volume étiquette chaque événement (nom + ×vol_ratio) avec
   lignes-guides verticales. Horodatage en CEST.
+- `screener/monitor.py` — suivi périodique d'un cours : `monitor_once` réutilise
+  `detect_window_structure` (progression du schéma), `detect_events` (signal frais
+  `bars_ago==0`) et une phase B/C/D → instantané avec état NONE/WATCH/ALERT. ALERT =
+  déclencheur frais conforme au biais *anticipé* (`expect`). `run_watch` (boucle alignée
+  sur la clôture de barre) et `run_once` (un poll, état JSON persisté pour cron/terminal
+  fermé, dédup par barre). `screener/notify.py` — alerte Telegram (urllib stdlib, no-op si
+  non configuré). Recettes cron/systemd/Windows : `docs/SUIVI.md`, wrapper `scripts/monitor_cron.sh`.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
-  `--chart` génère le PNG.
+  `--chart` génère le PNG ; `--watch`/`--once` (+ `--expect`, `--interval`) → suivi monitor.
 
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.

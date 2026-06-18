@@ -5,6 +5,8 @@ Usage :
     python -m screener.cli                       # config par défaut
     python -m screener.cli --timeframe 4h --top 80 --bias accumulation
     python -m screener.cli --symbols BTC/USDT ETH/USDT --no-cache
+    python -m screener.cli --watch --symbols BTC/USDT --timeframe 5m --expect distribution
+    python -m screener.cli --once  --symbols BTC/USDT --timeframe 1h --expect distribution
 """
 from __future__ import annotations
 
@@ -150,6 +152,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "drop_forming": True, "tg_token": None, "tg_chat_id": None,
     }
     cfg.update(load_config())
 
@@ -163,6 +166,14 @@ def main() -> None:
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
     p.add_argument("--window", nargs="?", type=int, const=30, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
+    p.add_argument("--watch", action="store_true",
+                   help="suivi en boucle, poll aligné sur la clôture de barre (écran ouvert)")
+    p.add_argument("--once", action="store_true",
+                   help="un seul poll (cron / terminal fermé), état persisté pour dédup")
+    p.add_argument("--expect", choices=["accumulation", "distribution"], default=None,
+                   help="biais anticipé : seul un déclencheur de ce biais lève une ALERT")
+    p.add_argument("--interval", type=int, default=None,
+                   help="secondes entre polls en mode --watch (défaut : aligné sur la barre)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--csv", default="watchlist.csv")
@@ -170,9 +181,16 @@ def main() -> None:
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+               use_cache=not args.no_cache, chart=args.chart,
+               expect=args.expect, interval=args.interval)
     if args.window is not None:
         cfg["window"] = args.window
+
+    # --- Modes de suivi (monitor.py) : prioritaires, sortie propre, pas de CSV watchlist.
+    if args.watch or args.once:
+        from .monitor import run_once, run_watch
+        (run_watch if args.watch else run_once)(cfg)
+        return
 
     if args.window is not None:
         table = run_window(cfg)

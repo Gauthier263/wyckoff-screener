@@ -11,6 +11,15 @@ use_cache: true
 # --- Multi-timeframe (option --mtf) : [HTF contexte, LTF déclencheur] ---
 timeframes: [4h, 1h]
 
+# --- Suivi temps réel (--watch / --once) ---
+# Anticipe un retournement et alerte au déclencheur (force=accumulation, faiblesse=distribution).
+#   python -m screener.cli --watch --symbols BTC/USDT --timeframe 5m --expect distribution
+#   python -m screener.cli --once  --symbols BTC/USDT --timeframe 1h --expect distribution  (cron)
+drop_forming: true       # ignore la bougie en cours (n'analyse que les barres clôturées)
+# Alerte Telegram (sinon console seule). Préférer les variables d'env TG_BOT_TOKEN / TG_CHAT_ID.
+tg_token: null
+tg_chat_id: null
+
 # --- Backtest (python -m screener.backtest) ---
 backtest:
   stop_atr: 1.0          # distance du stop en ATR
