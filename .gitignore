@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 watchlist.csv
+ob_*.csv
+*.xlsx
 chart_*.png
 .venv/
 *.parquet
