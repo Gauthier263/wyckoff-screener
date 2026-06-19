@@ -76,6 +76,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
 - Heuristiques transparentes et ajustables, jamais de boîte noire.
 - Tout nouveau détecteur doit venir avec un test synthétique dans `tests/`.
+- **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
+  invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
+  clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
+  5m, l'offre y plafonne les rebonds) »). Jamais un chiffre nu : Gauthier veut savoir *pourquoi
+  ce niveau* — quel événement Wyckoff, quelle borne, quel comportement volume/OI le définit.
 - **Illustration d'une analyse** (préférences Gauthier) :
   - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
     lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
