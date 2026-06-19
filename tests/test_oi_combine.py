@@ -18,8 +18,8 @@ def test_combine_sums_aligned_series():
 
 
 def test_combine_no_cliff_when_one_venue_ends_early():
-    # OKX/Gate couvrent 8h ; Binance s'arrête à la 5e (retard d'archive).
-    live = _series("2026-06-15 00:00", 8, 2.0)            # okx+gate combinés
+    # OKX couvre 8h ; Binance s'arrête à la 5e (retard d'archive).
+    live = _series("2026-06-15 00:00", 8, 2.0)            # OKX (venue live)
     binance = _series("2026-06-15 00:00", 5, 6.0)         # s'arrête tôt
     out = _combine_oi([live, binance])
     assert len(out) == 8

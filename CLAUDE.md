@@ -7,21 +7,20 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/data.py` — ccxt : `build_universe()` (top paires USDT par volume),
   `fetch_ohlcv()` avec cache parquet. `get_exchange("binance")` route les endpoints
   publics vers le miroir `data-api.binance.vision` (spot, non géo-restreint).
-  `fetch_open_interest()` — historique d'OI (perp) **agrégé multi-venues** (valeurs USD
-  sommées). `source=agg3|agg|okx|gate` : `agg`=OKX+Gate ; **`agg3`** (défaut CLI) ajoute
-  l'**OI Binance** via l'archive `data.binance.vision` (metrics 5m, non géo-bloqué ;
-  `fapi`/Bybit le sont) + un point **CoinGecko** courant pour combler le retard ~1j, avec
-  **repli auto** sur `agg` si l'archive tombe. Fusion via `_combine_oi` (carry → pas de
-  « falaise »). Chaque venue passe par `_oi_series` qui **rabat les TF non supportées sur une
-  base 5 min puis resample** (ex. OKX refuse 15m/30m → sinon *exclu en silence* de l'agrégat ;
-  table `_VENUE_OI_TF`). En **live**, l'archive Binance trop en retard (> `_ARCHIVE_MAX_LAG_H`,
-  via `_archive_lag_hours`) est **exclue** au lieu d'être reportée à plat — un Binance figé en
-  J-1 masquait la direction réelle de l'OI live (agg3 live ≈ OKX+Gate, qui colle aux venues).
-  `binance_oi_lag_hours()` expose ce retard ; le panneau OI le **signale** (« Binance archive
-  périmée → direction = OKX+Gate live »). `start`/`end` ciblent l'OI Binance d'un **intervalle
-  historique** (ex. mars) via les quotidiens d'archive (téléchargements parallélisés + cache
-  disque immuable) — l'archive y reste pleinement utilisée (profondeur).
-  `fetch_open_interest_ohlc()` — **bougies OHLC d'OI agrégé**. `fetch_binance_oi_archive()` —
+  `fetch_open_interest()` — historique d'OI (perp), indexé ts UTC. `source=okx|agg3` :
+  **`okx`** (défaut, **venue unique** — simple et fidèle aux venues live ; Gate retiré) ;
+  **`agg3`** ajoute l'**OI Binance** via l'archive `data.binance.vision` (metrics 5m, non
+  géo-bloqué ; `fapi`/Bybit le sont) + un point **CoinGecko** courant, **pour la profondeur
+  historique** (mode `start`/`end`). Fusion via `_combine_oi` (carry → pas de « falaise »).
+  `_oi_series` **rabat les TF non supportées par une venue sur une base 5 min puis resample**
+  (ex. OKX refuse 15m/30m → sinon *exclu en silence* ; table `_VENUE_OI_TF`). En **live**,
+  l'archive Binance trop en retard (> `_ARCHIVE_MAX_LAG_H`, via `_archive_lag_hours`) est
+  **exclue** au lieu d'être reportée à plat — un Binance figé en J-1 masquait la direction
+  réelle (agg3 live ≈ OKX). `binance_oi_lag_hours()` expose ce retard ; le panneau OI le
+  **signale**. `start`/`end` ciblent l'OI Binance d'un **intervalle historique** (ex. mars)
+  via les quotidiens d'archive (téléchargements parallélisés + cache disque immuable) — c'est
+  le seul intérêt d'`agg3`, l'archive y reste pleinement utilisée (profondeur).
+  `fetch_open_interest_ohlc()` — **bougies OHLC d'OI**. `fetch_binance_oi_archive()` —
   OI Binance brut (mode `days` ou `start`/`end`). Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.

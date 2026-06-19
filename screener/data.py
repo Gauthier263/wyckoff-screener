@@ -73,8 +73,8 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
     return df
 
 
-# Venues d'OI atteignables (Binance fapi / Bybit géo-bloqués dans cet environnement).
-OI_VENUES = ("okx", "gate")
+# Venues d'OI atteignables (Binance fapi / Bybit géo-bloqués ; Gate retiré → OKX seul).
+OI_VENUES = ("okx",)
 
 # Minutes par timeframe (planification des limites de téléchargement / du resampling).
 _TF_MIN = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
@@ -271,7 +271,7 @@ def _binance_oi_series(symbol: str, timeframe: str, limit: int,
     Fix #2 : en mode **live** (ni `start` ni `end`), si l'archive a plus de
     `_ARCHIVE_MAX_LAG_H` heures de retard, on **renvoie None** plutôt que de la reporter à
     plat (carry-forward) dans l'agrégat. Un Binance figé en J-1 masquait la direction réelle
-    de l'OI live → agg3 live se réduit alors au live OKX+Gate, qui colle aux venues.
+    de l'OI live → agg3 live se réduit alors au live OKX, qui colle aux venues.
     """
     if start is not None or end is not None:
         s5 = fetch_binance_oi_archive(symbol, start=start, end=end)
@@ -296,15 +296,16 @@ def _binance_oi_series(symbol: str, timeframe: str, limit: int,
 
 def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
                   start=None, end=None) -> "pd.Series | None":
-    """Somme (USD) de l'OI multi-venues, alignée sur l'union des horodatages.
+    """Série (USD) de l'OI, alignée sur l'union des horodatages.
 
-    `source` : 'agg' (OKX+Gate), 'agg3' (Binance archive + OKX + Gate), 'okx', 'gate'.
-    `agg3` ajoute l'OI Binance (archive + point CoinGecko) ; si l'archive est indisponible,
-    il **se replie automatiquement** sur OKX+Gate. openInterestValue est en USD partout.
+    `source` : 'okx' (défaut, venue unique), 'agg3' (OKX + archive Binance pour la
+    profondeur historique). `agg3` ajoute l'OI Binance (archive + point CoinGecko) ; si
+    l'archive est indisponible ou périmée en live, il **se replie** sur OKX seul.
+    openInterestValue est en USD. (Gate retiré pour simplifier — voir OI_VENUES.)
     """
     import ccxt  # import paresseux
 
-    ccxt_venues = {"okx": ("okx",), "gate": ("gate",)}.get(source, OI_VENUES)
+    ccxt_venues = {"okx": ("okx",)}.get(source, OI_VENUES)
     series = []
     for name in ccxt_venues:
         try:
@@ -322,13 +323,14 @@ def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
 
 
 def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
-                        source: str = "agg", start=None, end=None) -> "pd.DataFrame | None":
+                        source: str = "okx", start=None, end=None) -> "pd.DataFrame | None":
     """Historique d'Open Interest (perp) aligné sur les barres, indexé ts UTC (col `oi`).
 
     OI = donnée *futures* ; Binance `fapi` et Bybit sont géo-restreints ici. `source` :
-    'agg' (OKX+Gate), 'agg3' (Binance archive + OKX + Gate, repli auto sur agg si l'archive
-    tombe), 'okx', 'gate'. `start`/`end` ciblent l'OI Binance d'un **intervalle historique**
-    (ex. mars, via les quotidiens d'archive). Tolérant : None si indisponible (analyse sans OI).
+    'okx' (défaut, venue unique — simple et fidèle aux venues live), 'agg3' (OKX + archive
+    Binance, pour la profondeur historique). `start`/`end` ciblent l'OI Binance d'un
+    **intervalle historique** (ex. mars, via les quotidiens d'archive ; impose `agg3`).
+    Tolérant : None si indisponible (analyse sans OI).
     """
     try:
         agg = _aggregate_oi(symbol, timeframe, limit, source, start, end)
@@ -343,14 +345,14 @@ _TF_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
 
 
 def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 300,
-                             source: str = "agg", fine: str | None = None,
+                             source: str = "okx", fine: str | None = None,
                              start=None, end=None) -> "pd.DataFrame | None":
-    """Bougies OHLC d'Open Interest agrégé : on agrège l'OI *fin* multi-venues puis on le
-    resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs de la période).
+    """Bougies OHLC d'Open Interest : on prend l'OI *fin* (OKX, +archive Binance si `agg3`)
+    puis on resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs).
     Retourne un DataFrame [open, high, low, close] (USD) indexé ts UTC, ou None.
 
     `fine` (granularité source) est choisie selon `timeframe` : 5m pour les TF fines, 1h
-    pour les TF ≥ 4h (couvre ~12 j sur OKX/Gate). `start`/`end` ciblent une fenêtre historique.
+    pour les TF ≥ 4h (couvre ~12 j sur OKX). `start`/`end` ciblent une fenêtre historique.
     """
     try:
         if fine is None:

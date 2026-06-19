@@ -71,7 +71,7 @@ def _candles(ax, df, width):
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
-    oi_source: str = "agg3", oi_ohlc=None,
+    oi_source: str = "okx", oi_ohlc=None,
 ) -> str:
     """Dessine la structure `struct` détectée en `analysis_tf`, **dans la même TF** (bougies
     `analysis_tf`), sur l'intervalle couvert par les événements. Trois panneaux : cours,
@@ -222,18 +222,19 @@ def plot_window_structure(
         olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
         axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
         axo.set_ylabel("OI agg. (Md$)"); axo.grid(True, alpha=0.2)
-        # Composition affichée : sur agg3 live, si l'archive Binance est périmée (J-1) elle
-        # est exclue (fix #2) → on le signale pour que le panneau colle aux venues live.
-        compo = f"OI agrégé {oi_source} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)"
+        # Composition affichée. Sur agg3 live, si l'archive Binance est périmée (J-1) elle
+        # est exclue (fix #2) → on le signale ; sinon (okx) c'est la venue unique.
+        label = "OI OKX (perp)" if oi_source == "okx" else f"OI {oi_source}"
+        compo = f"{label} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)"
         if oi_source == "agg3":
             try:
                 lag = data_mod.binance_oi_lag_hours(symbol)
             except Exception:
                 lag = None
             if lag is None or lag > data_mod._ARCHIVE_MAX_LAG_H:
-                compo += "  |  Binance archive périmée → direction = OKX+Gate live"
+                compo += "  |  Binance archive périmée → direction = OKX live"
             else:
-                compo += "  |  OKX+Gate+Binance"
+                compo += "  |  OKX + Binance"
         axo.annotate(compo, (0.5, 0.04), xycoords="axes fraction", ha="center",
                      fontsize=7, color="#666")
 
