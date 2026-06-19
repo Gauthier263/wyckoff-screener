@@ -76,6 +76,15 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
 # Venues d'OI atteignables (Binance fapi / Bybit géo-bloqués dans cet environnement).
 OI_VENUES = ("okx", "gate")
 
+# Minutes par timeframe (planification des limites de téléchargement / du resampling).
+_TF_MIN = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+
+# TF réellement acceptées par chaque venue pour l'**historique d'OI**. OKX ne sert que
+# 5m/1h/1d : demander 15m/30m lève une erreur côté ccxt → la venue était jusqu'ici
+# *silencieusement exclue* de l'agrégat (bug). On rabat ces TF sur une base 5 min puis
+# on resample (fix #1). Les venues absentes de la table tentent directement le TF demandé.
+_VENUE_OI_TF = {"okx": {"5m", "1h", "1d"}}
+
 
 def _archive_days(now, days=4, start=None, end=None, cap=400) -> list:
     """Liste des dates 'YYYY-MM-DD' à récupérer (jours *passés* uniquement, ≤ veille).
@@ -165,16 +174,40 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4,
 
 
 def _oi_series(ex, symbol: str, timeframe: str, limit: int) -> "pd.Series | None":
-    """Série d'Open Interest (valeur USD) d'un exchange ccxt, indexée ts UTC."""
+    """Série d'Open Interest (valeur USD) d'un exchange ccxt, indexée ts UTC.
+
+    Fix #1 : si la venue ne sert pas le `timeframe` demandé en historique d'OI (ex. OKX
+    refuse 15m/30m), on récupère une base **5 min** et on la resample — la venue n'est plus
+    *silencieusement exclue* de l'agrégat. Repli déclenché par `_VENUE_OI_TF` ou par toute
+    erreur ccxt sur le premier appel.
+    """
     base, quote = symbol.split("/")
     perp = f"{base}/{quote}:{quote}"          # ex. BTC/USDT -> BTC/USDT:USDT
     if perp not in ex.markets:
         return None
-    hist = ex.fetch_open_interest_history(perp, timeframe, limit=limit)
-    rows = {pd.to_datetime(h["timestamp"], unit="ms", utc=True):
-            (h.get("openInterestValue") or h.get("openInterestAmount")) for h in hist}
-    s = pd.Series(rows).dropna().sort_index()
-    return s if len(s) else None
+
+    def _fetch(tf, lim):
+        hist = ex.fetch_open_interest_history(perp, tf, limit=lim)
+        rows = {pd.to_datetime(h["timestamp"], unit="ms", utc=True):
+                (h.get("openInterestValue") or h.get("openInterestAmount")) for h in hist}
+        return pd.Series(rows).dropna().sort_index()
+
+    supported = _VENUE_OI_TF.get(getattr(ex, "id", ""))
+    fallback = supported is not None and timeframe not in supported
+    s = None
+    if not fallback:
+        try:
+            s = _fetch(timeframe, limit)
+        except Exception:
+            fallback = True                   # la venue refuse ce TF → repli 5 min
+    if fallback or s is None or not len(s):
+        lim5 = min(1500, max(limit * _TF_MIN.get(timeframe, 60) // 5, 300))
+        try:
+            s5 = _fetch("5m", lim5)
+        except Exception:
+            return None
+        s = s5 if timeframe == "5m" else s5.resample(_TF_FREQ.get(timeframe, "1h")).last().dropna()
+    return s if s is not None and len(s) else None
 
 
 def _combine_oi(series: list) -> "pd.Series | None":
@@ -208,19 +241,49 @@ def _coingecko_oi(symbol: str, venue: str = "Binance (Futures)") -> "float | Non
     return None
 
 
+# Au-delà de ce retard, l'archive Binance est jugée trop périmée pour l'intraday *live*.
+_ARCHIVE_MAX_LAG_H = 6
+
+
+def _archive_lag_hours(series, now) -> "float | None":
+    """Retard (heures) du dernier point d'une série d'archive vs `now`. None si vide."""
+    if series is None or not len(series):
+        return None
+    return (pd.Timestamp(now) - series.index[-1]) / pd.Timedelta(hours=1)
+
+
+def binance_oi_lag_hours(symbol: str = "BTC/USDT") -> "float | None":
+    """Retard (heures) de l'archive OI Binance vs maintenant — sert au panneau OI à
+    signaler quand le composant Binance est périmé. None si l'archive est indisponible."""
+    try:
+        return _archive_lag_hours(fetch_binance_oi_archive(symbol, days=2),
+                                  pd.Timestamp.now(tz="UTC"))
+    except Exception:
+        return None
+
+
 def _binance_oi_series(symbol: str, timeframe: str, limit: int,
                        start=None, end=None) -> "pd.Series | None":
     """OI Binance résolu sur la grille `timeframe` : archive 5 min (data.binance.vision)
     resamplée. `start`/`end` ciblent un intervalle historique ; sinon span déduit de `limit`.
-    Point courant CoinGecko ajouté en bout pour combler le retard ~1j (sauf fenêtre passée)."""
+    Point courant CoinGecko ajouté en bout pour combler le retard ~1j (sauf fenêtre passée).
+
+    Fix #2 : en mode **live** (ni `start` ni `end`), si l'archive a plus de
+    `_ARCHIVE_MAX_LAG_H` heures de retard, on **renvoie None** plutôt que de la reporter à
+    plat (carry-forward) dans l'agrégat. Un Binance figé en J-1 masquait la direction réelle
+    de l'OI live → agg3 live se réduit alors au live OKX+Gate, qui colle aux venues.
+    """
     if start is not None or end is not None:
         s5 = fetch_binance_oi_archive(symbol, start=start, end=end)
     else:
-        tf_min = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}.get(timeframe, 60)
-        days = int(min(8, max(2, (limit * tf_min) / 1440 + 1)))   # borne les téléchargements
+        days = int(min(8, max(2, (limit * _TF_MIN.get(timeframe, 60)) / 1440 + 1)))
         s5 = fetch_binance_oi_archive(symbol, days=days)
     if s5 is None:
         return None
+    if start is None and end is None:                         # live : refuse l'archive périmée
+        lag = _archive_lag_hours(s5, pd.Timestamp.now(tz="UTC"))
+        if lag is not None and lag > _ARCHIVE_MAX_LAG_H:
+            return None
     freq = _TF_FREQ.get(timeframe, "1h")
     bn = s5.resample(freq).last().dropna()
     if end is None:                                            # gap du jour (live uniquement)

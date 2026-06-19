@@ -222,8 +222,20 @@ def plot_window_structure(
         olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
         axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
         axo.set_ylabel("OI agg. (Md$)"); axo.grid(True, alpha=0.2)
-        axo.annotate(f"OI agrégé {oi_source} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)",
-                     (0.5, 0.04), xycoords="axes fraction", ha="center", fontsize=7, color="#666")
+        # Composition affichée : sur agg3 live, si l'archive Binance est périmée (J-1) elle
+        # est exclue (fix #2) → on le signale pour que le panneau colle aux venues live.
+        compo = f"OI agrégé {oi_source} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)"
+        if oi_source == "agg3":
+            try:
+                lag = data_mod.binance_oi_lag_hours(symbol)
+            except Exception:
+                lag = None
+            if lag is None or lag > data_mod._ARCHIVE_MAX_LAG_H:
+                compo += "  |  Binance archive périmée → direction = OKX+Gate live"
+            else:
+                compo += "  |  OKX+Gate+Binance"
+        axo.annotate(compo, (0.5, 0.04), xycoords="axes fraction", ha="center",
+                     fontsize=7, color="#666")
 
     panels[-1].xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)
