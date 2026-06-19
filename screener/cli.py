@@ -122,7 +122,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
             oi = data_mod.fetch_open_interest(sym, cfg["timeframe"], cfg["limit"],
-                                              source=cfg.get("oi_source", "okx")) if cfg.get("oi", True) else None
+                                              source=cfg.get("oi_source", "binance")) if cfg.get("oi", True) else None
             struct = detect_window_structure(df, lookback=lookback, th=th, oi=oi)
             if not struct.is_valid:
                 continue
@@ -139,7 +139,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
                 from .plot import plot_window_structure
                 out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_window.png"
                 plot_window_structure(sym, cfg["timeframe"], struct, out, ex=ex,
-                                      oi_source=cfg.get("oi_source", "okx"))
+                                      oi_source=cfg.get("oi_source", "binance"))
                 print(f"→ graphique : {out}", file=sys.stderr)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
@@ -159,7 +159,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
-        "oi_source": "okx",
+        "oi_source": "binance",
     }
     cfg.update(load_config())
 
@@ -176,8 +176,8 @@ def main() -> None:
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
-    p.add_argument("--oi-source", choices=["okx", "agg3"], default=cfg["oi_source"],
-                   help="source d'OI : okx (défaut, venue unique), agg3 (OKX + archive Binance, profondeur historique)")
+    p.add_argument("--oi-source", choices=["binance", "okx", "agg3"], default=cfg["oi_source"],
+                   help="source d'OI : binance (défaut, Coinalyze = TradingView, repli OKX), okx (venue unique), agg3 (archive Binance, profondeur historique)")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 

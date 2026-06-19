@@ -71,7 +71,7 @@ def _candles(ax, df, width):
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
-    oi_source: str = "okx", oi_ohlc=None,
+    oi_source: str = "binance", oi_ohlc=None,
 ) -> str:
     """Dessine la structure `struct` détectée en `analysis_tf`, **dans la même TF** (bougies
     `analysis_tf`), sur l'intervalle couvert par les événements. Trois panneaux : cours,
@@ -222,9 +222,10 @@ def plot_window_structure(
         olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
         axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
         axo.set_ylabel("OI agg. (Md$)"); axo.grid(True, alpha=0.2)
-        # Composition affichée. Sur agg3 live, si l'archive Binance est périmée (J-1) elle
-        # est exclue (fix #2) → on le signale ; sinon (okx) c'est la venue unique.
-        label = "OI OKX (perp)" if oi_source == "okx" else f"OI {oi_source}"
+        # Composition affichée. binance = Coinalyze (= TradingView) ; okx = venue unique ;
+        # agg3 live signale si l'archive Binance est périmée (fix #2).
+        label = {"binance": "OI Binance (Coinalyze, = TradingView)",
+                 "okx": "OI OKX (perp)"}.get(oi_source, f"OI {oi_source}")
         compo = f"{label} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)"
         if oi_source == "agg3":
             try:

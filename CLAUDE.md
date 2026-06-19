@@ -7,11 +7,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/data.py` — ccxt : `build_universe()` (top paires USDT par volume),
   `fetch_ohlcv()` avec cache parquet. `get_exchange("binance")` route les endpoints
   publics vers le miroir `data-api.binance.vision` (spot, non géo-restreint).
-  `fetch_open_interest()` — historique d'OI (perp), indexé ts UTC. `source=okx|agg3` :
-  **`okx`** (défaut, **venue unique** — simple et fidèle aux venues live ; Gate retiré) ;
-  **`agg3`** ajoute l'**OI Binance** via l'archive `data.binance.vision` (metrics 5m, non
-  géo-bloqué ; `fapi`/Bybit le sont) + un point **CoinGecko** courant, **pour la profondeur
-  historique** (mode `start`/`end`). Fusion via `_combine_oi` (carry → pas de « falaise »).
+  `fetch_open_interest()` — historique d'OI (perp), indexé ts UTC. `source=binance|okx|agg3` :
+  **`binance`** (défaut) = **OI Binance live via Coinalyze** (`fetch_coinalyze_oi`, agrégateur
+  tiers non géo-bloqué) — **la donnée qui colle à TradingView `BTCUSDT.P`** ; `fapi` Binance
+  renvoie 451 ici. Clé gratuite read-only lue depuis l'env `COINALYZE_API_KEY` **ou** le fichier
+  `.cache/coinalyze_key` (gitignoré, jamais commité) ; **repli auto sur OKX** si pas de clé/API
+  HS. Coinalyze renvoie nativement des **bougies d'OI** (OHLC) et supporte 5m→1d (dont 15m/30m).
+  **`okx`** = venue unique (Gate retiré) ; **`agg3`** ajoute l'**OI Binance** via l'archive
+  `data.binance.vision` (metrics 5m) + un point **CoinGecko**, **pour la profondeur historique**
+  (mode `start`/`end`). Fusion via `_combine_oi` (carry → pas de « falaise »).
   `_oi_series` **rabat les TF non supportées par une venue sur une base 5 min puis resample**
   (ex. OKX refuse 15m/30m → sinon *exclu en silence* ; table `_VENUE_OI_TF`). En **live**,
   l'archive Binance trop en retard (> `_ARCHIVE_MAX_LAG_H`, via `_archive_lag_hours`) est

@@ -294,14 +294,89 @@ def _binance_oi_series(symbol: str, timeframe: str, limit: int,
     return bn if len(bn) else None
 
 
+# ── OI Binance live via Coinalyze (agrégateur tiers non géo-bloqué) ───────────────
+# Binance `fapi` renvoie 451 ici ; Coinalyze sert le **même OI Binance** en OHLC, sans
+# géo-block, via une clé API gratuite (read-only). Lue depuis l'env `COINALYZE_API_KEY`
+# ou le fichier `.cache/coinalyze_key` (gitignoré, jamais commité).
+_COINALYZE_BASE = "https://api.coinalyze.net/v1"
+_COINALYZE_INTERVAL = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
+                       "1h": "1hour", "4h": "4hour", "1d": "daily"}
+
+
+def _coinalyze_key() -> "str | None":
+    k = os.environ.get("COINALYZE_API_KEY")
+    if k and k.strip():
+        return k.strip()
+    try:
+        with open(os.path.join(CACHE_DIR, "coinalyze_key")) as f:
+            return f.read().strip() or None
+    except Exception:
+        return None
+
+
+def _coinalyze_symbol(symbol: str, exch: str = "A") -> str:
+    """BTC/USDT -> 'BTCUSDT_PERP.A' (suffixe .A = Binance chez Coinalyze)."""
+    base, quote = symbol.split("/")
+    return f"{base}{quote}_PERP.{exch}"
+
+
+def fetch_coinalyze_oi(symbol: str = "BTC/USDT", timeframe: str = "5m", limit: int = 300,
+                       start=None, end=None, ohlc: bool = False, exch: str = "A"):
+    """OI **Binance** (perp) via Coinalyze — la donnée qui colle à TradingView `BTCUSDT.P`.
+
+    Retourne, en USD indexé ts UTC : une Series (close) si `ohlc=False`, sinon un DataFrame
+    [open, high, low, close] (Coinalyze renvoie nativement des bougies d'OI). None si pas de
+    clé ou indisponible (l'appelant se replie alors sur OKX). Gère le 429 (Retry-After).
+    """
+    key = _coinalyze_key()
+    if key is None:
+        return None
+    interval = _COINALYZE_INTERVAL.get(timeframe, "5min")
+    if end is None:
+        to_ts = int(time.time())
+    else:
+        to_ts = int(pd.Timestamp(end).timestamp())
+    if start is not None:
+        from_ts = int(pd.Timestamp(start).timestamp())
+    else:
+        tf_min = _TF_MIN.get(timeframe, 5)
+        from_ts = to_ts - int(limit * tf_min * 60)
+    try:
+        import requests
+        params = {"symbols": _coinalyze_symbol(symbol, exch), "interval": interval,
+                  "from": from_ts, "to": to_ts, "convert_to_usd": "true"}
+        data = None
+        for _ in range(3):
+            r = requests.get(f"{_COINALYZE_BASE}/open-interest-history",
+                             headers={"api_key": key}, params=params, timeout=20)
+            if r.status_code == 429:
+                time.sleep(float(r.headers.get("Retry-After", 30)) + 1)
+                continue
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            break
+        if not data or not data[0].get("history"):
+            return None
+        h = pd.DataFrame(data[0]["history"])
+        h.index = pd.to_datetime(h["t"], unit="s", utc=True)
+        if ohlc:
+            out = h[["o", "h", "l", "c"]].astype(float)
+            out.columns = ["open", "high", "low", "close"]
+            return out if len(out) else None
+        s = h["c"].astype(float)
+        return s if len(s) else None
+    except Exception:
+        return None
+
+
 def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
                   start=None, end=None) -> "pd.Series | None":
-    """Série (USD) de l'OI, alignée sur l'union des horodatages.
+    """Série (USD) de l'OI multi-venues, alignée sur l'union des horodatages.
 
-    `source` : 'okx' (défaut, venue unique), 'agg3' (OKX + archive Binance pour la
-    profondeur historique). `agg3` ajoute l'OI Binance (archive + point CoinGecko) ; si
-    l'archive est indisponible ou périmée en live, il **se replie** sur OKX seul.
-    openInterestValue est en USD. (Gate retiré pour simplifier — voir OI_VENUES.)
+    `source` : 'binance' (Coinalyze, = TradingView), 'okx' (venue unique), 'agg3' (OKX +
+    archive Binance pour la profondeur historique). Le routage de 'binance' se fait en amont
+    (`fetch_open_interest`/`_ohlc`) ; ici on traite les sources ccxt + l'archive agg3.
     """
     import ccxt  # import paresseux
 
@@ -323,16 +398,20 @@ def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
 
 
 def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
-                        source: str = "okx", start=None, end=None) -> "pd.DataFrame | None":
+                        source: str = "binance", start=None, end=None) -> "pd.DataFrame | None":
     """Historique d'Open Interest (perp) aligné sur les barres, indexé ts UTC (col `oi`).
 
-    OI = donnée *futures* ; Binance `fapi` et Bybit sont géo-restreints ici. `source` :
-    'okx' (défaut, venue unique — simple et fidèle aux venues live), 'agg3' (OKX + archive
-    Binance, pour la profondeur historique). `start`/`end` ciblent l'OI Binance d'un
-    **intervalle historique** (ex. mars, via les quotidiens d'archive ; impose `agg3`).
-    Tolérant : None si indisponible (analyse sans OI).
+    OI = donnée *futures*. `source` : **'binance'** (défaut, via Coinalyze — la donnée qui
+    colle à TradingView `BTCUSDT.P` ; **repli auto sur OKX** si pas de clé/API HS), 'okx'
+    (venue unique), 'agg3' (OKX + archive Binance pour la profondeur historique). `start`/`end`
+    ciblent un **intervalle historique**. Tolérant : None si indisponible (analyse sans OI).
     """
     try:
+        if source == "binance":
+            s = fetch_coinalyze_oi(symbol, timeframe, limit, start, end)
+            if s is None:                                  # repli OKX si Coinalyze indispo
+                s = _aggregate_oi(symbol, timeframe, limit, "okx", start, end)
+            return None if s is None else pd.DataFrame({"oi": s})
         agg = _aggregate_oi(symbol, timeframe, limit, source, start, end)
         return None if agg is None else pd.DataFrame({"oi": agg})
     except Exception:
@@ -345,16 +424,21 @@ _TF_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
 
 
 def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 300,
-                             source: str = "okx", fine: str | None = None,
+                             source: str = "binance", fine: str | None = None,
                              start=None, end=None) -> "pd.DataFrame | None":
-    """Bougies OHLC d'Open Interest : on prend l'OI *fin* (OKX, +archive Binance si `agg3`)
-    puis on resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs).
-    Retourne un DataFrame [open, high, low, close] (USD) indexé ts UTC, ou None.
+    """Bougies OHLC d'Open Interest (USD), indexé ts UTC, ou None.
 
-    `fine` (granularité source) est choisie selon `timeframe` : 5m pour les TF fines, 1h
-    pour les TF ≥ 4h (couvre ~12 j sur OKX). `start`/`end` ciblent une fenêtre historique.
+    `source='binance'` (défaut) : bougies **natives** de Coinalyze (OI Binance, = TradingView),
+    aucun resample ; **repli OKX** si indispo. Sinon (okx/agg3) : on prend l'OI *fin* puis on
+    resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs). `fine` (5m pour
+    TF fines, 1h pour TF ≥ 4h). `start`/`end` ciblent une fenêtre historique.
     """
     try:
+        if source == "binance":
+            o = fetch_coinalyze_oi(symbol, timeframe, limit, start, end, ohlc=True)
+            if o is not None:
+                return o
+            source = "okx"                                 # repli : resample OKX ci-dessous
         if fine is None:
             fine = "5m" if timeframe in ("5m", "15m", "30m", "1h") else "1h"
         fine_min = {"5m": 5, "1h": 60}.get(fine, 5)
