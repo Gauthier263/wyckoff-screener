@@ -12,8 +12,10 @@ science-fiction inspiré de *Fahrenheit 451* (Ray Bradbury).
 - Les questions sont **pilotées par le professeur** depuis un écran projeté (type Kahoot).
 - Chaque **manche porte sur un thème grammatical**, de plus en plus difficile.
 - Score **en direct** = bonne réponse + bonus de rapidité + bonus de série.
-- **Élimination par paliers** : à la fin de chaque manche, les derniers du
-  classement sont éliminés (le nombre s'adapte au nombre d'élèves présents).
+- **Élimination par paliers (douce)** : à la fin de chaque manche, les derniers du
+  classement sont éliminés (le nombre s'adapte au nombre d'élèves présents). La
+  courbe garde **beaucoup de monde en jeu** : on ne descend à **3 finalistes qu'à la
+  manche 9**, puis 2 (manche 10), puis 1 (finale).
 - Les éliminés deviennent **fantômes** : ils continuent à jouer pour s'entraîner,
   hors classement.
 - La **finale** oppose les survivants jusqu'au vainqueur.
@@ -56,6 +58,17 @@ pseudo, et c'est parti.
 
 Bouton **Réinitialiser** : remet la partie à zéro (les connectés repartent en jeu).
 
+### Rejouer plusieurs fois (questions renouvelées)
+À l'écran de victoire, deux boutons :
+- **🔄 Rejouer (nouvelles questions)** : relance une partie en proposant en priorité
+  les questions **pas encore posées**. On peut ainsi enchaîner plusieurs parties sans
+  retomber sur les mêmes questions (quand un thème est épuisé, il est recyclé).
+- **♻️ Repartir de zéro (banque vierge)** : oublie l'historique → toute la banque
+  validée peut être reposée depuis le début (utile pour une nouvelle classe).
+
+> L'historique des questions posées vit tant que le serveur tourne ; il est aussi
+> remis à zéro si tu arrêtes puis relances `npm start`.
+
 ## Valider / modifier les questions (page « Gérer les questions »)
 **Une question n'est proposée aux élèves que si le maître l'a validée.** Au
 départ, toutes les questions sont « en attente ».
@@ -76,6 +89,10 @@ Clique enfin sur **💾 Enregistrer** : les modifications sont écrites dans
 ### Page de relecture imprimable
 `npm run revision` génère `RELECTURE.html` (à ouvrir dans un navigateur) : la liste
 complète des questions avec réponses et explications, pratique pour relire/imprimer.
+
+### Tests
+`npm test` (utilise `node --test`) vérifie la courbe d'élimination douce et le
+renouvellement des questions d'une partie à l'autre.
 
 ### Format des questions (`data/questions.json`)
 | type | champs |

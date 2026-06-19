@@ -36,17 +36,22 @@ export const CONFIG = {
 };
 
 // Calcule combien de Passeurs survivent APRÈS chaque manche, de façon adaptative
-// au nombre réel de joueurs présents (décroissance géométrique vers 1).
+// au nombre réel de joueurs présents. Courbe DOUCE : on garde beaucoup de monde
+// en jeu, déclin linéaire régulier de n vers 3, puis paliers finaux 3 → 2 → 1.
+// On ne descend donc à 3 finalistes qu'à l'avant-avant-dernière manche.
 export function eliminationSchedule(playerCount, numRounds) {
   const n = Math.max(1, playerCount);
   const sched = [];
+  const podiumRound = Math.max(1, numRounds - 2); // manche (1-indexée) où l'on vise 3
   for (let i = 1; i <= numRounds; i++) {
-    const frac = i / numRounds;
-    let target = Math.round(n * Math.pow(1 / n, frac));
+    let target;
+    if (i >= numRounds) target = 1;            // finale : un seul Gardien du Codex
+    else if (i === numRounds - 1) target = 2;  // duel juste avant la finale
+    else if (i >= podiumRound) target = 3;     // palier des 3 finalistes
+    else target = Math.round(n - (n - 3) * (i / podiumRound)); // déclin doux n → 3
     target = Math.max(1, Math.min(n, target));
     sched.push(target);
   }
-  if (numRounds > 0) sched[numRounds - 1] = 1; // la finale ne laisse qu'un vainqueur
   // Force une suite strictement non croissante.
   for (let i = 1; i < numRounds; i++) {
     if (sched[i] > sched[i - 1]) sched[i] = sched[i - 1];

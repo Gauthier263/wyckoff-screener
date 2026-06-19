@@ -82,3 +82,4 @@ main { padding: 1.4rem clamp(1rem, 4vw, 3rem); }
 .phenix { font-size: 5rem; animation: vacille 1.4s ease-in-out infinite alternate; }
 .winner { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; color: var(--or); margin: 0.4rem 0 1rem; }
 .victoire .leaderboard { max-width: 520px; margin: 1.4rem auto 0; text-align: left; }
+.fin-actions { display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap; margin-top: 1.8rem; }

@@ -38,6 +38,7 @@ export class GameEngine {
     this.startAt = 0;
     this.answers = new Map(); // token -> { answer, atMs, correct, points, scored }
     this.timer = null;
+    this.askedIds = new Set(); // questions déjà posées (mémoire entre parties)
   }
 
   // ---- Joueurs -----------------------------------------------------------
@@ -141,9 +142,17 @@ export class GameEngine {
     // question validée sont sautés automatiquement.
     while (this.roundIndex < CONFIG.rounds.length) {
       const round = CONFIG.rounds[this.roundIndex];
-      const pool = (this.bank[round.theme] || []).filter((q) => q.valide);
+      const validated = (this.bank[round.theme] || []).filter((q) => q.valide);
+      // On privilégie les questions PAS ENCORE POSÉES : rejouer = nouvelles questions.
+      let pool = validated.filter((q) => !this.askedIds.has(q.id));
+      if (pool.length < CONFIG.questionsPerRound && validated.length > 0) {
+        // Stock neuf épuisé pour ce thème : on le recycle pour pouvoir continuer.
+        for (const q of validated) this.askedIds.delete(q.id);
+        pool = validated.slice();
+      }
       pool.sort((a, b) => (a.difficulte || 1) - (b.difficulte || 1));
       this.roundQuestions = pool.slice(0, CONFIG.questionsPerRound);
+      for (const q of this.roundQuestions) this.askedIds.add(q.id);
       if (this.roundQuestions.length > 0) break;
       this.roundIndex += 1;
     }
@@ -349,7 +358,7 @@ export class GameEngine {
     this.io.emit("gameOver", { winner, leaderboard: ranked });
   }
 
-  hostReset() {
+  hostReset(opts = {}) {
     clearTimeout(this.timer);
     this.phase = PHASES.LOBBY;
     this.roundIndex = 0;
@@ -358,6 +367,9 @@ export class GameEngine {
     this.answers = new Map();
     this.roundQuestions = [];
     this.schedule = [];
+    // Rejeu normal : on GARDE la mémoire des questions posées (nouvelles questions).
+    // « Repartir de zéro » (clearHistory) : on repropose toute la banque depuis le début.
+    if (opts.clearHistory) this.askedIds.clear();
     for (const p of this.players.values()) {
       p.score = 0;
       p.streak = 0;

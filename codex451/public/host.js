@@ -19,6 +19,13 @@ $("btn-start").onclick = () => socket.emit("host:start", { timeLimitMs: Number($
 $("btn-reveal").onclick = () => socket.emit("host:reveal");
 $("btn-next").onclick = () => socket.emit("host:next");
 $("btn-reset").onclick = () => { if (confirm("Réinitialiser la partie ?")) socket.emit("host:reset"); };
+// Fin de partie : rejouer (questions encore non posées) ou repartir de zéro (banque vierge).
+$("btn-rejouer").onclick = () => socket.emit("host:reset");
+$("btn-zero").onclick = () => {
+  if (confirm("Repartir de zéro ? Toutes les questions de la banque pourront être reposées dès le début.")) {
+    socket.emit("host:reset", { clearHistory: true });
+  }
+};
 
 // --- Gestion des vues -----------------------------------------------------
 const VUES = ["lobby", "question", "reveal", "round", "fin"];

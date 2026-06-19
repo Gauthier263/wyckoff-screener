@@ -89,7 +89,7 @@ io.on("connection", (socket) => {
   socket.on("host:start", (opts) => engine.hostStart(opts || {}));
   socket.on("host:reveal", () => engine.reveal());
   socket.on("host:next", () => engine.hostNext());
-  socket.on("host:reset", () => engine.hostReset());
+  socket.on("host:reset", (opts) => engine.hostReset(opts || {}));
 
   // Élève
   socket.on("player:join", (data) => engine.join(socket, data || {}));
