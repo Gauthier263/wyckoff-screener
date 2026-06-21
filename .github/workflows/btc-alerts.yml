@@ -13,6 +13,7 @@ on:
       tp2: { description: "TP2", default: "65500" }
       stop: { description: "Stop", default: "63184" }
       resist: { description: "Seuil épuisement", default: "64500" }
+      profit_floor: { description: "Seuil faiblesse précoce", default: "63800" }
 
 concurrency:
   group: btc-alerts            # évite deux runs simultanés
@@ -52,4 +53,5 @@ jobs:
             --tp2 "${{ github.event.inputs.tp2 || '65500' }}" \
             --stop "${{ github.event.inputs.stop || '63184' }}" \
             --resist "${{ github.event.inputs.resist || '64500' }}" \
+            --profit-floor "${{ github.event.inputs.profit_floor || '63800' }}" \
             --state .cache/alerts_state.json

@@ -1,9 +1,10 @@
-"""Test du moteur de déclenchement d'alertes (check_trigger), hors-ligne."""
+"""Test du moteur de déclenchement d'alertes (check_trigger, check_weakness), hors-ligne."""
 import numpy as np
+import pandas as pd
 
-from screener.alerts import check_trigger
+from screener.alerts import check_trigger, check_weakness
 
-LEVELS = {"tp1": 64800, "tp2": 65500, "stop": 63184, "resist": 64500}
+LEVELS = {"tp1": 64800, "tp2": 65500, "stop": 63184, "resist": 64500, "profit_floor": 63800}
 
 
 def _bar(high, close, vr=1.0, clv=0.5):
@@ -42,3 +43,47 @@ def test_no_trigger_midrange():
 def test_oi_shown_when_available():
     _, msg = check_trigger(_bar(64850, 64820), 2.3, LEVELS)
     assert "+2.3%" in msg
+
+
+# ── Signaux de faiblesse précoce (check_weakness) ──────────────────────────────
+def _df(rows):
+    """rows: list de (open, high, low, close, vol_ratio, clv)."""
+    idx = pd.date_range("2026-06-20", periods=len(rows), freq="15min", tz="UTC")
+    return pd.DataFrame(rows, columns=["open", "high", "low", "close", "vol_ratio", "clv"], index=idx)
+
+
+def _flat(n, price=64000):
+    return [(price, price + 20, price - 20, price, 0.8, 0.5) for _ in range(n)]
+
+
+def test_weakness_supply_bar():
+    # avant-dernière barre = barre de vente volumique à clôture basse, en profit
+    rows = _flat(13) + [(64200, 64250, 63900, 63950, 2.4, 0.15), (63950, 64000, 63900, 63960, 0.5, 0.5)]
+    t, msg = check_weakness(_df(rows), None, LEVELS)
+    assert t == "SUPPLY" and "vol×2.4" in msg
+
+
+def test_no_supply_when_below_profit_floor():
+    rows = _flat(13, price=63000) + [(63000, 63050, 62700, 62750, 2.5, 0.1), (62750, 62800, 62700, 62760, 0.5, 0.5)]
+    assert check_weakness(_df(rows), None, LEVELS) is None     # sous profit_floor → ignoré
+
+
+def test_weakness_oi_divergence_near_high():
+    # prix proche du plus-haut récent, mais OI en baisse sur ~1h30 → DIVERG
+    rows = _flat(13, price=64200) + [(64200, 64300, 64150, 64290, 0.9, 0.8), (64290, 64300, 64250, 64295, 0.7, 0.7)]
+    df = _df(rows)
+    oi = pd.Series(np.linspace(6.40e9, 6.10e9, len(df)), index=df.index)   # OI qui décline nettement
+    t, msg = check_weakness(df, oi, LEVELS)
+    assert t == "DIVERG" and "OI en baisse" in msg
+
+
+def test_no_divergence_when_oi_rising():
+    rows = _flat(13, price=64200) + [(64200, 64300, 64150, 64290, 0.9, 0.8), (64290, 64300, 64250, 64295, 0.7, 0.7)]
+    df = _df(rows)
+    oi = pd.Series(np.linspace(6.18e9, 6.30e9, len(df)), index=df.index)   # OI qui monte
+    assert check_weakness(df, oi, LEVELS) is None
+
+
+def test_weakness_none_without_profit_floor():
+    rows = _flat(13) + [(64200, 64250, 63900, 63950, 2.4, 0.15), (63950, 64000, 63900, 63960, 0.5, 0.5)]
+    assert check_weakness(_df(rows), None, {"tp1": 1, "tp2": 2, "stop": 0, "resist": 1}) is None
