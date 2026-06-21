@@ -109,14 +109,21 @@ def run_window(cfg: dict) -> pd.DataFrame:
     ex = data_mod.get_exchange(cfg["exchange"])
     universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = Thresholds(**cfg.get("thresholds", {}))
-    lookback = cfg.get("window", 30)
+    lookback = cfg.get("window", 60)
+
+    # Mémo théorie (HTML cliquable) régénéré à chaque analyse, sur les seuils courants.
+    from .theory_table import build_theory_html
+    memo = build_theory_html(th)
+    print(f"→ mémo théorie : {memo}", file=sys.stderr)
 
     rows: list[dict] = []
     for sym in universe:
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
-            struct = detect_window_structure(df, lookback=lookback, th=th)
+            oi = data_mod.fetch_open_interest(sym, cfg["timeframe"], cfg["limit"],
+                                              source=cfg.get("oi_source", "binance")) if cfg.get("oi", True) else None
+            struct = detect_window_structure(df, lookback=lookback, th=th, oi=oi)
             if not struct.is_valid:
                 continue
             for e in struct.events:
@@ -125,12 +132,14 @@ def run_window(cfg: dict) -> pd.DataFrame:
                     "time": (e.ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh"),
                     "price": round(e.price, 2), "vol_x": round(e.vol_ratio, 2),
                     "spread_atr": round(e.spread_atr, 2), "clv": round(e.clv, 2),
+                    "oi_3h_%": "—" if pd.isna(e.oi_chg) else round(e.oi_chg, 2),
                     "volume/spread → thèse": e.why, "théorie": e.theory,
                 })
             if cfg.get("chart"):
                 from .plot import plot_window_structure
                 out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_window.png"
-                plot_window_structure(sym, cfg["timeframe"], struct, out, ex=ex)
+                plot_window_structure(sym, cfg["timeframe"], struct, out, ex=ex,
+                                      oi_source=cfg.get("oi_source", "binance"))
                 print(f"→ graphique : {out}", file=sys.stderr)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
@@ -149,7 +158,8 @@ def main() -> None:
         "exchange": "binance", "quote": "USDT", "timeframe": "1h", "top": 60,
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
-        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 30,
+        "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
+        "oi_source": "binance",
     }
     cfg.update(load_config())
 
@@ -161,16 +171,20 @@ def main() -> None:
     p.add_argument("--bias", choices=["accumulation", "distribution", "both"], default=cfg["bias"])
     p.add_argument("--max-results", type=int, default=cfg["max_results"])
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
-    p.add_argument("--window", nargs="?", type=int, const=30, default=None,
-                   help="mode séquence Wyckoff sur fenêtre glissante (défaut 30 barres)")
+    p.add_argument("--window", nargs="?", type=int, const=60, default=None,
+                   help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
+    p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
+    p.add_argument("--oi-source", choices=["binance", "okx", "agg3"], default=cfg["oi_source"],
+                   help="source d'OI : binance (défaut, Coinalyze = TradingView, repli OKX), okx (venue unique), agg3 (archive Binance, profondeur historique)")
     p.add_argument("--csv", default="watchlist.csv")
     args = p.parse_args()
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart)
+               use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
+               oi_source=args.oi_source)
     if args.window is not None:
         cfg["window"] = args.window
 

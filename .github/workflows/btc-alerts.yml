@@ -1,0 +1,55 @@
+name: BTC take-profit alerts
+
+# Lanceur d'alertes durable : tourne sur GitHub (24/7, même ordinateur éteint).
+# Pousse une notif Telegram sur TP1/TP2/épuisement/stop. Niveaux ajustables ci-dessous
+# ou via le déclenchement manuel (workflow_dispatch).
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"      # toutes les 15 min (aligné sur les bougies 15m)
+  workflow_dispatch:            # bouton « Run workflow » pour tester à la main
+    inputs:
+      tp1: { description: "TP1", default: "64800" }
+      tp2: { description: "TP2", default: "65500" }
+      stop: { description: "Stop", default: "63184" }
+      resist: { description: "Seuil épuisement", default: "64500" }
+
+concurrency:
+  group: btc-alerts            # évite deux runs simultanés
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip            # accélère les runs (moins de minutes Actions consommées)
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # Persiste l'état de dédup entre les runs (sinon une même bougie pourrait re-notifier).
+      - name: Restore alert state
+        uses: actions/cache@v4
+        with:
+          path: .cache/alerts_state.json
+          key: btc-alerts-state-${{ github.run_id }}
+          restore-keys: btc-alerts-state-
+
+      - name: Run alert check
+        env:
+          COINALYZE_API_KEY: ${{ secrets.COINALYZE_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python -m screener.alerts \
+            --symbol BTC/USDT --timeframe 15m \
+            --tp1 "${{ github.event.inputs.tp1 || '64800' }}" \
+            --tp2 "${{ github.event.inputs.tp2 || '65500' }}" \
+            --stop "${{ github.event.inputs.stop || '63184' }}" \
+            --resist "${{ github.event.inputs.resist || '64500' }}" \
+            --state .cache/alerts_state.json

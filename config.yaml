@@ -33,7 +33,8 @@ optimize:
     stop_atr: [0.75, 1.0, 1.5]
 
 # Liste manuelle (prioritaire sur `top` si non vide)
-symbols: []
+# Focus BTC pour le moment (override : --symbols ... en ligne de commande).
+symbols: [BTC/USDT]
 # symbols: [BTC/USDT, ETH/USDT, SOL/USDT]
 
 # --- Détection de plage ---
