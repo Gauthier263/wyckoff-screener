@@ -1,57 +1,55 @@
-name: BTC take-profit alerts
+name: Crypto take-profit alerts
 
-# Lanceur d'alertes durable : tourne sur GitHub (24/7, même ordinateur éteint).
-# Pousse une notif Telegram sur TP1/TP2/épuisement/stop. Niveaux ajustables ci-dessous
-# ou via le déclenchement manuel (workflow_dispatch).
+# Lanceur d'alertes durable multi-actifs (BTC + ETH) : tourne sur GitHub (24/7, même
+# ordinateur éteint). Pousse une notif Telegram sur TP1/TP2/épuisement/stop + faiblesse
+# précoce (SUPPLY / divergence OI). Niveaux par actif dans la matrice ci-dessous.
 
 on:
   schedule:
     - cron: "*/15 * * * *"      # toutes les 15 min (aligné sur les bougies 15m)
   workflow_dispatch:            # bouton « Run workflow » pour tester à la main
-    inputs:
-      tp1: { description: "TP1", default: "64800" }
-      tp2: { description: "TP2", default: "65500" }
-      stop: { description: "Stop", default: "63184" }
-      resist: { description: "Seuil épuisement", default: "64500" }
-      profit_floor: { description: "Seuil faiblesse précoce", default: "63800" }
 
 concurrency:
-  group: btc-alerts            # évite deux runs simultanés
+  group: crypto-alerts
   cancel-in-progress: false
 
 jobs:
   alert:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # ETH tourne même si BTC échoue (et inversement)
+      matrix:
+        include:
+          - { symbol: "BTC/USDT", tp1: "64800", tp2: "65500", stop: "63184", resist: "64500", profit_floor: "63800", id: "btc" }
+          - { symbol: "ETH/USDT", tp1: "1749.5", tp2: "1763",  stop: "1704",  resist: "1745",  profit_floor: "1712",  id: "eth" }
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip            # accélère les runs (moins de minutes Actions consommées)
+          cache: pip
 
       - name: Install deps
         run: pip install -r requirements.txt
 
-      # Persiste l'état de dédup entre les runs (sinon une même bougie pourrait re-notifier).
+      # État de dédup persisté entre runs, séparé par actif.
       - name: Restore alert state
         uses: actions/cache@v4
         with:
-          path: .cache/alerts_state.json
-          key: btc-alerts-state-${{ github.run_id }}
-          restore-keys: btc-alerts-state-
+          path: .cache/alerts_state_${{ matrix.id }}.json
+          key: alerts-state-${{ matrix.id }}-${{ github.run_id }}
+          restore-keys: alerts-state-${{ matrix.id }}-
 
-      - name: Run alert check
+      - name: Run alert check (${{ matrix.symbol }})
         env:
           COINALYZE_API_KEY: ${{ secrets.COINALYZE_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python -m screener.alerts \
-            --symbol BTC/USDT --timeframe 15m \
-            --tp1 "${{ github.event.inputs.tp1 || '64800' }}" \
-            --tp2 "${{ github.event.inputs.tp2 || '65500' }}" \
-            --stop "${{ github.event.inputs.stop || '63184' }}" \
-            --resist "${{ github.event.inputs.resist || '64500' }}" \
-            --profit-floor "${{ github.event.inputs.profit_floor || '63800' }}" \
-            --state .cache/alerts_state.json
+            --symbol "${{ matrix.symbol }}" --timeframe 15m \
+            --tp1 "${{ matrix.tp1 }}" --tp2 "${{ matrix.tp2 }}" \
+            --stop "${{ matrix.stop }}" --resist "${{ matrix.resist }}" \
+            --profit-floor "${{ matrix.profit_floor }}" \
+            --state .cache/alerts_state_${{ matrix.id }}.json
