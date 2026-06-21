@@ -123,6 +123,26 @@ def _save_state(path: str, state: dict) -> None:
         pass
 
 
+def _notify(msg: str) -> None:
+    """Envoie sur Telegram si les secrets sont présents, sinon stdout (logs CI / local)."""
+    token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
+    if token and chat:
+        send_telegram(token, chat, msg)
+    else:
+        print(msg)
+
+
+def run_test(symbol: str, timeframe: str) -> None:
+    """Envoie un message de **test** Telegram (vérifie le bout-en-bout données+notif par actif)."""
+    try:
+        ex = data_mod.get_exchange("binance")
+        c = float(data_mod.fetch_ohlcv(ex, symbol, timeframe, limit=3, use_cache=False)["close"].iloc[-1])
+        price = f" (dernier prix {c:,.2f})"
+    except Exception:
+        price = ""
+    _notify(f"✅ Test alerte {symbol} — système opérationnel{price}. [test, à ignorer]")
+
+
 def run_once(symbol: str, timeframe: str, levels: dict, state_path: str) -> bool:
     """Un seul cycle (pour cron). True si une alerte a été envoyée."""
     out = evaluate(symbol, timeframe, levels)
@@ -144,11 +164,7 @@ def run_once(symbol: str, timeframe: str, levels: dict, state_path: str) -> bool
         if state.get("last") == key:
             return False
         state["last"] = key
-    token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
-    if token and chat:
-        send_telegram(token, chat, msg)
-    else:
-        print(msg)                                         # repli : stdout (logs CI)
+    _notify(msg)
     _save_state(state_path, state)
     return True
 
@@ -166,7 +182,11 @@ def main(argv=None):
     p.add_argument("--state", default=".cache/alerts_state.json")
     p.add_argument("--loop", action="store_true", help="boucle locale (sinon: un seul cycle, pour cron)")
     p.add_argument("--interval", type=int, default=300)
+    p.add_argument("--test", action="store_true", help="envoie un message de test Telegram puis sort")
     a = p.parse_args(argv)
+    if a.test:
+        run_test(a.symbol, a.timeframe)
+        return
     levels = {"tp1": a.tp1, "tp2": a.tp2, "stop": a.stop, "resist": a.resist, "profit_floor": a.profit_floor}
     os.makedirs(os.path.dirname(a.state) or ".", exist_ok=True)
     if not a.loop:
