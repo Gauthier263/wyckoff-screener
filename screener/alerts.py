@@ -57,27 +57,49 @@ def send_telegram(token: str, chat_id: str, text: str) -> bool:
         return False
 
 
-def _oi_chg(symbol: str, timeframe: str, index, bars_back: int = 2) -> float:
-    """ΔOI % (Binance/Coinalyze) sur ~`bars_back` bougies, aligné sur les barres de prix."""
-    try:
-        oi = data_mod.fetch_open_interest(symbol, timeframe, limit=60, source="binance")
-        if oi is None:
-            return float("nan")
-        s = oi["oi"].reindex(index, method="nearest")
-        if len(s) <= bars_back:
-            return float("nan")
-        return (s.iloc[-2] / s.iloc[-2 - bars_back] - 1) * 100
-    except Exception:
-        return float("nan")
+WEAKNESS_TYPES = ("SUPPLY", "DIVERG")   # signaux de faiblesse (cooldown anti-spam)
+
+
+def check_weakness(df, oi_aligned, levels: dict) -> "tuple[str, str] | None":
+    """Signaux de **faiblesse précoce** (retournement possible) quand le long est déjà en
+    profit (close > `profit_floor`). Évite d'alerter dans la base. Fonction testable.
+
+    SUPPLY : barre de vente volumique à clôture basse (l'offre entre).
+    DIVERG : prix proche du plus-haut récent mais OI en repli sur ~1h30 (hausse portée par
+    du short-covering, pas de demande neuve). Retourne (type, message) ou None.
+    """
+    pf = levels.get("profit_floor")
+    if pf is None or len(df) < 14:
+        return None
+    bar = df.iloc[-2]
+    c, o = float(bar["close"]), float(bar["open"])
+    if c < pf:                                             # encore dans la base : non pertinent
+        return None
+    vr, clv = float(bar["vol_ratio"]), float(bar["clv"])
+    if c < o and vr >= 2.0 and clv < 0.25:
+        return "SUPPLY", (f"⚠️ Faiblesse — barre de vente vol×{vr:.1f} clôture basse (clv {clv:.2f}) à "
+                          f"{c:,.0f} = l'offre entre. Retournement possible → envisage un TP partiel précoce.")
+    recent_high = float(df["high"].iloc[-14:-2].max())
+    if oi_aligned is not None and len(oi_aligned) >= 8 and c >= recent_high * 0.996:
+        oi6 = (float(oi_aligned.iloc[-2]) / float(oi_aligned.iloc[-8]) - 1) * 100
+        if oi6 <= -1.2:
+            return "DIVERG", (f"⚠️ Divergence — prix proche du plus-haut ({c:,.0f}) mais OI en baisse "
+                              f"({oi6:+.1f}% sur ~1h30) = hausse portée par du short-covering, pas de demande "
+                              f"neuve. Retournement possible → TP partiel à considérer.")
+    return None
 
 
 def evaluate(symbol: str, timeframe: str, levels: dict) -> "tuple[str, str, str] | None":
-    """Récupère la dernière bougie close + OI, applique `check_trigger`.
+    """Récupère la dernière bougie close + OI, applique `check_trigger` puis `check_weakness`.
     Retourne (clé_dédup, type, message) ou None."""
     ex = data_mod.get_exchange("binance")
     df = add_features(data_mod.fetch_ohlcv(ex, symbol, timeframe, limit=60, use_cache=False))
+    oi = data_mod.fetch_open_interest(symbol, timeframe, limit=60, source="binance")
+    oi_aligned = oi["oi"].reindex(df.index, method="nearest") if oi is not None else None
+    oi_chg = ((oi_aligned.iloc[-2] / oi_aligned.iloc[-4] - 1) * 100
+              if (oi_aligned is not None and len(oi_aligned) >= 4) else float("nan"))
     bar, ts = df.iloc[-2], df.index[-2]                    # dernière bougie CLÔTURÉE
-    res = check_trigger(bar, _oi_chg(symbol, timeframe, df.index), levels)
+    res = check_trigger(bar, oi_chg, levels) or check_weakness(df, oi_aligned, levels)
     if res is None:
         return None
     typ, msg = res
@@ -106,16 +128,27 @@ def run_once(symbol: str, timeframe: str, levels: dict, state_path: str) -> bool
     out = evaluate(symbol, timeframe, levels)
     if out is None:
         return False
-    key, _typ, msg = out
+    key, typ, msg = out
     state = _load_state(state_path)
-    if state.get("last") == key:                           # déjà notifié cette bougie
-        return False
+    if typ in WEAKNESS_TYPES:                              # faiblesse : cooldown 2h (anti-spam)
+        ts_iso = key.split("|")[0]
+        last_weak = state.get("last_weak")
+        if last_weak is not None:
+            try:
+                if (pd.Timestamp(ts_iso) - pd.Timestamp(last_weak)) < pd.Timedelta(hours=2):
+                    return False
+            except Exception:
+                pass
+        state["last_weak"] = ts_iso
+    else:                                                  # TP/stop/épuisement : 1 par bougie
+        if state.get("last") == key:
+            return False
+        state["last"] = key
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if token and chat:
         send_telegram(token, chat, msg)
     else:
         print(msg)                                         # repli : stdout (logs CI)
-    state["last"] = key
     _save_state(state_path, state)
     return True
 
@@ -128,11 +161,13 @@ def main(argv=None):
     p.add_argument("--tp2", type=float, required=True)
     p.add_argument("--stop", type=float, required=True)
     p.add_argument("--resist", type=float, required=True, help="seuil prix au-dessus duquel guetter l'épuisement")
+    p.add_argument("--profit-floor", type=float, default=None, dest="profit_floor",
+                   help="au-dessus de ce prix, guette aussi les signaux de faiblesse précoce (SUPPLY/DIVERG)")
     p.add_argument("--state", default=".cache/alerts_state.json")
     p.add_argument("--loop", action="store_true", help="boucle locale (sinon: un seul cycle, pour cron)")
     p.add_argument("--interval", type=int, default=300)
     a = p.parse_args(argv)
-    levels = {"tp1": a.tp1, "tp2": a.tp2, "stop": a.stop, "resist": a.resist}
+    levels = {"tp1": a.tp1, "tp2": a.tp2, "stop": a.stop, "resist": a.resist, "profit_floor": a.profit_floor}
     os.makedirs(os.path.dirname(a.state) or ".", exist_ok=True)
     if not a.loop:
         sent = run_once(a.symbol, a.timeframe, levels, a.state)
