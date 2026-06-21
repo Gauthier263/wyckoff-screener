@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"      # toutes les 15 min (aligné sur les bougies 15m)
   workflow_dispatch:            # bouton « Run workflow » pour tester à la main
+    inputs:
+      test:
+        description: "Envoyer un message de TEST Telegram (true) au lieu d'un vrai check"
+        default: "false"
 
 concurrency:
   group: crypto-alerts
@@ -52,4 +56,5 @@ jobs:
             --tp1 "${{ matrix.tp1 }}" --tp2 "${{ matrix.tp2 }}" \
             --stop "${{ matrix.stop }}" --resist "${{ matrix.resist }}" \
             --profit-floor "${{ matrix.profit_floor }}" \
-            --state .cache/alerts_state_${{ matrix.id }}.json
+            --state .cache/alerts_state_${{ matrix.id }}.json \
+            ${{ github.event.inputs.test == 'true' && '--test' || '' }}
