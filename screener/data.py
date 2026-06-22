@@ -498,16 +498,23 @@ def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 30
                              start=None, end=None) -> "pd.DataFrame | None":
     """Bougies OHLC d'Open Interest (USD), indexé ts UTC, ou None.
 
-    `source='binance'` (défaut) : bougies **natives** de Coinalyze (OI Binance, = TradingView),
-    aucun resample ; **repli OKX** si indispo. Sinon (okx/agg3) : on prend l'OI *fin* puis on
-    resample en `timeframe` (open=1ʳᵉ, high=max, low=min, close=dernière obs). `fine` (5m pour
-    TF fines, 1h pour TF ≥ 4h). `start`/`end` ciblent une fenêtre historique.
+    `source='binance'` : on **reconstruit** l'OHLC à partir d'une série Coinalyze *fine*
+    (1m/5m) resamplée — car les champs `open`/`high` de l'OHLC 15m natif Coinalyze sont
+    **peu fiables** (open inventé, ex. 6.414 absent de la 1m). **Repli OKX** si indispo.
+    Sinon (okx/agg3) : OI *fin* multi-venues resamplé. `start`/`end` ciblent une fenêtre.
     """
     try:
         if source == "binance":
-            o = fetch_coinalyze_oi(symbol, timeframe, limit, start, end, ohlc=True)
-            if o is not None:
-                return o
+            fine_b = {"5m": "1m", "15m": "1m", "30m": "5m", "1h": "5m",
+                      "4h": "1h", "1d": "1h"}.get(timeframe, "5m")
+            fm = _TF_MIN.get(fine_b, 5); tm = _TF_MIN.get(timeframe, 60)
+            flim = min(2000, max(int(limit * tm / fm), 200))
+            s = fetch_coinalyze_oi(symbol, fine_b, flim, start, end, ohlc=False)
+            if s is not None and len(s):
+                freq = _TF_FREQ.get(timeframe, "1h")
+                o = s.resample(freq).agg(["first", "max", "min", "last"]).dropna()
+                o.columns = ["open", "high", "low", "close"]
+                return o if len(o) else None
             source = "okx"                                 # repli : resample OKX ci-dessous
         if fine is None:
             fine = "5m" if timeframe in ("5m", "15m", "30m", "1h") else "1h"
