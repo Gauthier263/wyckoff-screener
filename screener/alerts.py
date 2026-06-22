@@ -89,22 +89,71 @@ def check_weakness(df, oi_aligned, levels: dict) -> "tuple[str, str] | None":
     return None
 
 
-def evaluate(symbol: str, timeframe: str, levels: dict) -> "tuple[str, str, str] | None":
-    """Récupère la dernière bougie close + OI, applique `check_trigger` puis `check_weakness`.
-    Retourne (clé_dédup, type, message) ou None."""
+def _oi_chg_at(oi_aligned, index, ts, bars_back: int = 2) -> float:
+    """ΔOI % (coin) sur ~`bars_back` barres jusqu'à `ts`. nan si indispo."""
+    if oi_aligned is None:
+        return float("nan")
+    try:
+        i = index.get_loc(ts)
+        return (oi_aligned.iloc[i] / oi_aligned.iloc[i - bars_back] - 1) * 100 if i >= bars_back else float("nan")
+    except Exception:
+        return float("nan")
+
+
+def scan_window(closed, oi_aligned, levels: dict, since_ts=None) -> "tuple[str, str, object] | None":
+    """Scanne les bougies CLÔTURÉES postérieures à `since_ts` (catch-up robuste aux trous de
+    cron) et retourne le premier déclencheur (type, message, ts), ou None. Pure/testable.
+
+    Priorité : TP2/TP1 (via le **plus-haut** de la fenêtre — un TP touché plusieurs barres
+    plus tôt est rattrapé) > stop (close < stop) > épuisement/faiblesse (sur la dernière barre).
+    `since_ts=None` (démarrage à froid) → on n'évalue que la dernière close (pas de spam
+    rétroactif). `closed` doit exclure la barre en formation.
+    """
+    if closed is None or len(closed) == 0:
+        return None
+    scan = closed.iloc[-1:] if since_ts is None else closed[closed.index > since_ts]
+    if len(scan) == 0:
+        return None
+    # TP : on prend la barre qui a touché (plus-haut de la fenêtre)
+    if float(scan["high"].max()) >= levels["tp1"]:
+        cand = scan[scan["high"] >= levels["tp1"]].iloc[0]
+        res = check_trigger(cand, _oi_chg_at(oi_aligned, closed.index, cand.name), levels)
+        if res is not None:                                 # TP2 ou TP1 selon le high
+            return (res[0], res[1], cand.name)
+    # Stop : première clôture sous le stop
+    if (scan["close"] < levels["stop"]).any():
+        cand = scan[scan["close"] < levels["stop"]].iloc[0]
+        res = check_trigger(cand, _oi_chg_at(oi_aligned, closed.index, cand.name), levels)
+        if res is not None:
+            return (res[0], res[1], cand.name)
+    # Épuisement / faiblesse : sur la dernière barre clôturée
+    last = closed.iloc[-1]
+    res = check_trigger(last, _oi_chg_at(oi_aligned, closed.index, last.name), levels)
+    if res is not None and res[0] == "EXH":
+        return (res[0], res[1], last.name)
+    w = check_weakness(closed, oi_aligned, levels)
+    if w is not None:
+        return (w[0], w[1], closed.index[-1])
+    return None
+
+
+def evaluate(symbol: str, timeframe: str, levels: dict, since_ts=None):
+    """Récupère les bougies + OI (coin) et applique `scan_window`. Retourne
+    (dernière_ts_clôturée, type|None, message|None)."""
     ex = data_mod.get_exchange("binance")
     df = add_features(data_mod.fetch_ohlcv(ex, symbol, timeframe, limit=60, use_cache=False))
+    if len(df) < 3:
+        return None
     oi = data_mod.fetch_open_interest(symbol, timeframe, limit=60, source="binance")
     oi_aligned = oi["oi"].reindex(df.index, method="nearest") if oi is not None else None
-    oi_chg = ((oi_aligned.iloc[-2] / oi_aligned.iloc[-4] - 1) * 100
-              if (oi_aligned is not None and len(oi_aligned) >= 4) else float("nan"))
-    bar, ts = df.iloc[-2], df.index[-2]                    # dernière bougie CLÔTURÉE
-    res = check_trigger(bar, oi_chg, levels) or check_weakness(df, oi_aligned, levels)
+    closed = df.iloc[:-1]                                   # exclut la barre en formation
+    last_ts = closed.index[-1]
+    res = scan_window(closed, oi_aligned, levels, since_ts)
     if res is None:
-        return None
-    typ, msg = res
+        return (last_ts, None, None)
+    typ, m, ts = res
     cest = (ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh%M")
-    return f"{ts.isoformat()}|{typ}", typ, f"{symbol} {timeframe} @ {cest} CEST\n{msg}\n[aide à la décision, pas un ordre]"
+    return (last_ts, typ, f"{symbol} {timeframe} @ {cest} CEST\n{m}\n[aide à la décision, pas un ordre]")
 
 
 def _load_state(path: str) -> dict:
@@ -144,29 +193,37 @@ def run_test(symbol: str, timeframe: str) -> None:
 
 
 def run_once(symbol: str, timeframe: str, levels: dict, state_path: str) -> bool:
-    """Un seul cycle (pour cron). True si une alerte a été envoyée."""
-    out = evaluate(symbol, timeframe, levels)
+    """Un seul cycle (pour cron). Scanne toutes les barres depuis le dernier check (catch-up
+    robuste aux trous de cron) et notifie au plus un déclencheur. True si une alerte est envoyée."""
+    state = _load_state(state_path)
+    since = state.get("evaluated_until")
+    since_ts = None
+    if since:
+        try:
+            since_ts = pd.Timestamp(since)
+        except Exception:
+            since_ts = None
+    out = evaluate(symbol, timeframe, levels, since_ts)
     if out is None:
         return False
-    key, typ, msg = out
-    state = _load_state(state_path)
-    if typ in WEAKNESS_TYPES:                              # faiblesse : cooldown 2h (anti-spam)
-        ts_iso = key.split("|")[0]
-        last_weak = state.get("last_weak")
-        if last_weak is not None:
-            try:
-                if (pd.Timestamp(ts_iso) - pd.Timestamp(last_weak)) < pd.Timedelta(hours=2):
-                    return False
-            except Exception:
-                pass
-        state["last_weak"] = ts_iso
-    else:                                                  # TP/stop/épuisement : 1 par bougie
-        if state.get("last") == key:
-            return False
-        state["last"] = key
-    _notify(msg)
+    last_ts, typ, msg = out
+    state["evaluated_until"] = last_ts.isoformat()         # ces barres sont désormais évaluées
+    sent = False
+    if typ is not None and msg is not None:
+        if typ in WEAKNESS_TYPES:                          # faiblesse : cooldown 2h (anti-spam)
+            lw = state.get("last_weak")
+            cool = False
+            if lw:
+                try:
+                    cool = (last_ts - pd.Timestamp(lw)) < pd.Timedelta(hours=2)
+                except Exception:
+                    cool = False
+            if not cool:
+                _notify(msg); state["last_weak"] = last_ts.isoformat(); sent = True
+        else:
+            _notify(msg); sent = True
     _save_state(state_path, state)
-    return True
+    return sent
 
 
 def main(argv=None):
