@@ -69,6 +69,34 @@ def test_fetch_open_interest_binance_falls_back_to_okx_without_key(monkeypatch):
     assert list(out["oi"].values) == [1.0, 2.0, 3.0]
 
 
+def test_funding_long_short_liquidations_parsing(monkeypatch):
+    """Métriques tierces (funding / ratio L/S / liquidations) — départagent longs vs shorts."""
+    fund = [{"t": 1_781_860_000, "c": 0.0066}, {"t": 1_781_860_900, "c": -0.002}]
+    lsr = [{"t": 1_781_860_000, "r": 1.61, "l": 61.7}, {"t": 1_781_860_900, "r": 1.56, "l": 60.9}]
+    liq = [{"t": 1_781_860_000, "l": 5.0, "s": 0.0}, {"t": 1_781_860_900, "l": 0.0, "s": 104.0}]
+    table = {"funding-rate-history": fund, "long-short-ratio-history": lsr, "liquidation-history": liq}
+    monkeypatch.setattr(D, "_coinalyze_history",
+                        lambda path, *a, **k: table.get(path))
+
+    f = D.fetch_funding_rate("BTC/USDT", "15m")
+    assert list(f.values) == [0.0066, -0.002]                       # positif puis négatif
+
+    r = D.fetch_long_short_ratio("BTC/USDT", "15m")
+    assert list(r["ratio"].values) == [1.61, 1.56]                  # ratio qui baisse = shorts entrent
+    assert list(r["pct_long"].values) == [61.7, 60.9]
+
+    q = D.fetch_liquidations("BTC/USDT", "15m")
+    assert list(q["long_liq"].values) == [5.0, 0.0]
+    assert list(q["short_liq"].values) == [0.0, 104.0]
+
+
+def test_metrics_none_without_key(monkeypatch):
+    monkeypatch.setattr(D, "_coinalyze_key", lambda: None)
+    assert D.fetch_funding_rate("BTC/USDT") is None
+    assert D.fetch_long_short_ratio("BTC/USDT") is None
+    assert D.fetch_liquidations("BTC/USDT") is None
+
+
 def test_rate_limit_retry_then_success(monkeypatch):
     monkeypatch.setattr(D, "_coinalyze_key", lambda: "FAKEKEY")
     monkeypatch.setattr(D.time, "sleep", lambda *_: None)   # pas d'attente réelle

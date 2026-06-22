@@ -25,7 +25,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   via les quotidiens d'archive (téléchargements parallélisés + cache disque immuable) — c'est
   le seul intérêt d'`agg3`, l'archive y reste pleinement utilisée (profondeur).
   `fetch_open_interest_ohlc()` — **bougies OHLC d'OI**. `fetch_binance_oi_archive()` —
-  OI Binance brut (mode `days` ou `start`/`end`). Import ccxt paresseux (tests hors-ligne).
+  OI Binance brut (mode `days` ou `start`/`end`). **Métriques tierces pour départager
+  longs/shorts** (Binance via Coinalyze, `_coinalyze_history`) : `fetch_funding_rate`,
+  `fetch_long_short_ratio` ([ratio, pct_long]), `fetch_liquidations` ([long_liq, short_liq]).
+  Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
@@ -85,6 +88,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
   5m, l'offre y plafonne les rebonds) »). Jamais un chiffre nu : Gauthier veut savoir *pourquoi
   ce niveau* — quel événement Wyckoff, quelle borne, quel comportement volume/OI le définit.
+- **OI ambigu → croiser systématiquement 3 métriques tierces.** Prix+OI seuls sont
+  **ambigus quand le prix cale** (OI↑ à prix plat = longs *ou* shorts qui ouvrent — impossible
+  à trancher). Dans **toute lecture d'OI**, dès que le prix stagne / qu'une hausse d'OI doit
+  être attribuée, croiser avec : **ratio long/short** (`fetch_long_short_ratio` — ratio↓ = des
+  shorts entrent), **funding** (`fetch_funding_rate` — positif = longs majoritaires/paient),
+  **liquidations** (`fetch_liquidations` — long_liq vs short_liq ; ≈0 = mouvement ordonné, pas
+  de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
+  prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
 - **Illustration d'une analyse** (préférences Gauthier) :
   - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
     lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
