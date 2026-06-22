@@ -83,6 +83,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
 - Heuristiques transparentes et ajustables, jamais de boîte noire.
 - Tout nouveau détecteur doit venir avec un test synthétique dans `tests/`.
+- **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
+  de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
+  effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
+  des positions ?) ; (3) puis, **seulement quand nécessaire** (OI ambigu / prix qui cale), les
+  **métriques tierces** (ratio long/short, funding, liquidations). Ne jamais sauter au tertiaire
+  avant d'avoir lu volume puis OI.
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil

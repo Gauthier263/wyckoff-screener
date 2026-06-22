@@ -208,17 +208,26 @@ def plot_window_structure(
     axv.set_ylim(0, vmax * 1.42)
     axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
 
-    # Panneau Open Interest agrégé — bougies à la MÊME TF (vert = OI↑/positions ouvertes,
-    # rouge = OI↓/positions fermées).
+    # Panneau Open Interest — bougies à la MÊME TF. L'OI est une grandeur CONTINUE : on rend
+    # les bougies continues (open d'une barre = close de la précédente) et on colore par
+    # close vs close précédent → vert = OI↑ / rouge = OI↓ (conforme à la légende). Sinon, la
+    # couleur open/close *intra-barre* + les sauts inter-barres de la source produisent des
+    # bougies trompeuses (une rouge qui « remonte » le niveau vs la précédente).
     if has_oi:
         xo = mdates.date2num(oi_ohlc.index.to_pydatetime())
         ow = (xo[1] - xo[0]) * 0.7 if len(xo) > 1 else width
+        prev_close = None
         for xi, (_, r) in zip(xo, oi_ohlc.iterrows()):
-            c = "#26a69a" if r["close"] >= r["open"] else "#ef5350"
-            axo.vlines(xi, r["low"], r["high"], color=c, lw=0.8, zorder=1)
-            lo, hi = sorted((r["open"], r["close"]))
-            axo.add_patch(plt.Rectangle((xi - ow / 2, lo), ow, max(hi - lo, 1e-9),
+            close = r["close"]
+            open_ = prev_close if prev_close is not None else r["open"]   # continuité
+            hi = max(r["high"], open_, close)
+            lo = min(r["low"], open_, close)
+            c = "#26a69a" if close >= open_ else "#ef5350"               # OI↑ vs barre préc.
+            axo.vlines(xi, lo, hi, color=c, lw=0.8, zorder=1)
+            b0, b1 = sorted((open_, close))
+            axo.add_patch(plt.Rectangle((xi - ow / 2, b0), ow, max(b1 - b0, 1e-9),
                                         facecolor=c, edgecolor=c, zorder=2))
+            prev_close = close
         olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
         axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
         axo.set_ylabel("OI agg. (Md$)"); axo.grid(True, alpha=0.2)
@@ -226,7 +235,7 @@ def plot_window_structure(
         # agg3 live signale si l'archive Binance est périmée (fix #2).
         label = {"binance": "OI Binance (Coinalyze, = TradingView)",
                  "okx": "OI OKX (perp)"}.get(oi_source, f"OI {oi_source}")
-        compo = f"{label} — vert=OI↑ (ouvertures) · rouge=OI↓ (fermetures)"
+        compo = f"{label} — vert=OI↑ · rouge=OI↓ (vs barre précédente)"
         if oi_source == "agg3":
             try:
                 lag = data_mod.binance_oi_lag_hours(symbol)
