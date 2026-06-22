@@ -370,6 +370,76 @@ def fetch_coinalyze_oi(symbol: str = "BTC/USDT", timeframe: str = "5m", limit: i
         return None
 
 
+def _coinalyze_history(path: str, symbol: str, timeframe: str = "15m", limit: int = 120,
+                       start=None, end=None, exch: str = "A") -> "list | None":
+    """Appel générique d'un endpoint Coinalyze `*-history` → liste 'history' brute, ou None.
+    Gère la clé, le mapping de symbole/intervalle et le 429 (Retry-After)."""
+    key = _coinalyze_key()
+    if key is None:
+        return None
+    interval = _COINALYZE_INTERVAL.get(timeframe, "15min")
+    to_ts = int(time.time()) if end is None else int(pd.Timestamp(end).timestamp())
+    from_ts = (int(pd.Timestamp(start).timestamp()) if start is not None
+               else to_ts - int(limit * _TF_MIN.get(timeframe, 15) * 60))
+    try:
+        import requests
+        params = {"symbols": _coinalyze_symbol(symbol, exch), "interval": interval,
+                  "from": from_ts, "to": to_ts}
+        for _ in range(3):
+            r = requests.get(f"{_COINALYZE_BASE}/{path}", headers={"api_key": key},
+                             params=params, timeout=20)
+            if r.status_code == 429:
+                time.sleep(float(r.headers.get("Retry-After", 30)) + 1)
+                continue
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            return data[0]["history"] if (data and data[0].get("history")) else None
+    except Exception:
+        return None
+    return None
+
+
+def fetch_funding_rate(symbol: str = "BTC/USDT", timeframe: str = "15m", limit: int = 120,
+                       start=None, end=None, exch: str = "A") -> "pd.Series | None":
+    """Funding rate (Binance perp via Coinalyze), Series indexée ts UTC, ou None.
+    **Positif** = longs paient (longs majoritaires/crowded) ; **négatif** = shorts paient.
+    Sert à départager longs/shorts quand le prix cale et que l'OI seul est ambigu."""
+    h = _coinalyze_history("funding-rate-history", symbol, timeframe, limit, start, end, exch)
+    if not h:
+        return None
+    s = pd.Series({pd.to_datetime(x["t"], unit="s", utc=True): float(x["c"]) for x in h}).sort_index()
+    return s if len(s) else None
+
+
+def fetch_long_short_ratio(symbol: str = "BTC/USDT", timeframe: str = "15m", limit: int = 120,
+                           start=None, end=None, exch: str = "A") -> "pd.DataFrame | None":
+    """Ratio long/short (comptes, Binance via Coinalyze) → DataFrame [ratio, pct_long] indexé
+    ts UTC, ou None. **ratio↑** = comptes plus longs ; **ratio↓** = des shorts entrent. Tell
+    clé pour lever l'ambiguïté longs/shorts d'une hausse d'OI à prix plat."""
+    h = _coinalyze_history("long-short-ratio-history", symbol, timeframe, limit, start, end, exch)
+    if not h:
+        return None
+    rows = {pd.to_datetime(x["t"], unit="s", utc=True):
+            {"ratio": float(x["r"]), "pct_long": float(x["l"])} for x in h}
+    df = pd.DataFrame(rows).T.sort_index()
+    return df if len(df) else None
+
+
+def fetch_liquidations(symbol: str = "BTC/USDT", timeframe: str = "15m", limit: int = 120,
+                       start=None, end=None, exch: str = "A") -> "pd.DataFrame | None":
+    """Liquidations (USD, Binance via Coinalyze) → DataFrame [long_liq, short_liq] indexé ts
+    UTC, ou None. **long_liq** élevé = cascade de longs liquidés (chute) ; **short_liq** =
+    short squeeze. ≈0 = mouvement ordonné (pas de panique forcée)."""
+    h = _coinalyze_history("liquidation-history", symbol, timeframe, limit, start, end, exch)
+    if not h:
+        return None
+    rows = {pd.to_datetime(x["t"], unit="s", utc=True):
+            {"long_liq": float(x.get("l", 0)), "short_liq": float(x.get("s", 0))} for x in h}
+    df = pd.DataFrame(rows).T.sort_index()
+    return df if len(df) else None
+
+
 def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
                   start=None, end=None) -> "pd.Series | None":
     """Série (USD) de l'OI multi-venues, alignée sur l'union des horodatages.
