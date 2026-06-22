@@ -106,7 +106,11 @@ def plot_window_structure(
     if has_oi:
         oi_ohlc = oi_ohlc.copy()
         oi_ohlc.index = oi_ohlc.index + delta
-        oi_ohlc = (oi_ohlc[(oi_ohlc.index >= sub.index[0]) & (oi_ohlc.index <= sub.index[-1])] / 1e9)
+        oi_ohlc = oi_ohlc[(oi_ohlc.index >= sub.index[0]) & (oi_ohlc.index <= sub.index[-1])]
+        # Auto-échelle d'unité : OI USD (~1e9 = Md$) vs OI coin (~1e5 = k unités).
+        med = float(oi_ohlc["close"].median()) if len(oi_ohlc) else 0.0
+        oi_scale, oi_unit = (1e9, "Md$") if med > 1e6 else (1e3, "k (coin)")
+        oi_ohlc = oi_ohlc / oi_scale
         has_oi = len(oi_ohlc) > 0
 
     x = mdates.date2num(sub.index.to_pydatetime())
@@ -222,7 +226,7 @@ def plot_window_structure(
                                         facecolor=c, edgecolor=c, zorder=2))
         olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
         axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
-        axo.set_ylabel("OI agg. (Md$)"); axo.grid(True, alpha=0.2)
+        axo.set_ylabel(f"OI ({oi_unit})"); axo.grid(True, alpha=0.2)
         # Composition affichée. binance = Coinalyze (= TradingView) ; okx = venue unique ;
         # agg3 live signale si l'archive Binance est périmée (fix #2).
         label = {"binance": "OI Binance (Coinalyze, = TradingView)",
