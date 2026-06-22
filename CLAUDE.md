@@ -94,6 +94,13 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
   5m, l'offre y plafonne les rebonds) »). Jamais un chiffre nu : Gauthier veut savoir *pourquoi
   ce niveau* — quel événement Wyckoff, quelle borne, quel comportement volume/OI le définit.
+- **OI en COIN, jamais en USD, pour lire les positions.** L'OI en USD = OI_coin × prix
+  **conflate positions et prix** : une hausse de prix gonfle l'OI USD même quand les positions
+  *baissent* → faux signal *précisément quand le prix bouge* (ex. cassure BTC 64 800 : OI USD
+  +0.81 % « demande » alors que l'OI coin faisait −0.36 % = **short covering**). Toujours lire
+  la **direction** de l'OI en **coin** (`fetch_open_interest`/`_ohlc` défaut `usd=False`,
+  Coinalyze `convert_to_usd=false`) — c'est ce qu'affiche TradingView (« Intérêt ouvert » en
+  BTC). L'USD ne sert qu'à donner un ordre de grandeur de notional, jamais à lire un Δ.
 - **OI ambigu → croiser systématiquement 3 métriques tierces.** Prix+OI seuls sont
   **ambigus quand le prix cale** (OI↑ à prix plat = longs *ou* shorts qui ouvrent — impossible
   à trancher). Dans **toute lecture d'OI**, dès que le prix stagne / qu'une hausse d'OI doit

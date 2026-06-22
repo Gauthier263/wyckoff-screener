@@ -321,12 +321,15 @@ def _coinalyze_symbol(symbol: str, exch: str = "A") -> str:
 
 
 def fetch_coinalyze_oi(symbol: str = "BTC/USDT", timeframe: str = "5m", limit: int = 300,
-                       start=None, end=None, ohlc: bool = False, exch: str = "A"):
+                       start=None, end=None, ohlc: bool = False, exch: str = "A",
+                       usd: bool = False):
     """OI **Binance** (perp) via Coinalyze — la donnée qui colle à TradingView `BTCUSDT.P`.
 
-    Retourne, en USD indexé ts UTC : une Series (close) si `ohlc=False`, sinon un DataFrame
-    [open, high, low, close] (Coinalyze renvoie nativement des bougies d'OI). None si pas de
-    clé ou indisponible (l'appelant se replie alors sur OKX). Gère le 429 (Retry-After).
+    `usd=False` (défaut) → OI en **coin (BTC)**, la *bonne* mesure pour lire les changements
+    de positions (ouverture/fermeture). `usd=True` → OI en USD = coin×prix, qui **conflate
+    positions et prix** : trompeur dès que le prix bouge (une hausse de prix gonfle l'OI USD
+    même si les positions baissent). Retourne une Series (close) si `ohlc=False`, sinon un
+    DataFrame [open, high, low, close], indexé ts UTC. None si pas de clé. Gère le 429.
     """
     key = _coinalyze_key()
     if key is None:
@@ -344,7 +347,7 @@ def fetch_coinalyze_oi(symbol: str = "BTC/USDT", timeframe: str = "5m", limit: i
     try:
         import requests
         params = {"symbols": _coinalyze_symbol(symbol, exch), "interval": interval,
-                  "from": from_ts, "to": to_ts, "convert_to_usd": "true"}
+                  "from": from_ts, "to": to_ts, "convert_to_usd": "true" if usd else "false"}
         data = None
         for _ in range(3):
             r = requests.get(f"{_COINALYZE_BASE}/open-interest-history",
