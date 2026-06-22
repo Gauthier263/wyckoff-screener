@@ -88,7 +88,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
   des positions ?) ; (3) puis, **seulement quand nécessaire** (OI ambigu / prix qui cale), les
   **métriques tierces** (ratio long/short, funding, liquidations). Ne jamais sauter au tertiaire
-  avant d'avoir lu volume puis OI.
+  avant d'avoir lu volume puis OI. **Synthèse :** une fois l'ordre respecté, **lire OI coin +
+  tierces ensemble** comme un tout cohérent (en dégager un *sens commun*) plutôt que de les
+  lister séparément — ex. « prix↑ + OI coin↑ + shorts liquidés + funding contenu = vraie
+  demande qui squeeze les shorts ». Le volume reste traité en premier (force primaire).
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
@@ -120,6 +123,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
     commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
     est le plus pertinent pour la lecture.
+  - **Code couleur texte↔graphe** : préfixer les mots-clés du texte inline d'une **pastille
+    de couleur** assortie à la couleur de l'événement/niveau sur le graphe, pour un repérage
+    visuel immédiat. Palette fixe : 🟢 demande/force (SC, SOS, OI coin↑) · 🔴 offre/résistance
+    (BC, SOW, distribution) · 🟠 piège/faux signal (faux SOS, UTAD, upthrust) · 🔵 bornes de
+    plage / support / repli (LPS) · 🟣 spring / pivot / Phase C. Mêmes couleurs sur les
+    marqueurs du graphe et les pastilles du texte.
+  - **Alignement des étiquettes** (bug récurrent des scripts ad hoc) : les bougies sont
+    décalées +2h en gardant `tz=UTC` ; les timestamps d'événements doivent l'être *aussi*
+    (`pd.Timestamp('HH:MM', tz='UTC')` = heure CEST étiquetée UTC), JAMAIS `+02:00` (que
+    matplotlib reconvertit → étiquette 2 bougies trop à gauche). Vérifier l'alignement.
   - Toujours : panneau **volume avec moyenne (vol MA) + étiquettes d'événements** (nom +
     ×vol_ratio), et panneau **OI à la MÊME TF que le cours** (jamais une TF d'OI différente).
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
