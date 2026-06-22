@@ -101,6 +101,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   la **direction** de l'OI en **coin** (`fetch_open_interest`/`_ohlc` défaut `usd=False`,
   Coinalyze `convert_to_usd=false`) — c'est ce qu'affiche TradingView (« Intérêt ouvert » en
   BTC). L'USD ne sert qu'à donner un ordre de grandeur de notional, jamais à lire un Δ.
+  **En coin, le *signe* est fiable** → on prend en compte les **petits Δ** (pas de seuil de
+  bruit) en les pesant par leur **cohérence** : une dérive suivie sur plusieurs barres (ex.
+  −0.05/−0.07/−0.12 % = short covering réel) compte, une barre isolée minuscule moins.
 - **OI ambigu → croiser systématiquement 3 métriques tierces.** Prix+OI seuls sont
   **ambigus quand le prix cale** (OI↑ à prix plat = longs *ou* shorts qui ouvrent — impossible
   à trancher). Dans **toute lecture d'OI**, dès que le prix stagne / qu'une hausse d'OI doit
