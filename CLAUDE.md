@@ -117,6 +117,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
     dans le fil** (outil d'envoi de fichier) — Gauthier veut le voir sans cliquer.
   - **Bougies dans la MÊME TF que l'analyse** (analyse H4 → bougies H4, H1 → bougies H1).
+  - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
+    commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
+    est le plus pertinent pour la lecture.
   - Toujours : panneau **volume avec moyenne (vol MA) + étiquettes d'événements** (nom +
     ×vol_ratio), et panneau **OI à la MÊME TF que le cours** (jamais une TF d'OI différente).
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
