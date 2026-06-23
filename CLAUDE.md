@@ -83,6 +83,18 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
 - Heuristiques transparentes et ajustables, jamais de boîte noire.
 - Tout nouveau détecteur doit venir avec un test synthétique dans `tests/`.
+- **Classification Wyckoff = TOP-DOWN, jamais bottom-up.** Avant toute lecture de séquence,
+  établir le **contexte macro** (trend HTF Daily/H4, position de la plage) — c'est lui qui
+  décide accu-vs-distrib (une plage après baisse = accumulation *ou* redistribution). **Par
+  défaut, une plage dans un downtrend = redistribution** jusqu'à preuve du contraire (la
+  continuation prime sur le retournement). Conséquences : (1) tenir **les deux scénarios** en
+  parallèle jusqu'à la cassure de la plage ; (2) étiqueter les événements **conditionnellement**
+  (« test de résistance = SOS *ou* UTAD selon tenue ») et non fermement avant que le schéma soit
+  confirmé ; (3) un **breakout n'est un SOS qu'après tenue + back-up (LPS)** au-dessus — sinon
+  c'est une *tentative* (possible upthrust) ; (4) lire l'**OI à travers le cadre + le lieu**
+  (OI↑ à la résistance dans un downtrend = demande qui se fait *piéger*, pas signal haussier) ;
+  (5) **re-questionner le cadre** dès que le prix fait l'inattendu (un aller-retour = signal de
+  réévaluation). Ne jamais *présumer* l'accumulation : il faut la *gagner*.
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
