@@ -95,6 +95,18 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   (OI↑ à la résistance dans un downtrend = demande qui se fait *piéger*, pas signal haussier) ;
   (5) **re-questionner le cadre** dès que le prix fait l'inattendu (un aller-retour = signal de
   réévaluation). Ne jamais *présumer* l'accumulation : il faut la *gagner*.
+- **Wyckoff est FRACTAL — séparer les échelles.** Chaque TF a son **schéma complet** : une
+  consolidation locale (ex. H1) est une **structure entière** (BC/AR/ST/UTAD/SOW propres) qui,
+  sur la TF supérieure (H4/D1), n'est qu'**un seul événement** (ex. un test de Phase B). La
+  **même bougie** peut donc être un **BC local** (cadre H1) *et* un **test de Phase B macro**
+  (cadre H4) — les deux sont vrais. Règles : (1) **déclarer la TF/structure** avant d'étiqueter ;
+  (2) étiqueter **relativement à la plage de CETTE structure** (un BC/UTAD local ≠ ceux de la
+  macro ; un BC n'est pas forcément le plus-haut absolu, juste le climax de l'avance *analysée*) ;
+  (3) un **UTAD peut dépasser le BC** (plus-haut marginal pour piéger — normal) ; (4) **quand
+  Gauthier fixe une TF + fenêtre, analyser à CETTE échelle d'abord**, la TF supérieure servant de
+  *contexte/biais* sans écraser les étiquettes locales ; (5) **cartographier l'emboîtement**
+  (la structure locale exécute une sous-phase de la supérieure) ; la **confluence** local↔macro
+  donne le signal le plus fort. Ne pas plaquer les étiquettes macro sur une analyse locale.
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
