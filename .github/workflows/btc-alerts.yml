@@ -5,9 +5,11 @@ name: Crypto take-profit alerts
 # précoce (SUPPLY / divergence OI). Niveaux par actif dans la matrice ci-dessous.
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"      # toutes les 15 min (aligné sur les bougies 15m)
-  workflow_dispatch:            # bouton « Run workflow » pour tester à la main
+  # Cron désactivé (Gauthier a coupé les notifications Telegram le 23/06).
+  # Pour réactiver : décommenter la ligne schedule ci-dessous.
+  # schedule:
+  #   - cron: "*/15 * * * *"      # toutes les 15 min (aligné sur les bougies 15m)
+  workflow_dispatch:            # bouton « Run workflow » pour relancer/tester à la main
     inputs:
       test:
         description: "Envoyer un message de TEST Telegram (true) au lieu d'un vrai check"
