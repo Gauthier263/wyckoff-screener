@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>États du cours — régimes de marché & order blocks (Wyckoff)</title>
+<style>
+  :root{
+    --vert:#1b6b1b; --rouge:#a11; --orange:#c97a0a; --bleu:#1f5fbf;
+    --violet:#7a3ea1; --gris:#777; --rougef:#7a1010;
+    --bg:#fff; --ink:#1d1d1f; --muted:#666; --line:#e2e2e2;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       margin:0;padding:28px 22px 60px;color:var(--ink);background:var(--bg);line-height:1.5}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:1.55em;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 6px;font-size:.92em}
+  .lede{background:#f6f8fa;border:1px solid var(--line);border-left:4px solid var(--bleu);
+        border-radius:8px;padding:12px 16px;margin:16px 0 24px;font-size:.93em}
+  h2{font-size:1.18em;margin:34px 0 10px;padding-bottom:5px;border-bottom:2px solid var(--line)}
+  /* pastilles */
+  .dot{display:inline-block;width:.72em;height:.72em;border-radius:50%;margin-right:.32em;vertical-align:baseline}
+  .sq{display:inline-block;width:.66em;height:.66em;border-radius:2px;margin-right:.32em;vertical-align:baseline}
+  .c-vert{background:var(--vert)} .c-rouge{background:var(--rouge)} .c-orange{background:var(--orange)}
+  .c-bleu{background:var(--bleu)} .c-violet{background:var(--violet)} .c-gris{background:var(--gris)}
+  .c-rougef{background:var(--rougef)}
+  /* table de synthèse */
+  table{border-collapse:collapse;width:100%;font-size:.82em;margin:8px 0 4px}
+  th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:#f4f4f4;font-weight:600;position:sticky;top:0}
+  td.st{white-space:nowrap;font-weight:700}
+  td.st small{display:block;font-weight:400;color:var(--muted);font-size:.82em;white-space:normal}
+  .ob-no{color:var(--rouge);font-weight:700}
+  .ob-yes{color:var(--vert);font-weight:700}
+  .ob-warn{color:var(--orange);font-weight:700}
+  .on{color:var(--vert);font-weight:700}
+  .off{color:var(--rouge);font-weight:700}
+  /* fiches */
+  .card{border:1px solid var(--line);border-radius:10px;padding:0;margin:18px 0;overflow:hidden}
+  .card>header{padding:12px 16px;color:#fff;font-weight:700;font-size:1.05em;display:flex;
+               justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+  .card>header .ph{font-weight:400;font-size:.78em;opacity:.92}
+  .card .grid{display:grid;grid-template-columns:170px 1fr;gap:0}
+  .card .grid>div{padding:9px 14px;border-top:1px solid var(--line)}
+  .card .grid>.k{background:#fafafa;font-weight:600;color:#333;font-size:.84em}
+  .card .grid>.v{font-size:.9em}
+  .card .grid>.v ul{margin:4px 0 4px 0;padding-left:18px}
+  .card .grid>.v li{margin:2px 0}
+  code{background:#f0f2f5;border-radius:4px;padding:.5px 5px;font-size:.85em;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .tag{display:inline-block;background:#eef5ff;color:#234;border:1px solid #cfe0fb;
+       border-radius:5px;padding:1px 7px;font-size:.82em;margin:2px 3px 2px 0;
+       font-family:ui-monospace,Menlo,Consolas,monospace}
+  .gate{font-weight:600}
+  .legend{margin-top:26px;font-size:.85em;color:#555;background:#fafafa;border:1px solid var(--line);
+          border-radius:8px;padding:12px 16px}
+  .legend b{color:#222}
+  .foot{margin-top:22px;font-size:.82em;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>États du cours — régimes de marché &amp; respect des order blocks</h1>
+<p class="sub">Mémo d'identification — Wyckoff top-down · ordre de lecture VSA <b>volume → OI → tierces</b> · objectif : tagguer l'état, passer <span class="on">ON</span> uniquement en équilibre opéré, sinon rester <span class="off">OFF</span> pour protéger le capital.</p>
+
+<div class="lede">
+<b>Principe directeur.</b> Un order block (zone MM) n'est respecté <b>que si un opérateur composite a une raison de défendre ce niveau</b> — il a de l'inventaire à remplir/écouler et travaille le prix <b>en équilibre</b> (plage = Phase B/C/D). Dès que cette condition disparaît (flux unidirectionnel, panique, repricing, carnet vide, bruit), <b>le prix traverse les OB sans s'arrêter</b>. Repérer le non-respect = repérer qu'on n'est <b>plus dans un régime d'équilibre opéré</b>. Il n'existe <b>qu'un seul état réellement tradable</b> ; tout le reste = OFF ou réduit.
+</div>
+
+<!-- ============ TABLE DE SYNTHÈSE ============ -->
+<h2>Tableau de synthèse</h2>
+<table>
+<thead>
+<tr>
+  <th style="width:140px">État</th>
+  <th style="width:150px">Acteur dominant</th>
+  <th style="width:160px">Objectif</th>
+  <th style="width:90px">OB respectés ?</th>
+  <th>Comportement typique (cours · bougies · indicateurs)</th>
+  <th style="width:64px">Toi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td class="st"><span class="sq c-bleu"></span>Plage opérée<small>Accu/Distrib · Phase B-C-D · <i>équilibre</i></small></td>
+  <td>Opérateur composite (MM)</td>
+  <td>Remplir / écouler en absorbant, sans bouger le prix</td>
+  <td class="ob-yes">✅ Oui<br><small>leur outil</small></td>
+  <td>Cours latéral entre 2 bornes nettes, swings qui se chevauchent. Bougies équilibrées, mèches aux bornes (rejets), peu de suite. Volume qui <b>sèche</b> vers le milieu, pics aux bornes. ATR stable/comprimé. OI sans dérive franche. Les niveaux <b>tiennent</b> et se re-testent.</td>
+  <td class="on">ON</td>
+</tr>
+<tr>
+  <td class="st"><span class="dot c-vert"></span>Markup<br><span class="dot c-rouge"></span>Markdown<small>Phase E · tendance impulsive</small></td>
+  <td>Trend-followers, CTA, momentum</td>
+  <td>Courir la tendance (continuation)</td>
+  <td class="ob-no">❌ Non<br><small>OB contraire balayés</small></td>
+  <td>Suite de plus-hauts/plus-bas (HH-HL ou LH-LL), pullbacks <b>peu profonds</b>. Bougies <b>directionnelles</b>, larges, clôtures au bout (CLV extrême), peu de mèches contraires. Volume soutenu dans le sens. ATR en hausse. OI coin ↑ <b>avec</b> le prix (argent neuf). EMA en éventail, pente forte.</td>
+  <td class="off">OFF*</td>
+</tr>
+<tr>
+  <td class="st"><span class="dot c-orange"></span>Climax<small>SC/BC · Phase A · capitulation/euphorie</small></td>
+  <td>Retail capitulant + liquidations</td>
+  <td>Transfert de panique/euphorie aux mains fortes</td>
+  <td class="ob-no">❌ Non<br><small>aucun niveau ne tient</small></td>
+  <td>Accélération parabolique puis <b>1 barre géante</b> à contre-clôture (rejet). Mèche énorme. Volume <b>record</b> (≥ ×climax_vol), spread très large (≥ 2-3 ATR). OI ↑ puis <b>purge</b> brutale (liquidations). Gaps, slippage. Tout OB sur le chemin est avalé.</td>
+  <td class="off">OFF</td>
+</tr>
+<tr>
+  <td class="st"><span class="dot c-orange"></span>Expansion volatilité / news<small>hors cycle · repricing</small></td>
+  <td>Tout le monde (repricing)</td>
+  <td>Trouver une <i>nouvelle</i> valeur d'équilibre</td>
+  <td class="ob-no">❌ Non<br><small>OB vaporisés</small></td>
+  <td>Saut soudain (CPI/FOMC/listing/hack). <b>Plusieurs</b> bougies larges d'affilée (≠ climax isolé), va-et-vient violent. ATR qui double. Spread_atr élevé en série. Spreads bid/ask qui s'écartent, liquidité fantôme. Niveaux pré-news invalidés.</td>
+  <td class="off">OFF</td>
+</tr>
+<tr>
+  <td class="st"><span class="sq c-gris"></span>Vide de liquidité / drift<small>week-end · nuit · fériés</small></td>
+  <td>Personne (carnet fin)</td>
+  <td>Aucun — simple dérive</td>
+  <td class="ob-warn">⚠️ Trompeur<br><small>faux respect &amp; fausses cassures</small></td>
+  <td>Dérive lente ou micro-cassures sur <b>rien</b>. Bougies étroites, parfois 1 mèche absurde (un seul ordre balaie le carnet). Volume <b>très bas</b> et soutenu (vol_ratio ≪ 1). ATR faible mais cassures « gratuites ». Contexte <b>horaire</b> clé (samedi/dimanche, 0h-6h CEST).</td>
+  <td class="off">OFF</td>
+</tr>
+<tr>
+  <td class="st"><span class="sq c-gris"></span>Chop / bruit<small>sans structure dominante</small></td>
+  <td>Aucun opérateur net</td>
+  <td>Bruit (pas d'objectif directeur)</td>
+  <td class="ob-warn">⚠️ Whipsaw<br><small>faux signaux</small></td>
+  <td>Allers-retours sans suite, pas de borne fiable. Bougies alternées, CLV qui zigzague, <b>pas de follow-through</b>. Swings qui se contredisent (pivots hauts/bas qui s'annulent). Volume médiocre et erratique. Indicateurs qui « hésitent » (croisements répétés).</td>
+  <td class="off">OFF</td>
+</tr>
+<tr>
+  <td class="st"><span class="dot c-rougef"></span>Cascade de liquidation / déleveraging<small>hors cycle · flux forcé</small></td>
+  <td>Vendeurs/acheteurs <b>forcés</b></td>
+  <td>Liquidation forcée (deleverage)</td>
+  <td class="ob-no">❌ Non<br><small>OI s'effondre</small></td>
+  <td>Chute (ou squeeze) en escalier vertical, mèches de wick-hunt. Bougies pleines à clôture au bout, peu de rebond. Volume en pic. <b>OI coin qui s'effondre</b> (positions fermées de force). Liquidations très déséquilibrées (long_liq ≫ short_liq ou l'inverse). Funding qui claque.</td>
+  <td class="off">OFF</td>
+</tr>
+</tbody>
+</table>
+<p class="foot">* <span class="off">OFF</span> pour ta stratégie d'OB/zones (on ne <i>fade</i> pas une tendance) ; une tendance peut se trader <i>dans son sens</i>, mais ce n'est plus du jeu d'order block en équilibre.</p>
+
+<!-- ============ FICHES DÉTAILLÉES ============ -->
+<h2>Fiches d'identification détaillées</h2>
+
+<!-- 1 -->
+<div class="card">
+  <header style="background:var(--bleu)"><span>① Plage opérée par le MM — <i>l'état tradable</i></span><span class="ph">Accu / Distrib · Phase B-C-D · équilibre</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Opérateur composite (« smart money »). Il <b>absorbe</b> le flux opposé pour constituer (accu) ou liquider (distrib) une position <b>sans déplacer le prix</b> — d'où la latéralisation. C'est le seul moment où défendre un niveau a un sens économique pour lui → les OB tiennent.</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Oscillation entre <span class="sq c-bleu"></span><b>support</b> et <span class="sq c-bleu"></span><b>résistance</b> nettes, plusieurs touches de chaque borne.</li>
+      <li>Swings qui <b>se chevauchent</b> (pas de série HH-HL franche). Excursions hors borne <b>rejetées</b> et ramenées dans la plage (spring/UTAD = Phase C).</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Corps modérés, <b>mèches aux bornes</b> (rejet d'absorption), clôtures revenant vers le milieu. Pas de série de grandes bougies du même côté.</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v">Volume qui <b>sèche</b> dans le ventre de la plage, pics aux climax/tests des bornes. Spread comprimé (<code>spread_atr</code> &lt; <code>wide_spread_atr</code>). Effort ↗ sans résultat = absorption.</div>
+    <div class="k">OI + tierces</div><div class="v">OI coin sans dérive soutenue. AR/ST = OI <b>en repli</b> (débouclage). Spring = OI ↑ sur la mèche puis ↓ (shorts piégés). Tierces consultées seulement si le prix cale.</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">tr.is_valid == True</span><span class="tag">height_atr ≤ max_height_atr</span><span class="tag">touch_hi & touch_lo ≥ min_touches</span><span class="tag">médiane(vol_ratio) ≈ 1</span><span class="tag">médiane(spread_atr) &lt; wide_spread_atr</span><span class="tag">|ΣOI| faible</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="on">ON</span> — chercher les events Wyckoff, jouer les bornes / OB (springs, ST, LPS), stop derrière la borne défendue.</div>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="card">
+  <header style="background:linear-gradient(90deg,var(--vert),var(--rouge))"><span>② Markup / Markdown impulsif</span><span class="ph">Phase E · tendance</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Trend-followers, CTA, momentum, FOMO. Personne ne défend un niveau intermédiaire : l'objectif est la <b>continuation</b>. Les OB du sens contraire sont « mitigés » en une bougie puis traversés.</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Série de <span class="dot c-vert"></span><b>HH-HL</b> (markup) ou <span class="dot c-rouge"></span><b>LH-LL</b> (markdown).</li>
+      <li>Pullbacks <b>peu profonds</b> et brefs ; les retours dans un OB ne tiennent pas, le prix repart.</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Grandes bougies <b>directionnelles</b>, clôtures au bout (CLV ≈ 1 en hausse / ≈ 0 en baisse), <b>peu de mèches contraires</b>. Bougies de respiration courtes entre les poussées.</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v">Volume <b>soutenu dans le sens</b> de la tendance, faiblissant dans les pullbacks (= sain). <code>spread_atr</code> &gt; 1 régulièrement, <b>ATR qui monte</b>.</div>
+    <div class="k">OI + tierces</div><div class="v">OI coin ↑ <b>avec</b> le prix = argent neuf (vraie tendance). OI ↓ pendant la hausse = short-covering (rallye plus fragile). Funding qui s'étire dans le sens du trend.</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">tr.is_valid == False (height_atr &gt; max)</span><span class="tag">Σret(N) ≫ 0 ou ≪ 0</span><span class="tag">suite de CLV biaisés (&gt;.6 ou &lt;.4)</span><span class="tag">pente EMA forte</span><span class="tag">ATR_t/ATR_t-k &gt; 1</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="off">OFF</span> pour le jeu d'OB (ne <b>jamais</b> fader la tendance). Au mieux, suivre <i>dans le sens</i> sur pullback — mais ce n'est plus de l'équilibre.</div>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="card">
+  <header style="background:var(--orange)"><span>③ Climax (Selling / Buying Climax)</span><span class="ph">Phase A · capitulation / euphorie</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Retail en capitulation (SC) ou euphorie (BC) + moteur de <b>liquidations</b>. Les mains fortes absorbent le panic. Objectif : transfert maximal en un point. Aucun niveau intermédiaire n'est défendu pendant le mouvement.</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Accélération <b>parabolique</b> puis <span class="dot c-orange"></span>barre de retournement géante (rejet).</li>
+      <li>Souvent juste <b>après</b> une cassure d'OB/de range → le climax avale les niveaux.</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Une bougie <b>énorme</b> à <b>mèche démesurée</b> et clôture de rejet (CLV haut sur SC, bas sur BC). Possibles <b>gaps</b> et slippage.</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v">Volume <b>record</b> de la fenêtre (<code>vol_ratio ≥ climax_vol</code>), <code>spread_atr</code> très élevé (souvent ≥ 2-3). C'est le pic d'« effort ».</div>
+    <div class="k">OI + tierces</div><div class="v">OI ↑ puis <b>purge</b> brutale (positions liquidées). <code>fetch_liquidations</code> en pic massif d'un côté. Funding qui claque puis se normalise.</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">vol_ratio ≥ climax_vol</span><span class="tag">spread_atr ≥ ~2</span><span class="tag">|ret| barre &gt;&gt; ret moyen</span><span class="tag">ΔOI brutal (↑ puis ↓)</span><span class="tag">liq pic</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="off">OFF</span> pendant le climax. Il <b>pose</b> une borne (futur support/résistance) → attendre l'<b>AR</b> puis l'<b>ST</b> : on ne revient ON qu'une fois la plage posée (état ①).</div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="card">
+  <header style="background:var(--orange)"><span>④ Expansion de volatilité / news</span><span class="ph">hors cycle · repricing</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Tous les participants en même temps, sur une info nouvelle (CPI, FOMC, listing, hack, déblocage). Objectif collectif : <b>repricer</b> vers une nouvelle valeur. Les niveaux d'avant l'info n'ont plus de mémoire → OB vaporisés.</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Saut soudain + <b>va-et-vient violent</b> autour de la nouvelle zone.</li>
+      <li><b>Plusieurs</b> bougies larges d'affilée (≠ climax = une seule).</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Grandes bougies <b>dans les deux sens</b>, longues mèches des deux côtés, clôtures instables. Peu de structure exploitable en intrabar.</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v"><b>ATR qui double</b> rapidement, <code>spread_atr</code> élevé <b>en série</b> (pas isolé). Carnet qui s'écarte (spreads bid/ask larges), liquidité fantôme.</div>
+    <div class="k">OI + tierces</div><div class="v">OI peut bondir <b>et</b> chuter (repositionnement chaotique) → peu lisible. Funding et liq erratiques. C'est le cas où même les tierces sont bruitées : ne rien conclure.</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">ATR_t / ATR_t-k ≥ ~1.8</span><span class="tag">spread_atr élevé sur ≥3 barres</span><span class="tag">CLV alterné fort</span><span class="tag">(filtre calendrier macro)</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="off">OFF</span> — attendre que l'ATR <b>retombe</b> et qu'une nouvelle plage se forme. Idéalement, fermer/réduire <b>avant</b> les news connues.</div>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="card">
+  <header style="background:var(--gris)"><span>⑤ Vide de liquidité / drift</span><span class="ph">week-end · nuit · fériés</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Quasi personne — carnet fin. Pas d'objectif directeur : le prix <b>dérive</b> et un seul ordre peut balayer plusieurs niveaux. Le « respect » d'un OB y est un <b>artefact</b> (et la cassure aussi).</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Dérive lente, ou <b>micro-cassures sur rien</b> qui ne suivent pas.</li>
+      <li>Mèche absurde isolée (sweep de liquidité dans un carnet vide).</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Bougies <b>étroites</b>, corps minuscules, ponctuées d'1 wick disproportionnée. Pas d'enchaînement cohérent.</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v">Volume <b>très bas et soutenu</b> (<code>vol_ratio ≪ 1</code>, ex. &lt; 0.5). ATR faible — mais les cassures « gratuites » trompent.</div>
+    <div class="k">OI + tierces</div><div class="v">OI quasi plat, tierces non significatives (volumes trop faibles pour faire foi).</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">vol_ratio &lt; ~0.5 soutenu</span><span class="tag">spread_atr faible</span><span class="tag">filtre horaire (sam/dim, 00h-06h CEST)</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="off">OFF</span> — ne jamais valider un OB sur un volume famélique. Attendre le retour des sessions liquides (Londres/NY).</div>
+  </div>
+</div>
+
+<!-- 6 -->
+<div class="card">
+  <header style="background:var(--gris)"><span>⑥ Chop / bruit sans structure</span><span class="ph">aucune main directrice</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Aucun opérateur net ne domine. Ni accumulation, ni distribution organisée, ni tendance : du <b>bruit</b>. À distinguer de l'état ① : ici <b>pas de bornes fiables</b> ni de touches répétées propres.</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Allers-retours <b>sans follow-through</b>, pivots qui s'annulent.</li>
+      <li>Pas de support/résistance qui se confirme par re-test propre.</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Bougies <b>alternées</b>, CLV qui zigzague, beaucoup de bougies à corps réduit / dojis. Chaque poussée est aussitôt rendue.</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v">Volume médiocre et <b>erratique</b>, spread faible. Effort sans direction. <code>swing_points</code> hauts et bas se contredisent.</div>
+    <div class="k">OI + tierces</div><div class="v">OI sans tendance, tierces peu informatives.</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">tr.is_valid == False (faute de touches)</span><span class="tag">spread_atr faible</span><span class="tag">Σret(N) ≈ 0</span><span class="tag">CLV alterné</span><span class="tag">swing_high/low contradictoires</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="off">OFF</span> — c'est le tueur de capital par mille coupures (whipsaw). Attendre qu'une <b>vraie</b> plage (①) ou tendance (②) émerge.</div>
+  </div>
+</div>
+
+<!-- 7 -->
+<div class="card">
+  <header style="background:var(--rougef)"><span>⑦ Cascade de liquidation / déleveraging</span><span class="ph">hors cycle · flux forcé</span></header>
+  <div class="grid">
+    <div class="k">Acteur &amp; objectif</div><div class="v">Vendeurs (ou acheteurs) <b>forcés</b> par le moteur de liquidation et le deleverage. Objectif : <b>se débarrasser</b> du risque, à n'importe quel prix. Aucun niveau n'est respecté tant que les positions ne sont pas purgées.</div>
+    <div class="k">Comportement du cours</div><div class="v"><ul>
+      <li>Mouvement en <b>escalier vertical</b> (chute ou squeeze), wick-hunt des liquidations.</li>
+      <li>Les OB sont traversés <b>en accéléré</b> (chaque niveau déclenche le suivant).</li>
+    </ul></div>
+    <div class="k">Bougies</div><div class="v">Bougies <b>pleines</b> à clôture au bout, peu de rebond, mèches de chasse de stops. Souvent une bougie de capitulation finale (≈ climax).</div>
+    <div class="k">Volume / spread (VSA)</div><div class="v">Pics de volume, <code>spread_atr</code> élevé. L'« effort » est massif et <b>unidirectionnel</b>.</div>
+    <div class="k">OI + tierces</div><div class="v"><b>OI coin qui s'effondre</b> (positions fermées de force) = la signature clé qui distingue d'un markdown « sain » (OI↑). <code>fetch_liquidations</code> très déséquilibré ; funding qui claque puis se détend.</div>
+    <div class="k">Signature taggable</div><div class="v"><span class="tag">spread_atr élevé directionnel</span><span class="tag">ΔOI coin très négatif</span><span class="tag">liq long≫short (ou inverse)</span><span class="tag">funding extrême</span></div>
+    <div class="k gate">Décision</div><div class="v"><span class="off">OFF</span> — ne pas attraper le couteau. Attendre la <b>fin</b> de la purge (OI qui se stabilise, liq qui retombent) → souvent un climax (③) qui posera une future plage (①).</div>
+  </div>
+</div>
+
+<!-- ============ GATE ============ -->
+<h2>Le gate ON / OFF (résumé décisionnel)</h2>
+<div class="legend">
+<b>OFF par défaut</b> — on ne <i>présume</i> jamais l'équilibre, on le <i>gagne</i> (cf. top-down).<br><br>
+On passe <span class="on">ON</span> <b>uniquement si TOUTES</b> ces conditions sont vraies (état ①) :
+<ol style="margin:6px 0 6px 0">
+  <li><code>tr.is_valid == True</code> (plage avec bornes touchées plusieurs fois, <code>height_atr</code> borné) ;</li>
+  <li><b>pas</b> de climax récent (aucune barre <code>vol_ratio ≥ climax_vol</code> &amp; <code>spread_atr</code> très élevé dans la fenêtre proche) ;</li>
+  <li>ATR <b>stable</b> (pas d'expansion : <code>ATR_t/ATR_t-k</code> proche de 1) ;</li>
+  <li>volume <b>non famélique</b> (pas de vide de liquidité) et hors créneau horaire mort ;</li>
+  <li>OI coin <b>sans dérive violente</b> (pas de cascade de liquidation en cours).</li>
+</ol>
+Si <b>un seul</b> état ②→⑦ est tagué → <span class="off">OFF</span>, même si un OB « parfait » est présent : dans ces régimes, l'OB est un <span class="dot c-orange"></span><b>piège</b>, pas un support.
+</div>
+
+<p class="foot">Palette (couleur = sens, cf. CLAUDE.md) : <span class="dot c-vert"></span>demande/force · <span class="dot c-rouge"></span>offre/baisse · <span class="dot c-orange"></span>piège/faux signal · <span class="sq c-bleu"></span>bornes de plage/équilibre · <span class="dot c-violet"></span>spring/Phase C · <span class="sq c-gris"></span>liquidité/bruit · <span class="dot c-rougef"></span>flux forcé. — Mémo d'apprentissage, à compléter / ajuster avant implémentation d'un <code>regime.py</code>.</p>
+
+</div>
+</body>
+</html>
