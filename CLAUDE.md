@@ -175,6 +175,24 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **liquidations** (`fetch_liquidations` — long_liq vs short_liq ; ≈0 = mouvement ordonné, pas
   de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
   prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
+- **CVD (Cumulative Volume Delta) — tierce d'ABSORPTION, lue en première parmi les tierces.**
+  Le CVD = somme cumulée du delta (acheteurs agressifs − vendeurs agressifs), où le delta par
+  barre = `taker_buy − taker_sell` (taker_buy = col 9 des klines Binance `publicGetKlines`,
+  taker_sell = volume total − taker_buy). C'est du **flux d'ordres agressifs** → la tierce la
+  plus proche du volume primaire, donc **traitée en tête des tierces** (avant funding/L-S/liq).
+  **Job unique : détecter l'absorption via la divergence prix↔CVD** :
+  · **prix↑ + CVD plat/↓** = hausse sans demande agressive (passive/covering) → **offre absorbe
+    la demande = signe de distribution / faiblesse** ;
+  · **prix↓ + CVD plat/↑** (ou grosse vente agressive mais prix qui tient/récupère) = **demande
+    absorbe l'offre = signe d'accumulation / absorption au plancher** ;
+  · **prix et CVD en phase** = mouvement « honnête », **pas d'absorption, signal non concluant**.
+  Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une thèse, **ou rien
+  d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp
+  `fapi` 451-bloqué) = proxy du flux ; une divergence **CVD spot vs OI perp** est elle-même
+  lisible (spot achète / perp déboucle). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD
+  +1 023 (rallye sans demande agressive → confirme distribution) ; barre SC 58 115 = vente
+  agressive (delta −1 822) mais prix qui récupère (absorption au plancher → affaiblit la
+  continuation baissière).
 - **Illustration d'une analyse** (préférences Gauthier) :
   - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
     distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
@@ -281,13 +299,27 @@ La colonne "Volume + OI = sens" dit la signature théorique attendue (ex. AR : O
 attendu = débouclage) + ce qu'on observe + interprétation (covering / nouveaux longs /
 nouveaux shorts / liq forcée).
 
-**Confirmation tierce — synthèse en sens commun** (après le tableau, quand OI ambigu ou
-quand les métriques tierces ont été consultées) :
-Ne pas lister les métriques séparément. Les lire ensemble pour en dégager un sens unique en
-une ou deux phrases : ex. « Liquidations nulles des deux côtés + funding négatif + crowd 68%
-long = le rebond est du covering volontaire, pas un squeeze forcé — les longs encombrés sont
-la fragilité dominante ». Les tierces confirment ou infirment ce que le tableau a établi ;
-elles ne s'y substituent pas.
+Le **CVD** ne va PAS dans le tableau événement (c'est une tierce) : il est lu après, en
+section "Confirmation tierce" (1. CVD/absorption), pour confirmer/affaiblir les lignes ci-dessus.
+
+**Confirmation tierce — deux lectures froides** (après le tableau, quand OI ambigu ou quand
+les tierces ont été consultées). Vient *en second temps* valider / affaiblir / renforcer les
+hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
+
+1. **CVD / absorption** (flux d'ordres agressifs, lu en premier car le plus proche du volume) :
+   chercher une **divergence prix↔CVD** = signe d'absorption. prix↑ + CVD plat/↓ = hausse sans
+   demande agressive → distribution/faiblesse ; prix↓ + CVD plat/↑ (ou vente agressive mais prix
+   qui tient) = demande absorbe l'offre → accumulation/absorption au plancher ; prix et CVD en
+   phase = pas d'absorption, **non concluant**. Dire explicitement lequel des 4 cas (confirme
+   distrib / confirme accu / affaiblit / rien d'exploitable). CVD = spot (proxy).
+
+2. **Positionnement — synthèse en sens commun** (funding, ratio L/S, liquidations) :
+   ne pas lister séparément. Les lire ensemble pour un sens unique en une ou deux phrases : ex.
+   « Liquidations nulles des deux côtés + funding négatif + crowd 68% long = rebond en covering
+   volontaire, pas un squeeze forcé — longs encombrés = fragilité dominante ».
+
+Les tierces confirment ou infirment ce que le tableau a établi ; elles ne s'y substituent pas,
+et se lisent **à froid** (cf. interdits : ne jamais tordre une tierce pour forcer le consensus).
 **Lecture froide, pas de biais de confirmation** : l'objectif n'est PAS de faire converger les
 tierces vers la thèse. Trois cas à traiter honnêtement : (a) elles **confirment** → on renforce ;
 (b) elles **affaiblissent** → relater le risque (« la thèse tient mais X la fragilise ») ;
