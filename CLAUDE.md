@@ -140,9 +140,13 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
   prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
 - **Illustration d'une analyse** (préférences Gauthier) :
-  - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
-    lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
-    dans le fil** (outil d'envoi de fichier) — Gauthier veut le voir sans cliquer.
+  - **Affichage GRAND inline = via l'outil Read sur le PNG.** En session distante/web, c'est
+    l'**ouverture du PNG avec Read** (la « visualisation pour vérifier le rendu ») qui
+    l'affiche **en grand directement dans le fil**. `SendUserFile` ne le livre qu'en
+    **pièce jointe plus petite** (téléchargeable). Donc, pour CHAQUE graphe : (1) **Read le
+    PNG** → grand rendu inline que Gauthier voit sans cliquer ; (2) **SendUserFile** le même
+    PNG → version téléchargeable. Les deux, systématiquement. Ne pas se contenter de
+    SendUserFile (sinon le graphe reste petit). Pas de lien cliquable `[texte](...)`.
   - **Bougies dans la MÊME TF que l'analyse** (analyse H4 → bougies H4, H1 → bougies H1).
   - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
     commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
