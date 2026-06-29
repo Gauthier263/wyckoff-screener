@@ -146,6 +146,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   tierces ensemble** comme un tout cohérent (en dégager un *sens commun*) plutôt que de les
   lister séparément — ex. « prix↑ + OI coin↑ + shorts liquidés + funding contenu = vraie
   demande qui squeeze les shorts ». Le volume reste traité en premier (force primaire).
+  **Lecture FROIDE, jamais orientée vers la thèse** : le « sens commun » n'est pas un outil
+  pour *valider* ce qu'on veut voir. Si les tierces **contredisent ou affaiblissent** la thèse
+  établie par volume+OI, le **relater explicitement** comme **risque / invalidation partielle**
+  (ex. « le tableau penche distribution, MAIS funding négatif + crowd déjà short = carburant
+  haussier latent, la thèse est fragilisée »). Ne jamais tordre les tierces pour forcer le
+  consensus : une divergence tierce **est** un signal, pas un bruit à gommer.
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
@@ -282,6 +288,11 @@ une ou deux phrases : ex. « Liquidations nulles des deux côtés + funding nég
 long = le rebond est du covering volontaire, pas un squeeze forcé — les longs encombrés sont
 la fragilité dominante ». Les tierces confirment ou infirment ce que le tableau a établi ;
 elles ne s'y substituent pas.
+**Lecture froide, pas de biais de confirmation** : l'objectif n'est PAS de faire converger les
+tierces vers la thèse. Trois cas à traiter honnêtement : (a) elles **confirment** → on renforce ;
+(b) elles **affaiblissent** → relater le risque (« la thèse tient mais X la fragilise ») ;
+(c) elles **contredisent** → relater l'**invalidation possible** depuis l'angle tierce, et
+réévaluer. Forcer le consensus = faute. Une tierce divergente est un signal à part entière.
 
 Chaque ligne = un seul événement, lecture factuelle et concise.
 
@@ -319,6 +330,9 @@ pour vérifier les seuils vol× qui distinguent un vrai SOS d'un covering »).
   non validé" doit être explicite
 - Lister les métriques tierces en bullets séparés : elles se lisent ensemble
   pour produire un sens commun en une phrase synthèse
+- Tordre les tierces pour forcer le consensus de la thèse : si elles affaiblissent
+  ou contredisent, relater le risque / l'invalidation (lecture froide, pas de
+  biais de confirmation)
 
 ## Commandes
 ```bash
