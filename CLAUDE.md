@@ -156,6 +156,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     matplotlib reconvertit → étiquette 2 bougies trop à gauche). Vérifier l'alignement.
   - Toujours : panneau **volume avec moyenne (vol MA) + étiquettes d'événements** (nom +
     ×vol_ratio), et panneau **OI à la MÊME TF que le cours** (jamais une TF d'OI différente).
+  - **Panneau OI = BOUGIES OHLC, jamais une ligne.** L'OI se trace en **chandeliers de la
+    MÊME TF que le cours** (vert = OI↑ sur la barre, rouge = OI↓), comme `plot.py`. Source
+    `fetch_open_interest_ohlc` (défaut coin, `usd=False`). Pour la profondeur historique
+    (archive Binance en USD), **construire les bougies d'OI en coin** (O/H/L/C de l'OI_coin
+    sur chaque barre, OI_coin = OI_usd / prix) — ne jamais se contenter d'une courbe lissée.
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
     confirment la thèse, et rappeler ce que dit la théorie sur cet événement dans le
     schéma (accumulation / distribution) — colonne dédiée.
@@ -178,6 +183,21 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 
 Structure imposée pour toute analyse Wyckoff manuelle (ad hoc ou sur demande).
 **Gauthier valide ce format** — ne jamais en dévier sans raison explicite.
+
+### Mots-clés déclencheurs
+Le format complet (graphe bougies OI + mémo théorie + 5 sections) se déclenche dès que la
+demande contient **« analyse wyckoff » / « analyse de la séquence »** sur un actif. Forme
+canonique : **`analyse wyckoff [ACTIF] [TF] [depuis quand]`** (ex. « analyse wyckoff BTCUSDT
+H8 depuis 02/06 »). Les 3 paramètres utiles :
+- **Actif** (obligatoire) — BTCUSDT.P, XAU, VELVET…
+- **TF** (optionnel) — H8, H1, 5m, 3m… ; à défaut, choisir celle qui colle le mieux à la lecture.
+- **Fenêtre / point de départ** (optionnel) — « depuis 02/06 », « depuis 16h » ; à défaut,
+  remonter au début de structure pertinent (≥ 80 bougies).
+
+**Distinguer du suivi rapide** : une simple question d'état (« où en est BTC », « réactualise
+sur la dernière bougie », « le niveau X tient ? ») n'est PAS une analyse de séquence → réponse
+courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd est réservé aux
+**analyses de séquence**.
 
 ### Livrables dans le fil
 1. PNG du graphe (via SendUserFile — jamais un lien cliquable)
