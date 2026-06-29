@@ -310,12 +310,21 @@ section "Confirmation tierce" (1. CVD/absorption), pour confirmer/affaiblir les 
 les tierces ont été consultées). Vient *en second temps* valider / affaiblir / renforcer les
 hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
 
-1. **CVD / absorption** (flux d'ordres agressifs, lu en premier car le plus proche du volume) :
-   chercher une **divergence prix↔CVD** = signe d'absorption. prix↑ + CVD plat/↓ = hausse sans
-   demande agressive → distribution/faiblesse ; prix↓ + CVD plat/↑ (ou vente agressive mais prix
-   qui tient) = demande absorbe l'offre → accumulation/absorption au plancher ; prix et CVD en
-   phase = pas d'absorption, **non concluant**. Dire explicitement lequel des 4 cas (confirme
-   distrib / confirme accu / affaiblit / rien d'exploitable). CVD = spot (proxy).
+1. **CVD / absorption** (flux d'ordres agressifs, lu en premier car le plus proche du volume).
+   **Hors du tableau événement** (sinon il devient co-primaire et casse l'ordre volume→OI→tierces
+   + le tableau s'alourdit + le delta 1 barre est bruité), mais structuré en **mini-liste
+   event-ancrée** — PAS un paragraphe global. Pour chaque événement où le CVD parle, une ligne :
+   `Événement — théorie (CVD attendu) — observé (Δ CVD / divergence) — verdict`.
+   Attentes théoriques par event :
+   · **SC/climax** : vente agressive massive (CVD↓ fort) **mais** absorption (prix qui récupère)
+     = climax absorbé → constructif ;
+   · **SOS** : exige **CVD↑ franc** (demande agressive) ; un SOS sans CVD↑ = covering, faux SOS ;
+   · **SOW** : **CVD↓ franc** en phase avec le prix = offre agressive réelle ;
+   · **UTAD / upthrust** : prix↑ **mais CVD plat/divergent** = pas de demande = piège confirmé ;
+   · **AR / ST** : CVD plat/modeste attendu (réflexe, pas d'agression).
+   La divergence décisive est souvent **multi-barres** (sur un swing), pas 1 bougie — la signaler
+   comme telle. Conclure chaque ligne par l'un des 4 cas : **confirme distrib / confirme accu /
+   affaiblit / rien d'exploitable**. CVD = spot (proxy).
 
 2. **Positionnement — synthèse en sens commun** (funding, ratio L/S, liquidations) :
    ne pas lister séparément. Les lire ensemble pour un sens unique en une ou deux phrases : ex.
