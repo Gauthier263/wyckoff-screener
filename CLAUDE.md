@@ -147,13 +147,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
     commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
     est le plus pertinent pour la lecture.
-  - **Code couleur texte↔graphe** : préfixer les mots-clés du texte inline d'une pastille
-    de couleur assortie à la couleur de l'élément sur le graphe. **Forme = type** : **ronds
-    pour les ÉVÉNEMENTS** (🟢🟠🔵🟣🔴) · **carrés pour les NIVEAUX de prix** (🟩🟧🟦🟪🟥).
-    Palette fixe (couleur = sens) : **vert** demande/force (SC, SOS, OI coin↑) · **rouge**
-    offre/résistance (BC, SOW, distribution) · **orange** piège/faux signal (faux SOS, UTAD,
-    upthrust) · **bleu** bornes de plage / support / repli (LPS) · **violet** spring / pivot /
-    Phase C. Mêmes couleurs sur les marqueurs du graphe.
+  - **PAS de code couleur emoji dans le texte** (🟢🔴🔵🟣🟠🟩🟥 etc. bannis du corps de
+    l'analyse). Les couleurs restent sur le graphe uniquement (marqueurs, flèches, traits
+    verticaux). Dans le texte, nommer directement l'événement sans pastille.
   - **Alignement des étiquettes** (bug récurrent des scripts ad hoc) : les bougies sont
     décalées +2h en gardant `tz=UTC` ; les timestamps d'événements doivent l'être *aussi*
     (`pd.Timestamp('HH:MM', tz='UTC')` = heure CEST étiquetée UTC), JAMAIS `+02:00` (que
@@ -173,6 +169,70 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     validité (vol×, ATR, clôture) + OI attendu de chaque événement, accumulation et
     distribution, pour mémoriser ce qui rend un événement valide ou non. À la **fin** de
     chaque analyse, proposer explicitement à Gauthier de pouvoir y référer.
+
+## Format canonique des analyses Wyckoff texte
+
+Structure imposée pour toute analyse Wyckoff manuelle (ad hoc ou sur demande).
+**Gauthier valide ce format** — ne jamais en dévier sans raison explicite.
+
+### Livrables dans le fil
+1. PNG du graphe (via SendUserFile — jamais un lien cliquable)
+2. HTML mémo théorie (via SendUserFile — `memo_theorie.html`)
+
+### Corps de l'analyse — sections numérotées dans cet ordre
+
+**Titre en en-tête** : `ACTIF TF — description courte de la séquence et des dates`
+
+**1. Contexte macro (top-down)**
+Toujours en premier, avant toute étiquette. Identifier :
+- Tendance HTF (Daily/H4) : plus-hauts/plus-bas, sommet de référence, amplitude du markdown
+- Position dans le cycle : la plage est-elle après montée ou après baisse ?
+- Classification par défaut : redistribution si downtrend, à défaut de preuve contraire
+- Conséquence sur les étiquettes (conditionnel tant que la plage n'est pas cassée)
+
+**2. Lecture événement par événement**
+Tableau obligatoire. Colonnes selon disponibilité des données :
+
+— VSA pur (OI indisponible, ex. XAU) :
+`Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Lecture VSA`
+
+— Avec OI (ex. BTC via Coinalyze) :
+`Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Volume + OI = sens`
+
+— Quand OI ambigu → section séparée "Confirmation tierce" (liquidations, funding, ratio L/S)
+avec synthèse en une phrase (ex. « prix↑ + OI coin↑ + shorts liquidés + funding contenu =
+vraie demande qui squeeze les shorts »).
+
+Chaque ligne = un seul événement, lecture en une phrase max, factuelle.
+
+**3. Note fractale**
+Comment cette structure locale (LTF) s'insère dans la TF supérieure.
+Préciser : quelle sous-phase macro elle représente. Ne pas plaquer les étiquettes macro.
+
+**4. Synthèse** (ou "Structure identifiée")
+- Séquence identifiée : SC → AR → ST → … (Phase A/B/C/D selon avancement)
+- Biais directionnel et degré de conviction (avec la raison)
+- Si verdict impossible : dire explicitement "trop tôt — attendre [tel signal]"
+
+**5. Niveaux (justifiés)**
+Bullet points — format : `prix (raison qui en fait un niveau clé)`. Toujours inclure :
+- Plafond (résistance, AR, rejet)
+- Support interne / pivot
+- Plancher (SC low, borne basse confirmée)
+- Stop (au-dessus/en dessous de quel événement Wyckoff, et pourquoi)
+- Cibles (avec les étapes intermédiaires)
+- Invalidation (ce qui remettrait en cause le biais)
+
+**Fin de chaque analyse** : rappeler en une phrase ce que le mémo théorie permet de
+vérifier pour CETTE structure spécifique (ex. « Le mémo théorie est joint — utile ici
+pour vérifier les seuils vol× qui distinguent un vrai SOS d'un covering »).
+
+### Ce qui est interdit dans le format
+- Code couleur emoji dans le texte (🟢🔴 etc.)
+- Niveaux sans justification entre parenthèses
+- Étiquetter l'accumulation sans preuve (toujours "à gagner")
+- Sauter la section contexte macro
+- Analyser bottom-up (étiquettes avant cadre)
 
 ## Commandes
 ```bash
