@@ -122,6 +122,21 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   la résistance est un **ST/UTAD**, pas un AR. Tenir les deux jeux d'étiquettes en parallèle
   tant que la plage n'est pas cassée (cf. top-down), mais ne jamais **mélanger** les deux
   grammaires dans un même cadre committé.
+  - **L'OI sur le rebond DÉSAMBIGUÏSE accumulation vs redistribution — c'est toute la nuance du
+    début.** Le prix seul ne distingue pas les deux : il faut lire **QUI porte le rebond** via
+    l'OI coin. Décomposer le rebond climax→test en phases :
+    · **prix↑ + OI↓ = short covering** = « rebond effectif » : les shorts du markdown se
+      rachètent, la pression vendeuse s'épuise. **Constructif / AMBIGU — ne confirme PAS la
+      distribution** (penche même vers l'accumulation : le carburant baissier se retire).
+    · **prix↑ + OI↑ = nouveaux longs** : demande qui entre. Au **test de la résistance** dans un
+      downtrend = **demande piégée** = signature **redistribution** (ces longs deviennent le
+      carburant du markdown suivant, liquidés ensuite).
+    La distribution n'est **confirmée** que si le test de la borne haute est porté par des
+    **nouveaux longs (OI↑) qui échouent**, suivi de la cassure. Un rebond entièrement en
+    covering (OI↓) laisse le scénario **ouvert**. Ex. BTC H8 15/06 : rebond AR-bas→ST en 2
+    phases — Phase 1 covering (prix +4,1 % / OI −3,4 %, ambigu) puis Phase 2 new longs (prix
+    +5,8 % / OI +6,8 %, piégés au test) → redistribution gagnée à la cassure du 24/06. Toujours
+    annoter ces phases sur le panneau OI quand un rebond porte la décision accu-vs-distrib.
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
