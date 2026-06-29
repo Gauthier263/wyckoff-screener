@@ -137,9 +137,16 @@ def run_window(cfg: dict) -> pd.DataFrame:
                 })
             if cfg.get("chart"):
                 from .plot import plot_window_structure
+                cvd_df = None
+                if cfg.get("cvd", True):
+                    try:
+                        cvd_df = data_mod.fetch_cvd(sym, cfg["timeframe"], cfg["limit"])
+                    except Exception:
+                        cvd_df = None
                 out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_window.png"
                 plot_window_structure(sym, cfg["timeframe"], struct, out, ex=ex,
-                                      oi_source=cfg.get("oi_source", "binance"))
+                                      oi_source=cfg.get("oi_source", "binance"),
+                                      cvd_df=cvd_df)
                 print(f"→ graphique : {out}", file=sys.stderr)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
@@ -159,7 +166,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
-        "oi_source": "binance",
+        "oi_source": "binance", "cvd": True,
     }
     cfg.update(load_config())
 
@@ -176,6 +183,7 @@ def main() -> None:
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
+    p.add_argument("--no-cvd", action="store_true", help="désactive le CVD (panneau taker buy/sell delta)")
     p.add_argument("--oi-source", choices=["binance", "okx", "agg3"], default=cfg["oi_source"],
                    help="source d'OI : binance (défaut, Coinalyze = TradingView, repli OKX), okx (venue unique), agg3 (archive Binance, profondeur historique)")
     p.add_argument("--csv", default="watchlist.csv")
@@ -184,7 +192,7 @@ def main() -> None:
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
                use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
-               oi_source=args.oi_source)
+               oi_source=args.oi_source, cvd=not args.no_cvd)
     if args.window is not None:
         cfg["window"] = args.window
 

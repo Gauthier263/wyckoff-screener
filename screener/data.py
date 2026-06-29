@@ -496,6 +496,173 @@ _TF_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
             "1h": "1h", "4h": "4h", "1d": "1D"}
 
 
+# ── CVD (Cumulative Volume Delta) ──────────────────────────────────────────────────────
+# Décompose chaque bougie en taker_buy_vol / taker_sell_vol depuis les klines Binance
+# (colonne 9 : taker_buy_base_asset_volume présente dans toutes les réponses klines
+# Binance — spot via le miroir data-api.binance.vision, futures via l'archive
+# data.binance.vision/data/futures/um/daily/klines).
+# CVD = Σ(buy_vol − sell_vol) → divergence prix/CVD = signal d'absorption ou de piège.
+
+def fetch_cvd_spot(symbol: str, timeframe: str = "1h", limit: int = 300,
+                   use_cache: bool = True, max_age_s: int = 1800) -> "pd.DataFrame | None":
+    """CVD depuis les klines **spot** Binance (miroir data-api, non géo-bloqué).
+
+    Retourne DataFrame [buy_vol, sell_vol, delta, cvd] indexé ts UTC.
+    `delta` = buy_vol − sell_vol par bougie ; `cvd` = cumsum(delta) depuis la 1ʳᵉ barre.
+    Cache parquet (`.cache/cvd_spot/`). None si indisponible.
+    """
+    import requests
+
+    cache_dir = os.path.join(CACHE_DIR, "cvd_spot")
+    os.makedirs(cache_dir, exist_ok=True)
+    safe = symbol.replace("/", "_")
+    path = os.path.join(cache_dir, f"{safe}_{timeframe}.parquet")
+
+    if use_cache and os.path.exists(path) and (time.time() - os.path.getmtime(path)) < max_age_s:
+        return pd.read_parquet(path)
+
+    base, quote = symbol.split("/")
+    sym = f"{base}{quote}"
+    base_url = os.environ.get("BINANCE_PUBLIC_URL", "https://data-api.binance.vision/api/v3")
+    try:
+        r = requests.get(f"{base_url}/klines",
+                         params={"symbol": sym, "interval": timeframe,
+                                 "limit": min(limit, 1000)},
+                         timeout=20)
+        if r.status_code != 200:
+            return None
+        raw = r.json()
+        if not raw:
+            return None
+        df = pd.DataFrame(raw, columns=[
+            "ts", "open", "high", "low", "close", "volume",
+            "close_time", "quote_vol", "n_trades", "buy_vol", "buy_quote_vol", "ignore",
+        ])
+        df["ts"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
+        df = df.set_index("ts")
+        df["buy_vol"] = df["buy_vol"].astype(float)
+        df["volume"] = df["volume"].astype(float)
+        df["sell_vol"] = df["volume"] - df["buy_vol"]
+        df["delta"] = df["buy_vol"] - df["sell_vol"]
+        df["cvd"] = df["delta"].cumsum()
+        out = df[["buy_vol", "sell_vol", "delta", "cvd"]]
+        if use_cache:
+            try:
+                out.to_parquet(path)
+            except Exception:
+                pass
+        return out
+    except Exception:
+        return None
+
+
+def fetch_cvd_futures_archive(symbol: str = "BTC/USDT", timeframe: str = "1h",
+                               days: int = 4, start=None, end=None) -> "pd.DataFrame | None":
+    """CVD perp Binance depuis l'archive `data.binance.vision` (klines futures USDⓂ).
+
+    Fichiers quotidiens par TF (ex. BTCUSDT-1h-2024-01-15.zip) — colonne 9 =
+    taker_buy_base_asset_volume. **Retard ~1 jour** (même CDN que l'OI archive).
+    Téléchargements parallélisés + cache disque (`.cache/cvd_futures/`, immuables).
+    Retourne DataFrame [buy_vol, sell_vol, delta, cvd] indexé ts UTC, ou None.
+    """
+    import io
+    import zipfile
+    from concurrent.futures import ThreadPoolExecutor
+
+    import requests
+
+    base, quote = symbol.split("/")
+    sym = f"{base}{quote}"
+    cache_dir = os.path.join(CACHE_DIR, "cvd_futures")
+    os.makedirs(cache_dir, exist_ok=True)
+    dates = _archive_days(pd.Timestamp.now(tz="UTC"), days=days, start=start, end=end)
+
+    def _one(d):
+        fname = f"{sym}-{timeframe}-{d}.zip"
+        fpath = os.path.join(cache_dir, fname)
+        content = None
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "rb") as f:
+                    content = f.read()
+            except Exception:
+                content = None
+        if content is None:
+            url = (f"https://data.binance.vision/data/futures/um/daily/klines/"
+                   f"{sym}/{timeframe}/{fname}")
+            try:
+                r = requests.get(url, timeout=30)
+                if r.status_code != 200:
+                    return None
+                content = r.content
+                try:
+                    with open(fpath, "wb") as f:
+                        f.write(content)
+                except Exception:
+                    pass
+            except Exception:
+                return None
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(content))
+            # Colonne 0 = open_time (ms), 5 = volume, 9 = taker_buy_base_asset_volume
+            chunk = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])), header=None,
+                                usecols=[0, 5, 9])
+            chunk.columns = ["ts", "volume", "buy_vol"]
+            chunk["ts"] = pd.to_datetime(chunk["ts"], unit="ms", utc=True)
+            chunk = chunk.set_index("ts")
+            chunk["buy_vol"] = chunk["buy_vol"].astype(float)
+            chunk["volume"] = chunk["volume"].astype(float)
+            chunk["sell_vol"] = chunk["volume"] - chunk["buy_vol"]
+            chunk["delta"] = chunk["buy_vol"] - chunk["sell_vol"]
+            return chunk[["buy_vol", "sell_vol", "delta"]]
+        except Exception:
+            return None
+
+    if not dates:
+        return None
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        parts = [p for p in pool.map(_one, dates) if p is not None]
+    if not parts:
+        return None
+    raw = pd.concat(parts).sort_index()
+    raw = raw[~raw.index.duplicated(keep="last")]
+    raw["cvd"] = raw["delta"].cumsum()
+    return raw
+
+
+def fetch_cvd(symbol: str, timeframe: str = "1h", limit: int = 300,
+              use_cache: bool = True, max_age_s: int = 1800) -> "pd.DataFrame | None":
+    """CVD principal : archive futures (profondeur, ~1j de retard) + spot live (récent).
+
+    Stratégie : archive pour la profondeur historique, bougies spot pour les N barres
+    récentes non encore archivées. Le delta est recalculé sur la série fusionnée avant
+    le recumul → CVD cohérent sur toute la fenêtre.
+    Retourne DataFrame [buy_vol, sell_vol, delta, cvd] indexé ts UTC, ou None.
+    """
+    spot = fetch_cvd_spot(symbol, timeframe, limit, use_cache, max_age_s)
+    days = int(min(14, max(3, (limit * _TF_MIN.get(timeframe, 60)) / 1440 + 1)))
+    try:
+        arch = fetch_cvd_futures_archive(symbol, timeframe, days=days)
+    except Exception:
+        arch = None
+
+    if arch is None and spot is None:
+        return None
+    if arch is None:
+        return spot
+    if spot is None:
+        return arch
+
+    # Fusion : archive (futures) pour les anciennes barres, spot pour les récentes.
+    # On ne garde que delta/buy_vol/sell_vol et on re-cumule le CVD sur la série complète.
+    cols = ["buy_vol", "sell_vol", "delta"]
+    combined = pd.concat([arch[cols], spot[cols]])
+    combined = combined[~combined.index.duplicated(keep="last")].sort_index()
+    combined = combined.iloc[-limit:]
+    combined["cvd"] = combined["delta"].cumsum()
+    return combined
+
+
 def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 300,
                              source: str = "binance", fine: str | None = None,
                              start=None, end=None) -> "pd.DataFrame | None":

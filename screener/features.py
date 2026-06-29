@@ -51,6 +51,49 @@ def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd
 
 
 # --------------------------------------------------------------------------- #
+# CVD features — divergences et absorption
+# --------------------------------------------------------------------------- #
+def add_cvd_features(df: pd.DataFrame, cvd: pd.DataFrame,
+                     window: int = 20) -> pd.DataFrame:
+    """Aligne le CVD sur les barres OHLCV et ajoute les colonnes de microstructure.
+
+    Colonnes ajoutées :
+    - cvd_delta   : delta taker buy−sell de la bougie (positif = pression acheteuse nette)
+    - cvd         : CVD cumulatif depuis la première barre de la série
+    - cvd_div_bull: prix au bas de la fenêtre MAIS pression acheteuse nette → accumulation cachée
+    - cvd_div_bear: prix au sommet de la fenêtre MAIS pression vendeuse nette → distribution cachée
+    - absorption  : volume fort (vol_ratio > 1.5) + faible déplacement (spread_atr < 0.5)
+                    → offre/demande absorbée → requiert add_features() appelée avant
+    """
+    out = df.copy()
+    # Tolérance d'alignement : une demi-barre (évite les décalages de quelques secondes).
+    tf_min = {c: m for c, m in [("1m", 1), ("5m", 5), ("15m", 15), ("30m", 30),
+                                  ("1h", 60), ("4h", 240), ("1d", 1440)]}.get("1h", 60)
+    tol = pd.Timedelta(minutes=tf_min // 2 + 1)
+    aligned = cvd.reindex(out.index, method="nearest", tolerance=tol)
+    out["cvd_delta"] = aligned["delta"]
+    out["cvd"] = aligned["cvd"]
+
+    # Position du prix dans la fenêtre glissante [0 = bas, 1 = haut]
+    lo = out["low"].rolling(window, min_periods=3).min()
+    hi = out["high"].rolling(window, min_periods=3).max()
+    price_pct = ((out["close"] - lo) / (hi - lo).replace(0, np.nan)).clip(0, 1)
+
+    # Divergence haussière : prix en bas de plage + delta positif (acheteurs nets malgré le bas)
+    out["cvd_div_bull"] = (price_pct < 0.25) & (out["cvd_delta"] > 0)
+    # Divergence baissière : prix en haut de plage + delta négatif (vendeurs nets malgré le haut)
+    out["cvd_div_bear"] = (price_pct > 0.75) & (out["cvd_delta"] < 0)
+
+    # Absorption : volume fort SANS déplacement de prix — requiert les colonnes VSA
+    if "vol_ratio" in out.columns and "spread_atr" in out.columns:
+        out["absorption"] = (out["vol_ratio"] > 1.5) & (out["spread_atr"] < 0.5)
+    else:
+        out["absorption"] = False
+
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Pivots / swings
 # --------------------------------------------------------------------------- #
 def swing_points(df: pd.DataFrame, left: int = 3, right: int = 3) -> pd.DataFrame:

@@ -71,7 +71,7 @@ def _candles(ax, df, width):
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
     ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
-    oi_source: str = "binance", oi_ohlc=None,
+    oi_source: str = "binance", oi_ohlc=None, cvd_df=None,
 ) -> str:
     """Dessine la structure `struct` détectée en `analysis_tf`, **dans la même TF** (bougies
     `analysis_tf`), sur l'intervalle couvert par les événements. Trois panneaux : cours,
@@ -113,16 +113,35 @@ def plot_window_structure(
         oi_ohlc = oi_ohlc / oi_scale
         has_oi = len(oi_ohlc) > 0
 
+    # Aligner le CVD sur la fenêtre affichée (décalage fuseau inclus).
+    has_cvd = cvd_df is not None and len(cvd_df) > 0
+    if has_cvd:
+        cvd_plot = cvd_df.copy()
+        cvd_plot.index = cvd_plot.index + delta
+        cvd_plot = cvd_plot[(cvd_plot.index >= sub.index[0]) & (cvd_plot.index <= sub.index[-1])]
+        has_cvd = len(cvd_plot) > 0
+
     x = mdates.date2num(sub.index.to_pydatetime())
     width = (x[1] - x[0]) * 0.7 if len(x) > 1 else 0.01
-    if has_oi:
+
+    n_extra = (1 if has_oi else 0) + (1 if has_cvd else 0)
+    if n_extra == 2:
+        fig, axes = plt.subplots(4, 1, figsize=(13.5, 11.5), sharex=True,
+                                 gridspec_kw={"height_ratios": [3, 1, 1.2, 1.2], "hspace": 0.06})
+        axp, axv, axo, axc = axes
+    elif has_oi:
         fig, (axp, axv, axo) = plt.subplots(3, 1, figsize=(13.5, 9.2), sharex=True,
-                                            gridspec_kw={"height_ratios": [3, 1, 1.4], "hspace": 0.06})
+                                             gridspec_kw={"height_ratios": [3, 1, 1.4], "hspace": 0.06})
+        axc = None
+    elif has_cvd:
+        fig, (axp, axv, axc) = plt.subplots(3, 1, figsize=(13.5, 9.2), sharex=True,
+                                             gridspec_kw={"height_ratios": [3, 1, 1.4], "hspace": 0.06})
+        axo = None
     else:
         fig, (axp, axv) = plt.subplots(2, 1, figsize=(13.5, 7.5), sharex=True,
-                                       gridspec_kw={"height_ratios": [3, 1], "hspace": 0.06})
-        axo = None
-    panels = [axp, axv] + ([axo] if has_oi else [])
+                                        gridspec_kw={"height_ratios": [3, 1], "hspace": 0.06})
+        axo = axc = None
+    panels = [axp, axv] + ([axo] if has_oi else []) + ([axc] if has_cvd else [])
     fig.patch.set_facecolor("white")
     _candles(axp, sub, width)
 
@@ -243,6 +262,35 @@ def plot_window_structure(
                 compo += "  |  OKX + Binance"
         axo.annotate(compo, (0.5, 0.04), xycoords="axes fraction", ha="center",
                      fontsize=7, color="#666")
+
+    # Panneau CVD — barres delta (vert = acheteurs nets, rouge = vendeurs nets) + ligne CVD.
+    # La ligne CVD en axe droit (scale indépendante) permet de voir le cumul sans que
+    # les barres delta ne le cachent.
+    if has_cvd and axc is not None:
+        xc = mdates.date2num(cvd_plot.index.to_pydatetime())
+        wc = (xc[1] - xc[0]) * 0.7 if len(xc) > 1 else width
+        delta_vals = cvd_plot["delta"].values
+        bar_cols = ["#26a69a" if d >= 0 else "#ef5350" for d in delta_vals]
+        axc.bar(xc, delta_vals, width=wc, color=bar_cols, alpha=0.7, zorder=2)
+        axc.axhline(0, color="#555", lw=0.5, zorder=1)
+        # Ligne CVD sur axe secondaire (droite) — cumul visible sans confondre les échelles.
+        axc2 = axc.twinx()
+        axc2.plot(xc, cvd_plot["cvd"].values, color="#ff7f0e", lw=1.2, zorder=3, label="CVD")
+        axc2.set_ylabel("CVD (cumul)", fontsize=8, color="#ff7f0e")
+        axc2.tick_params(axis="y", labelcolor="#ff7f0e", labelsize=7)
+        axc2.legend(fontsize=7, loc="upper right")
+        axc.set_ylabel("Δ buy−sell"); axc.grid(True, alpha=0.2)
+        # Barres de divergence : fond coloré sur les barres remarquables.
+        if "cvd_div_bull" in cvd_plot.columns:
+            for xi, bull, bear in zip(xc,
+                                      cvd_plot.get("cvd_div_bull", [False] * len(xc)),
+                                      cvd_plot.get("cvd_div_bear", [False] * len(xc))):
+                if bull:
+                    axc.axvspan(xi - wc / 2, xi + wc / 2, color="#26a69a", alpha=0.15, zorder=0)
+                elif bear:
+                    axc.axvspan(xi - wc / 2, xi + wc / 2, color="#ef5350", alpha=0.15, zorder=0)
+        axc.annotate("CVD — vert=acheteurs nets · rouge=vendeurs nets · orange=CVD cumulatif",
+                     (0.5, 0.04), xycoords="axes fraction", ha="center", fontsize=7, color="#666")
 
     panels[-1].xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)
