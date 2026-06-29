@@ -23,6 +23,20 @@ def get_exchange(name: str = "binance"):
         # géo-bloqués) qui n'apportent rien ici.
         opts["options"] = {"fetchMarkets": ["spot"]}
     ex = klass(opts)
+    # Environnements avec proxy HTTPS (ex. CI/cloud) : le proxy ré-termine le TLS avec
+    # son propre certificat. ccxt crée sa propre Session et ignore REQUESTS_CA_BUNDLE car
+    # il passe verify=self.verify (True) en kwargs → écrase le bundle de la session.
+    # Seul remède : monter un HTTPAdapter qui force le verify au niveau send().
+    _ca = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if _ca and hasattr(ex, "session"):
+        from requests.adapters import HTTPAdapter
+
+        class _CAAdapter(HTTPAdapter):
+            def send(self, *a, **kw):
+                kw["verify"] = _ca
+                return super().send(*a, **kw)
+
+        ex.session.mount("https://", _CAAdapter())
     if name == "binance":
         # Route les endpoints publics vers le miroir officiel data-only de Binance :
         # mêmes données et mêmes volumes, sans clé API, et non géo-restreint —
