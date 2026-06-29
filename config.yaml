@@ -43,6 +43,22 @@ buffer: 5               # dernières barres examinées pour les événements
 vol_ma: 20
 atr_period: 14
 
+# --- Régime de marché (option --regime) : gate ON/OFF par état du cours ---
+# Tague chaque symbole : RANGE_ON (plage opérée = seul état tradable), TREND,
+# CLIMAX, VOL_EXPANSION, LOW_LIQ, CHOP, LIQUIDATION. Cf. etats_du_cours.html.
+regime:
+  recent: 12             # barres récentes évaluées pour l'état courant
+  climax_window: 3       # un climax doit être dans les N dernières barres
+  climax_vol: 2.0        # vol_ratio d'une barre climactique
+  climax_spread_atr: 2.0 # spread_atr d'une barre climactique
+  wide_spread_atr: 1.3   # barre "large"
+  atr_expansion: 1.8     # ATR_t / ATR_ref = expansion de volatilité
+  expansion_wide_bars: 3 # nb de barres larges (≠ climax isolé)
+  low_liq_vol: 0.5       # médiane vol_ratio sous laquelle = vide de liquidité
+  trend_move_atr: 4.0    # déplacement net (en ATR) sur la fenêtre = tendance
+  trend_consistency: 0.6 # fraction de barres dans le même sens
+  liq_oi_drop_pct: 2.0   # chute d'OI coin (%) sur la fenêtre = déleveraging
+
 # --- Seuils des détecteurs (heuristiques Wyckoff/VSA) ---
 thresholds:
   climax_vol: 2.0        # vol_ratio d'un climax (SC/BC)

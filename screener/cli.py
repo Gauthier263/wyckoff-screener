@@ -18,6 +18,7 @@ from . import data as data_mod
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
+from .regime import RegimeThresholds, tag_regime
 from .score import SymbolResult, score_symbol
 from .window import detect_window_structure
 
@@ -102,6 +103,32 @@ def run_mtf(cfg: dict) -> pd.DataFrame:
     return pd.DataFrame([r.as_row() for r in results])
 
 
+def run_regime(cfg: dict) -> pd.DataFrame:
+    """Mode régime : tague l'état du cours par symbole (gate ON/OFF) — repère quand
+    on n'est PAS dans une plage opérée et que les niveaux/OB ne seront pas respectés."""
+    ex = data_mod.get_exchange(cfg["exchange"])
+    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    rth = RegimeThresholds(**cfg.get("regime", {}))
+
+    rows: list[dict] = []
+    for sym in universe:
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+            tr = detect_trading_range(df, lookback=cfg["lookback"], buffer=cfg["buffer"])
+            oi = data_mod.fetch_open_interest(sym, cfg["timeframe"], cfg["limit"],
+                                              source=cfg.get("oi_source", "binance")) if cfg.get("oi", True) else None
+            reg = tag_regime(df, tr, oi=oi, th=rth)
+            rows.append(reg.as_row(sym))
+        except Exception as e:
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+    # États ON en tête (les setups exploitables), puis le reste.
+    out = pd.DataFrame(rows)
+    if not out.empty:
+        out = out.sort_values("tradable", ascending=False, kind="stable").reset_index(drop=True)
+    return out
+
+
 def run_window(cfg: dict) -> pd.DataFrame:
     """Mode fenêtre : reconnaît une séquence Wyckoff (SC-AR-ST-SOS / BC-AR-ST-SOW)
     sur une fenêtre glissante, avec rappel théorique et justification volume/spread
@@ -159,7 +186,7 @@ def main() -> None:
         "limit": 300, "lookback": 80, "buffer": 5, "vol_ma": 20, "atr_period": 14,
         "max_results": 25, "use_cache": True, "bias": "both", "symbols": [],
         "thresholds": {}, "timeframes": ["4h", "1h"], "window": 60, "oi": True,
-        "oi_source": "binance",
+        "oi_source": "binance", "regime": {},
     }
     cfg.update(load_config())
 
@@ -173,6 +200,8 @@ def main() -> None:
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
     p.add_argument("--window", nargs="?", type=int, const=60, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
+    p.add_argument("--regime", action="store_true",
+                   help="mode régime : tague l'état du cours par symbole (gate ON/OFF)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
@@ -188,7 +217,9 @@ def main() -> None:
     if args.window is not None:
         cfg["window"] = args.window
 
-    if args.window is not None:
+    if args.regime:
+        table = run_regime(cfg)
+    elif args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)

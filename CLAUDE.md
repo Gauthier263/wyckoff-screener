@@ -35,6 +35,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   qu'un spring récent soit mesuré contre la plage qui le précède.
 - `screener/events.py` — `detect_events` : SPRING, UTAD, SC, BC, SOS, SOW, ST,
   LPS, LPSY. Seuils dans `Thresholds` (mappés depuis config.yaml).
+- `screener/regime.py` — `tag_regime(df, tr, oi=None)` : classe la fenêtre récente dans un
+  **état du cours** (régime) et renvoie un **gate ON/OFF** (`Regime.tradable`). 7 états :
+  **`RANGE_ON`** (plage opérée par le MM = équilibre, **seul état tradable**) · `TREND`
+  (markup/markdown, Phase E) · `CLIMAX` (SC/BC en cours) · `VOL_EXPANSION` (news/repricing) ·
+  `LOW_LIQ` (vide de liquidité) · `CHOP` (bruit) · `LIQUIDATION` (déleveraging, OI coin qui
+  s'effondre). But : **suspendre le trading** quand les niveaux/order blocks ne seront pas
+  respectés. Ordre VSA respecté (volume → OI) ; états OFF aigus prioritaires, puis RANGE_ON
+  (plage valide) ou CHOP (défaut). Seuils dans `RegimeThresholds` (mappés depuis `config.yaml`
+  section `regime`). `cli.py --regime` → `run_regime` (table symbol/état/ON-OFF/why). Doc de
+  référence : `etats_du_cours.html`.
 - `screener/score.py` — `score_symbol` : biais dominant, phase, score composite
   = poids_type × force × récence (demi-vie 4 barres).
 - `screener/mtf.py` — `combine_mtf` : confluence HTF (contexte) × LTF (déclencheur).
@@ -179,6 +189,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
+python -m screener.cli --timeframe 1h --symbols BTC/USDT --regime   # état du cours + gate ON/OFF
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
