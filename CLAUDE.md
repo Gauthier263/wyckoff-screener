@@ -192,7 +192,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   lisible (spot achète / perp déboucle). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD
   +1 023 (rallye sans demande agressive → confirme distribution) ; barre SC 58 115 = vente
   agressive (delta −1 822) mais prix qui récupère (absorption au plancher → affaiblit la
-  continuation baissière).
+  continuation baissière). **Fuseau horaire — OBLIGATOIRE de vérifier** : `publicGetKlines`
+  renvoie les **mêmes open times UTC réel** que `fetch_ohlcv` (vérifié : timestamps + close
+  identiques bougie par bougie, écart 0) → appliquer le **même décalage +2h** (`index += 2h`,
+  tz=UTC) qu'au prix et à l'OI. Ne jamais laisser le CVD sur un fuseau différent : une barre
+  CVD décalée fausse la lecture de divergence. Toujours réaligner sur l'index des bougies prix.
 - **Illustration d'une analyse** (préférences Gauthier) :
   - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
     distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
