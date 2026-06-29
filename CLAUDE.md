@@ -107,6 +107,21 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   *contexte/biais* sans écraser les étiquettes locales ; (5) **cartographier l'emboîtement**
   (la structure locale exécute une sous-phase de la supérieure) ; la **confluence** local↔macro
   donne le signal le plus fort. Ne pas plaquer les étiquettes macro sur une analyse locale.
+- **AR/ST sont ANCRÉS sur le climax — cohérence de cadre obligatoire.** L'AR part toujours
+  dans le sens **opposé** au climax, et l'ST **reteste le climax** :
+  - **Accumulation** (climax = **SC**, bas) : **AR** rebondit **vers le HAUT** → fixe la **borne
+    haute** ; **ST** reteste **vers le bas** (le SC) → borne basse.
+  - **Distribution** (climax = **BC**, haut) : **AR** réagit **vers le BAS** → fixe la **borne
+    basse** ; **ST** reteste **vers le HAUT** (le BC) → **borne haute** (un lower high qui cale
+    sous le BC = offre confirmée).
+  **Erreur à NE PLUS refaire** : importer la grammaire d'accumulation (climax-bas = « SC » →
+  rallye = « AR-haut ») dans une structure qu'on a classée **distribution**. Dans un cadre
+  distribution, un **climax-bas suivi d'un rallye** se lit **AR-bas (borne basse) puis ST-haut
+  (test de la borne haute)** — JAMAIS « SC puis AR ». Avant d'étiqueter un rebond « AR », se
+  demander : *quel climax l'ancre, et de quel côté ?* Si le cadre est distribution, le test de
+  la résistance est un **ST/UTAD**, pas un AR. Tenir les deux jeux d'étiquettes en parallèle
+  tant que la plage n'est pas cassée (cf. top-down), mais ne jamais **mélanger** les deux
+  grammaires dans un même cadre committé.
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
