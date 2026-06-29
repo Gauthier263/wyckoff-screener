@@ -170,13 +170,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
   prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
 - **Illustration d'une analyse** (préférences Gauthier) :
-  - **Affichage GRAND inline = via l'outil Read sur le PNG.** En session distante/web, c'est
-    l'**ouverture du PNG avec Read** (la « visualisation pour vérifier le rendu ») qui
-    l'affiche **en grand directement dans le fil**. `SendUserFile` ne le livre qu'en
-    **pièce jointe plus petite** (téléchargeable). Donc, pour CHAQUE graphe : (1) **Read le
-    PNG** → grand rendu inline que Gauthier voit sans cliquer ; (2) **SendUserFile** le même
-    PNG → version téléchargeable. Les deux, systématiquement. Ne pas se contenter de
-    SendUserFile (sinon le graphe reste petit). Pas de lien cliquable `[texte](...)`.
+  - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
+    distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
+    dans le fil** ; `SendUserFile` ne le livre qu'en **pièce jointe plus petite**. Donc pour
+    CHAQUE graphe, à CHAQUE fois : (1) **Read le PNG** → grand rendu inline (obligatoire,
+    systématique, jamais omis — c'est ce qui le rend grand) ; (2) **SendUserFile** le même PNG
+    → version téléchargeable. **Ne JAMAIS se contenter de SendUserFile seul** (sinon le graphe
+    reste petit). Le Read inline n'est pas optionnel : c'est la règle par défaut pour tout
+    graphe livré. Pas de lien cliquable `[texte](...)`.
   - **Bougies dans la MÊME TF que l'analyse** (analyse H4 → bougies H4, H1 → bougies H1).
   - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
     commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
@@ -196,9 +197,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     (archive Binance en USD), **construire les bougies d'OI en coin** (O/H/L/C de l'OI_coin
     sur chaque barre, OI_coin = OI_usd / prix) — ne jamais se contenter d'une courbe lissée.
   - **Export PNG = RGB haute résolution** (clic-pour-agrandir fiable côté web). Toujours :
-    `savefig(..., dpi=160, bbox_inches='tight', facecolor='white')` **puis aplatir
+    `savefig(..., dpi=200, bbox_inches='tight', facecolor='white')` **puis aplatir
     RGBA→RGB sur fond blanc via PIL** (un PNG en RGBA n'active pas toujours le zoom au clic).
-    Viser **≥ 2000 px de large**. Vérifier `Image.open(...).mode == 'RGB'` avant de livrer.
+    Vérifier `Image.open(...).mode == 'RGB'` avant de livrer.
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
     confirment la thèse, et rappeler ce que dit la théorie sur cet événement dans le
     schéma (accumulation / distribution) — colonne dédiée.
