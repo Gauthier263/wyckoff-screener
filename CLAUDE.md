@@ -164,11 +164,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     test ≤ ×test_vol, SOS/SOW ≥ ×sos_vol, spread vs wide_spread_atr). Texte généré par
     `window._theory(bias, name, th)` à partir des `Thresholds` courants — but : développer
     des automatismes de lecture event par event.
-  - **Mémo théorie** : à *chaque* demande d'analyse, livrer dans le fil le **HTML
-    cliquable** (`theory_table.build_theory_html` → `memo_theorie.html`) — rôle + seuils de
-    validité (vol×, ATR, clôture) + OI attendu de chaque événement, accumulation et
-    distribution, pour mémoriser ce qui rend un événement valide ou non. À la **fin** de
-    chaque analyse, proposer explicitement à Gauthier de pouvoir y référer.
+  - **Mémo théorie** : à *chaque* demande d'analyse, **livrer obligatoirement** dans le fil
+    le **HTML cliquable** (`theory_table.build_theory_html` → `memo_theorie.html`) via
+    SendUserFile — rôle + seuils de validité (vol×, ATR, clôture) + OI attendu de chaque
+    événement, accumulation et distribution. Ce mémo est le référentiel pour confronter les
+    observations du tableau aux seuils théoriques. **À la fin de chaque analyse**, rappeler
+    en une phrase ce que ce mémo permet de vérifier pour CETTE structure spécifique (ex.
+    « Le mémo théorie est joint — il permet ici de vérifier les seuils vol× qui distinguent
+    un vrai SOS d'un faux SOS / covering »). Ne pas juste "proposer" de s'y référer :
+    le livrer systématiquement.
 
 ## Format canonique des analyses Wyckoff texte
 
@@ -191,19 +195,36 @@ Toujours en premier, avant toute étiquette. Identifier :
 - Conséquence sur les étiquettes (conditionnel tant que la plage n'est pas cassée)
 
 **2. Lecture événement par événement**
-Tableau obligatoire. Colonnes selon disponibilité des données :
+Tableau obligatoire. Chaque ligne confronte ce qui est observé aux seuils théoriques de
+l'événement (vol×, spread/ATR, CLV attendus selon `Thresholds`). La colonne "Lecture" doit
+dire : (a) ce que la théorie attend pour cet événement, (b) ce qu'on observe, (c) si c'est
+validé ou non. C'est le cœur pédagogique : développer les automatismes event par event.
+
+Colonnes selon disponibilité des données :
 
 — VSA pur (OI indisponible, ex. XAU) :
 `Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Lecture VSA`
 
+La colonne "Lecture VSA" inclut systématiquement : seuil théorique attendu pour cet
+événement (ex. SC : vol ≥ climax_vol×, spread large, clv ≤ 0.3 pour capitulation pure) +
+valeur observée + verdict (validé / ambigu / non validé).
+
 — Avec OI (ex. BTC via Coinalyze) :
 `Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Volume + OI = sens`
 
-— Quand OI ambigu → section séparée "Confirmation tierce" (liquidations, funding, ratio L/S)
-avec synthèse en une phrase (ex. « prix↑ + OI coin↑ + shorts liquidés + funding contenu =
-vraie demande qui squeeze les shorts »).
+La colonne "Volume + OI = sens" dit la signature théorique attendue (ex. AR : OI en repli
+attendu = débouclage) + ce qu'on observe + interprétation (covering / nouveaux longs /
+nouveaux shorts / liq forcée).
 
-Chaque ligne = un seul événement, lecture en une phrase max, factuelle.
+**Confirmation tierce — synthèse en sens commun** (après le tableau, quand OI ambigu ou
+quand les métriques tierces ont été consultées) :
+Ne pas lister les métriques séparément. Les lire ensemble pour en dégager un sens unique en
+une ou deux phrases : ex. « Liquidations nulles des deux côtés + funding négatif + crowd 68%
+long = le rebond est du covering volontaire, pas un squeeze forcé — les longs encombrés sont
+la fragilité dominante ». Les tierces confirment ou infirment ce que le tableau a établi ;
+elles ne s'y substituent pas.
+
+Chaque ligne = un seul événement, lecture factuelle et concise.
 
 **3. Note fractale**
 Comment cette structure locale (LTF) s'insère dans la TF supérieure.
@@ -233,6 +254,12 @@ pour vérifier les seuils vol× qui distinguent un vrai SOS d'un covering »).
 - Étiquetter l'accumulation sans preuve (toujours "à gagner")
 - Sauter la section contexte macro
 - Analyser bottom-up (étiquettes avant cadre)
+- Omettre le mémo théorie HTML (livré à chaque analyse, sans exception)
+- Décrire un événement sans confronter aux seuils théoriques (vol×, spread/ATR,
+  CLV, OI attendu) — l'observation seule ne suffit pas, le "validé / ambigu /
+  non validé" doit être explicite
+- Lister les métriques tierces en bullets séparés : elles se lisent ensemble
+  pour produire un sens commun en une phrase synthèse
 
 ## Commandes
 ```bash
