@@ -161,6 +161,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     `fetch_open_interest_ohlc` (défaut coin, `usd=False`). Pour la profondeur historique
     (archive Binance en USD), **construire les bougies d'OI en coin** (O/H/L/C de l'OI_coin
     sur chaque barre, OI_coin = OI_usd / prix) — ne jamais se contenter d'une courbe lissée.
+  - **Export PNG = RGB haute résolution** (clic-pour-agrandir fiable côté web). Toujours :
+    `savefig(..., dpi=160, bbox_inches='tight', facecolor='white')` **puis aplatir
+    RGBA→RGB sur fond blanc via PIL** (un PNG en RGBA n'active pas toujours le zoom au clic).
+    Viser **≥ 2000 px de large**. Vérifier `Image.open(...).mode == 'RGB'` avant de livrer.
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
     confirment la thèse, et rappeler ce que dit la théorie sur cet événement dans le
     schéma (accumulation / distribution) — colonne dédiée.
