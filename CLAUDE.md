@@ -204,7 +204,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **Citer les DEUX, complémentaires** (backtest BTC) : per-barre = rejet d'**une** bougie (fiable
   100% des deux côtés mais fragile à la TF) ; `absorption_w` = contexte multi-barres robuste à la
   TF (fiable sur DEMANDE/honnêtes, mais **masque l'absorption d'OFFRE au sommet d'un rallye**).
-  Désaccord (per-barre >0, abs_w <0) = absorption **locale** dans un mouvement de fond. Plus
+  **Formule prouvée symétrique** (test miroir, écart 10⁻¹³ : aucun bug de signe) — la fenêtre
+  dilue un rejet isolé dans une tendance forte des DEUX côtés ; ça touche plus l'offre car les
+  rallyes BTC sont plus directionnels (~+1 ATR) que les descentes (~−0.5 ATR). À un sommet, lire
+  le per-barre. Désaccord (per-barre >0, abs_w <0) = absorption **locale** dans un mouvement de fond. Plus
   `no_demand`/`no_supply` (prix qui voyage sans flux = l'**autre** divergence). Citer la valeur
   et/ou le flag event par event. Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une
   thèse, **ou rien d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp

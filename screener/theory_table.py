@@ -1028,11 +1028,13 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
             "piege": "<b>Lire les DEUX, complémentaires</b> (validé en backtest BTC) : le per-barre "
                      "<code>absorption</code> détecte le rejet d'UNE bougie (fiable des deux côtés) mais "
                      "<b>dépend de la TF</b> ; <code>absorption_w</code> est stable à la TF et capte les "
-                     "reclaims multi-barres (DEMANDE aux creux), MAIS comme c'est une mesure nette "
-                     "multi-barres il <b>masque l'absorption d'OFFRE au sommet d'un rallye</b> (le "
-                     "contexte haussier domine la fenêtre). Désaccord (per-barre &gt; 0, abs_w &lt; 0) "
-                     "= rejet LOCAL dans un mouvement de fond. Relatif à l'actif (σ glissant). CVD = "
-                     "spot (proxy). Ne pas confondre absorption (flux rejeté) et no-demand (prix sans flux).",
+                     "reclaims multi-barres. La formule est <b>rigoureusement symétrique</b> (test miroir : "
+                     "écart 10⁻¹³, aucun biais de signe) : un rejet isolé noyé dans une <b>tendance "
+                     "directionnelle forte</b> est dilué par la fenêtre <i>quel que soit le côté</i>. "
+                     "Empiriquement ça touche plus l'<b>offre au sommet</b> simplement parce que les "
+                     "rallyes BTC sont plus directionnels (~+1 ATR) que les descentes (~−0.5 ATR) → à un "
+                     "sommet (UTAD/BC), s'appuyer sur le per-barre. Désaccord (per-barre &gt; 0, abs_w "
+                     "&lt; 0) = rejet LOCAL dans un mouvement de fond. CVD = spot (proxy).",
         },
         {
             "id": "funding", "name": "Funding rate", "rank": "TIERCE de positionnement",
