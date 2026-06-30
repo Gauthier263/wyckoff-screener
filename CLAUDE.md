@@ -28,9 +28,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   OI Binance brut (mode `days` ou `start`/`end`). **Métriques tierces pour départager
   longs/shorts** (Binance via Coinalyze, `_coinalyze_history`) : `fetch_funding_rate`,
   `fetch_long_short_ratio` ([ratio, pct_long]), `fetch_liquidations` ([long_liq, short_liq]).
+  `fetch_taker_delta()` — **delta agressif par barre** (taker_buy − taker_sell, en coin) depuis
+  les klines Binance (col 9 `publicGetKlines`), base du CVD/absorption (proxy **spot**).
   Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
+  `add_absorption(df, delta)` — **effort (CVD) vs résultat (prix)** : `delta_z` (flux net en σ),
+  `ret_atr`, `absorption` = `−delta_z·(2·clv−1)` (>0 = flux rejeté ; signe de delta_z = côté
+  absorbant), `no_demand`/`no_supply` (prix qui voyage ≥ `move_atr` ATR avec effort faible). Deux
+  divergences OPPOSÉES du 2×2 (absorption ≠ no-demand).
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
   qu'un spring récent soit mesuré contre la plage qui le précède.
 - `screener/events.py` — `detect_events` : SPRING, UTAD, SC, BC, SOS, SOW, ST,
@@ -186,8 +192,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   · **prix↓ + CVD plat/↑** (ou grosse vente agressive mais prix qui tient/récupère) = **demande
     absorbe l'offre = signe d'accumulation / absorption au plancher** ;
   · **prix et CVD en phase** = mouvement « honnête », **pas d'absorption, signal non concluant**.
-  Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une thèse, **ou rien
-  d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp
+  **Quantifié** via `features.add_absorption(df, fetch_taker_delta(...))` : colonne `absorption`
+  (`−delta_z·(2·clv−1)`, >0 = flux rejeté ; delta_z<0 = demande absorbe (haussier), delta_z>0 =
+  offre absorbe (baissier)) + `no_demand`/`no_supply` (prix qui voyage sans flux = l'**autre**
+  divergence, que l'absorption ne voit pas). Citer la valeur d'absorption et/ou le flag dans la
+  lecture event par event. Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une
+  thèse, **ou rien d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp
   `fapi` 451-bloqué) = proxy du flux ; une divergence **CVD spot vs OI perp** est elle-même
   lisible (spot achète / perp déboucle). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD
   +1 023 (rallye sans demande agressive → confirme distribution) ; barre SC 58 115 = vente
@@ -322,9 +332,14 @@ hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
    · **SOW** : **CVD↓ franc** en phase avec le prix = offre agressive réelle ;
    · **UTAD / upthrust** : prix↑ **mais CVD plat/divergent** = pas de demande = piège confirmé ;
    · **AR / ST** : CVD plat/modeste attendu (réflexe, pas d'agression).
+   **Chiffrer avec `add_absorption`** (cf. `data.fetch_taker_delta` + `features.add_absorption`,
+   même décalage +2h que le prix) : citer pour chaque event la valeur `absorption` (>0 = flux
+   rejeté ; signe de delta_z = côté) **OU** le flag `no_demand`/`no_supply` (prix qui voyage sans
+   flux — l'autre divergence, que l'absorption ne voit pas). Toujours distinguer les deux :
+   *absorption* = effort fort rejeté ; *no-demand* = résultat fort sans effort.
    La divergence décisive est souvent **multi-barres** (sur un swing), pas 1 bougie — la signaler
-   comme telle. Conclure chaque ligne par l'un des 4 cas : **confirme distrib / confirme accu /
-   affaiblit / rien d'exploitable**. CVD = spot (proxy).
+   comme telle (per-barre l'absorption est bruitée). Conclure chaque ligne par l'un des 4 cas :
+   **confirme distrib / confirme accu / affaiblit / rien d'exploitable**. CVD = spot (proxy).
 
 2. **Positionnement — synthèse en sens commun** (funding, ratio L/S, liquidations) :
    ne pas lister séparément. Les lire ensemble pour un sens unique en une ou deux phrases : ex.
