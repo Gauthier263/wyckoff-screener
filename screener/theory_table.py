@@ -813,6 +813,35 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
                      "(même +2h que le prix). Une divergence CVD spot vs OI perp est elle-même lisible.",
         },
         {
+            "id": "absorption", "name": "Absorption & No-demand (effort vs résultat)",
+            "rank": "TIERCE dérivée du CVD — quantifie l'absorption",
+            "def": "Deux lectures chiffrées de la loi <b>effort (CVD) vs résultat (prix)</b>, à partir "
+                   "du flux agressif. <b>EFFORT</b> = <code>delta_z</code> = delta ÷ écart-type glissant "
+                   "(le flux net en σ, signe = côté). <b>RÉSULTAT</b> = soit <code>clv_s = 2·clv − 1</code> "
+                   "(clôture dans le range), soit <code>ret_atr = (close − open)/atr</code> (déplacement). "
+                   "<b>absorption = −delta_z · clv_s</b> ; <b>no_demand/no_supply</b> = prix qui voyage "
+                   "(|ret_atr| ≥ ~1 ATR) avec un effort faible (|delta_z| ≤ ~0.5σ).",
+            "mesure": "<b>Deux divergences OPPOSÉES</b> du 2×2 effort/résultat : "
+                      "(1) <b>Absorption</b> = effort fort mais flux <i>rejeté</i> (gros delta, clôture "
+                      "contraire) → quelqu'un encaisse passivement. (2) <b>No-demand / No-supply</b> = "
+                      "résultat fort mais effort <i>absent</i> (le prix bouge sans participation agressive). "
+                      "L'absorption ne voit PAS le no-demand et vice-versa — d'où les deux.",
+            "role": "Tierce, dérivée du CVD (donc lue après volume+OI, à froid). Confirme/affaiblit "
+                    "l'hypothèse du tableau. <b>absorption > 0</b> : delta_z < 0 = demande absorbe l'offre "
+                    "(haussier) ; delta_z > 0 = offre absorbe la demande (baissier). <b>≈ 0</b> = mouvement "
+                    "honnête.",
+            "attendu": [
+                ("SC / Spring (accu)", "absorption > 0 côté demande (vente rejetée au plancher)"),
+                ("BC / UTAD (distrib)", "absorption > 0 côté offre, OU no_demand (achat rejeté / hausse sans flux)"),
+                ("SOS / SOW honnêtes", "absorption ≈ 0 ou négatif (effort ET résultat alignés)"),
+                ("Markup/markdown passif", "no_demand (hausse sans achat) / no_supply (baisse sans vente)"),
+            ],
+            "piege": "Per-barre c'est BRUITÉ — l'absorption se lit mieux sur un SWING. Relatif et "
+                     "dépendant de la TF/de l'actif (le σ glissant est la référence). CVD = spot (proxy). "
+                     "Ne pas confondre absorption (flux rejeté) et no-demand (prix sans flux) : ce sont "
+                     "deux signaux distincts.",
+        },
+        {
             "id": "funding", "name": "Funding rate", "rank": "TIERCE de positionnement",
             "def": "Paiement périodique entre longs et shorts sur les perpétuels, qui arrime le perp au "
                    "spot. <b>Positif</b> = les longs paient les shorts (longs majoritaires/avides) ; "
@@ -912,7 +941,8 @@ def _toc_html() -> str:
           <a href="#ev-lpsy">LPSY</a></li>
         <li><a href="#indices">Théorie par indice</a> —
           <a href="#ind-vol">Volume</a> · <a href="#ind-spread">Spread</a> · <a href="#ind-clv">CLV</a> ·
-          <a href="#ind-oi">OI</a> · <a href="#ind-cvd">CVD</a> · <a href="#ind-funding">Funding</a> ·
+          <a href="#ind-oi">OI</a> · <a href="#ind-cvd">CVD</a> ·
+          <a href="#ind-absorption">Absorption</a> · <a href="#ind-funding">Funding</a> ·
           <a href="#ind-lsr">L/S</a> · <a href="#ind-liq">Liquidations</a></li>
       </ol>
     </nav>"""

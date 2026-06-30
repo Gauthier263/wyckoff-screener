@@ -64,10 +64,11 @@ def test_build_theory_html_v2_sections(tmp_path):
     for token in ("Ce qui se passe", "Qui est en jeu", "Buying Climax",
                   "Upthrust After Distribution", "Selling Climax"):
         assert token in doc
-    # théorie par indice : les 8 indicateurs
+    # théorie par indice : les indicateurs (dont absorption/no-demand)
     for token in ("Cumulative Volume Delta", "Close Location Value", "Open Interest",
-                  "Funding rate", "Ratio Long/Short", "Liquidations", "Average True Range"):
+                  "Funding rate", "Ratio Long/Short", "Liquidations", "Average True Range",
+                  "effort vs résultat", "No-demand"):
         assert token in doc
-    # une fiche par événement (≥ 12) et par indice (8)
+    # une fiche par événement (≥ 12) et par indice (9, dont absorption)
     assert doc.count("card event") >= 12
-    assert doc.count("card indic") == 8
+    assert doc.count("card indic") == 9

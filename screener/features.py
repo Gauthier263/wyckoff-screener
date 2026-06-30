@@ -50,6 +50,46 @@ def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd
     return out
 
 
+def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
+                   move_atr: float = 1.0, weak_eff: float = 0.5) -> pd.DataFrame:
+    """Effort (CVD) vs résultat (prix) : **absorption** et **no-demand / no-supply**.
+
+    Deux lectures opposées de la loi effort-vs-résultat, à partir du flux d'ordres agressifs.
+    `df` doit déjà porter `clv` et `atr` (via :func:`add_features`) ; `delta` est le flux
+    agressif net par barre (taker_buy − taker_sell, en coin), aligné sur l'index de `df`
+    (cf. :func:`screener.data.fetch_taker_delta`).
+
+    Colonnes ajoutées :
+      - ``delta``      : flux agressif net par barre (coin).
+      - ``delta_z``    : delta / écart-type glissant — **EFFORT** en σ (signe = côté agressif).
+      - ``ret_atr``    : (close − open) / atr — **RÉSULTAT** directionnel, en ATR.
+      - ``absorption`` : ``−delta_z · (2·clv − 1)``. **> 0 = flux rejeté = absorption** ;
+        ``delta_z < 0`` (vente rejetée) → la demande absorbe l'offre (haussier),
+        ``delta_z > 0`` (achat rejeté) → l'offre absorbe la demande (baissier) ; ``≈ 0`` =
+        mouvement honnête (effort et clôture alignés) ou pas de flux.
+      - ``no_demand``  : prix MONTE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (hausse
+        sans demande agressive = faiblesse / distribution).
+      - ``no_supply``  : prix BAISSE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (baisse
+        sans offre agressive = force / accumulation).
+    """
+    out = df.copy()
+    d = delta if isinstance(delta, pd.Series) else pd.Series(delta, index=out.index)
+    d = d.reindex(out.index).astype(float)
+    out["delta"] = d
+
+    sd = d.rolling(vol_window, min_periods=max(3, vol_window // 4)).std()
+    out["delta_z"] = d / sd.replace(0, np.nan)
+    out["ret_atr"] = (out["close"] - out["open"]) / out["atr"].replace(0, np.nan)
+
+    clv_s = 2.0 * out["clv"] - 1.0                 # clôture dans le range, [-1, +1]
+    out["absorption"] = -out["delta_z"] * clv_s
+
+    weak = out["delta_z"].abs() <= weak_eff        # NaN → False (pas de faux flag)
+    out["no_demand"] = (out["ret_atr"] >= move_atr) & weak
+    out["no_supply"] = (out["ret_atr"] <= -move_atr) & weak
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Pivots / swings
 # --------------------------------------------------------------------------- #
