@@ -70,10 +70,15 @@ def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
         **< 0 = mouvement honnête confirmé** (effort ET clôture alignés : un SOS/SOW franc sort
         nettement négatif) ; **≈ 0 = flux faible** ou clôture neutre (AR/ST).
       - ``absorption_w`` : **même formule sur une fenêtre de ``win`` barres** (défaut 3) — flux net
-        cumulé vs position de la clôture dans le range des ``win`` dernières barres. **Plus
-        robuste** : capture l'absorption même quand la vente et le rejet sont sur des barres
-        DIFFÉRENTES (ce que le per-barre rate), donc moins sensible au découpage de TF. **C'est la
-        lecture de référence ; ``absorption`` per-barre sert pour la barre d'événement précise.**
+        cumulé vs position de la clôture dans le range des ``win`` dernières barres.
+        **COMPLÉMENTAIRE du per-barre, pas un remplaçant** (backtest BTC) : il est bien plus
+        **stable d'une TF à l'autre** et capte les reclaims étalés sur plusieurs barres (absorption
+        de DEMANDE aux creux) ; MAIS comme c'est une mesure *nette multi-barres*, il **masque** un
+        rejet d'une seule bougie noyé dans une tendance opposée (typiquement l'absorption d'OFFRE
+        au sommet d'un rallye, où le contexte haussier domine la fenêtre). Lire les DEUX : le
+        per-barre pour « cette bougie est-elle un rejet ? », ``absorption_w`` pour le contexte
+        multi-barres robuste à la TF. Un désaccord (per-barre > 0, ``absorption_w`` < 0) = rejet
+        LOCAL dans un mouvement de fond.
       - ``no_demand``  : prix MONTE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (hausse
         sans demande agressive = faiblesse / distribution).
       - ``no_supply``  : prix BAISSE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (baisse
