@@ -31,13 +31,13 @@ _SEQ = {
 
 # Comportement d'OI attendu (texte mémo) par schéma + type d'événement.
 _OI = {
-    ("accumulation", "climax"): "↑ puis purge (shorts agressifs entrent, longs liquidés)",
+    ("accumulation", "climax"): "purge du levier — net AMBIGU (shorts neufs ↑ vs longs liquidés ↓)",
     ("accumulation", "ar"): "↓ short covering (rebond SANS engagement neuf)",
     ("accumulation", "st"): "plat / ↓ (offre tarie)",
     ("accumulation", "spring"): "↑ sur la mèche puis ↓ (shorts piégés → squeeze)",
     ("accumulation", "sign"): "↑ avec le prix (longs neufs = markup réel)",
     ("accumulation", "lp"): "plat (back-up sain)",
-    ("distribution", "climax"): "↑ puis purge (FOMO longs entrent, puis liquidés)",
+    ("distribution", "climax"): "purge du levier — net AMBIGU (longs FOMO ↑ vs shorts liquidés ↓)",
     ("distribution", "ar"): "↓ longs liquidés (repli SANS engagement neuf)",
     ("distribution", "st"): "plat / ↓ (demande tarie)",
     ("distribution", "spring"): "↑ au-dessus puis ↓ (longs piégés → squeeze)",
@@ -203,7 +203,8 @@ def _foundations_html(th: Thresholds) -> str:
         ("Phase B — Construction", "La « cause » se construit : allers-retours dans la plage, les mains "
          "fortes accumulent/distribuent. Tests répétés des bornes, volume globalement en repli."),
         ("Phase C — Test", "Le piège : <b>Spring</b> (accu, sous le plancher) ou <b>UTAD</b> (distrib, "
-         "au-dessus du plafond). Fausse cassure qui déloge les mains faibles avant le vrai mouvement."),
+         "au-dessus du plafond). Fausse cassure qui déloge les mains faibles avant le vrai mouvement. "
+         "<i>Non obligatoire</i> : une plage peut passer par un simple test de la borne, sans spring/upthrust."),
         ("Phase D — Confirmation", "La direction s'affirme : <b>SOS/SOW</b> puis <b>LPS/LPSY</b>. "
          "L'argent neuf entre (OI↑, CVD franc). Série de creux montants (accu) ou sommets descendants (distrib)."),
         ("Phase E — Tendance", "Hors de la plage : <b>markup</b> (hausse) ou <b>markdown</b> (baisse). "
@@ -258,6 +259,13 @@ def _foundations_html(th: Thresholds) -> str:
 
       <h3>Hiérarchie de lecture : volume → OI → tierces (CVD en tête)</h3>
       <p>{hierarchy}</p>
+      <p class="muted"><b>Note de méthode (honnêteté théorique).</b> Wyckoff classique ne lit que
+      <b>PRIX + VOLUME</b> (l'œuvre est antérieure aux marchés à terme/perps). L'<b>OI</b>, le
+      <b>CVD</b> et les <b>tierces</b> (funding, ratio L/S, liquidations) sont des <b>extensions
+      modernes</b> — des modèles cohérents avec la logique de Wyckoff (suivre l'opérateur composite),
+      mais PAS de la doctrine d'origine. Leurs « comportements attendus » par événement sont des
+      heuristiques raisonnées, à traiter comme des confirmations <i>à froid</i>, jamais comme des
+      vérités absolues.</p>
 
       <h3 id="topdown">Garde-fous de cadre (à ne jamais oublier)</h3>
       <ul>
@@ -365,8 +373,8 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                  "amplitude énorme = capitulation, le prix parcourt une grande distance"),
                 ("CLV", f"≥ reclaim_clv ({th.reclaim_clv}) : clôture moitié haute",
                  "le prix récupère DANS la barre = absorption visible (effort vs résultat). Une clôture sur le bas n'est pas encore validée SC par le détecteur : l'absorption se lira alors sur l'AR"),
-                ("OI", "↑ puis purge : shorts agressifs entrent + longs liquidés de force",
-                 "le bas attire de nouveaux shorts (qui seront piégés) et flush les derniers longs"),
+                ("OI", "purge du levier, net ambigu (shorts neufs ↑ vs longs liquidés ↓)",
+                 "le bas attire de nouveaux shorts (piégés) ET flush les derniers longs ; le NET dépend de qui domine — un deleveraging fait BAISSER l'OI, des shorts agressifs le font MONTER. Lire avec les tierces"),
                 ("CVD", "↓ FORT (vente agressive massive) MAIS prix qui récupère",
                  "L'ABSORPTION par excellence : énorme agression vendeuse sans résultat baissier durable"),
                 ("Tierces", "funding négatif, longs liquidés massifs, crowd short",
@@ -396,8 +404,10 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("Tierces", "short liqs possibles sur le rebond", "les shorts trop tôt se font sortir, alimentant le rebond"),
             ],
             "trap": "Un AR à fort volume OU à OI montant n'est PAS un AR : c'est déjà un signe de force "
-                    "(des longs s'engagent). La nuance OI/CVD distingue le simple covering (ambigu) de la "
-                    "vraie demande.",
+                    "(des longs s'engagent). NB théorie : classiquement l'AR peut être un rallye "
+                    "VIGOUREUX — son essence est l'épuisement vendeur + le réflexe/covering, pas le "
+                    "« faible volume » ; le critère volume-en-repli + OI-en-repli est le filtre "
+                    "OPÉRATIONNEL du screener pour le distinguer d'un SOS.",
         },
         {
             "id": "st-acc", "schema": "accumulation", "phase": "Phase A/B",
@@ -529,7 +539,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("Volume", f"≥ ×{th.climax_vol} (climactique, le + fort)", "effort acheteur maximal — mais c'est là que la distribution se produit"),
                 ("Spread/ATR", f"≥ {th.wide_spread_atr} ATR, très large", "amplitude énorme = euphorie, grande distance parcourue"),
                 ("CLV", f"≤ {round(1 - th.reclaim_clv, 2)} : clôture moitié basse", "le prix cale DANS la barre = l'offre a absorbé (effort vs résultat). Une clôture sur le haut n'est pas encore validée BC : l'absorption se lira sur l'AR"),
-                ("OI", "↑ puis purge : FOMO longs entrent + shorts liquidés", "le haut attire de nouveaux longs (piégés) et flush les shorts"),
+                ("OI", "purge du levier, net ambigu (longs FOMO ↑ vs shorts liquidés ↓)", "le haut attire de nouveaux longs (piégés) ET flush les shorts ; le NET dépend de qui domine. Lire avec les tierces"),
                 ("CVD", "↑ FORT (achat agressif/FOMO) MAIS prix qui cale", "ABSORPTION : énorme agression acheteuse sans résultat haussier durable"),
                 ("Tierces", "funding très positif, shorts liquidés, crowd long", "longs encombrés au sommet = base d'un futur markdown"),
             ],
@@ -766,7 +776,7 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
             "role": "Secondaire : après le volume, désambiguïse QUI agit. Distingue l'argent neuf "
                     "(engagement directionnel) du simple débouclage (covering/liquidation).",
             "attendu": [
-                ("Climax", "↑ puis purge (neufs piégés + flush de l'autre côté)"),
+                ("Climax", "purge du levier — net AMBIGU (neufs ↑ vs liquidés ↓), lire avec tierces"),
                 ("AR", "↓ (débouclage : covering en accu, liquidation en distrib)"),
                 ("ST / LPS / LPSY", "plat (pas d'engagement)"),
                 ("Spring/UTAD", "↑ sur la mèche (piégés) puis ↓ (squeeze)"),
