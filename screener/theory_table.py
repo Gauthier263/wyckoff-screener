@@ -61,6 +61,59 @@ _CVD = {
     ("distribution", "lp"): "plat / sec (rebond faible, sans agression)",
 }
 
+# Indice d'ABSORPTION (`features.add_absorption`) attendu, version courte pour la table.
+# absorption = −delta_z·(2·clv−1) : >0 = flux rejeté ; signe de delta_z = côté absorbant.
+_ABS = {
+    ("accumulation", "prelim"): "naissante (faible)",
+    ("accumulation", "climax"): "abs > 0 côté demande (surtout MULTI-barres)",
+    ("accumulation", "ar"): "≈ 0 / flag no_demand (rebond passif)",
+    ("accumulation", "st"): "≈ 0 (aucune agression)",
+    ("accumulation", "spring"): "abs > 0 FORTE côté demande (vente rejetée)",
+    ("accumulation", "sign"): "abs < 0 — achat HONNÊTE (flux confirmé, non rejeté)",
+    ("accumulation", "lp"): "≈ 0 (sec)",
+    ("distribution", "prelim"): "naissante (faible)",
+    ("distribution", "climax"): "abs > 0 côté offre (surtout MULTI-barres)",
+    ("distribution", "ar"): "≈ 0 / flag no_supply (repli passif)",
+    ("distribution", "st"): "≈ 0 (aucune agression)",
+    ("distribution", "spring"): "abs > 0 côté offre OU no_demand (achat rejeté)",
+    ("distribution", "sign"): "abs < 0 — vente HONNÊTE (flux confirmé, non rejeté)",
+    ("distribution", "lp"): "≈ 0 (sec)",
+}
+
+# Indice d'absorption attendu, version détaillée (narratif) keyée par id d'événement.
+_ABS_EVENT = {
+    "ps":  ("naissante, faible", "premiers signes d'absorption de l'offre, rien de tranché encore"),
+    "sc":  ("abs > 0 côté demande, surtout MULTI-BARRES",
+            "la vente agressive au plancher est encaissée ; per-barre l'indice peut être faible "
+            "(clôture mi-range), le signal est net sur le SWING — les lows qui tiennent"),
+    "ar-acc": ("≈ 0, ou flag no_demand",
+               "le rebond monte sans demande agressive (covering) → souvent no_demand ; ce n'est "
+               "PAS baissier ici, juste « pas encore de vraie demande »"),
+    "st-acc": ("≈ 0", "pas d'agression : ni absorption ni no-demand, le marché s'assèche"),
+    "spring": ("abs > 0 FORTE côté demande (delta_z < 0)",
+               "LA signature : grosse vente agressive sur la mèche mais le prix REJETTE et reclôt "
+               "dans la plage = la demande encaisse. Souvent le pic d'absorption de toute la structure"),
+    "sos": ("abs < 0 (mouvement HONNÊTE confirmé)",
+            "un vrai SOS = achat agressif (CVD↑) ET prix qui monte = effort ET résultat ALIGNÉS → "
+            "absorption NÉGATIVE (flux confirmé par la clôture), PAS positive comme un spring. "
+            "Le signe tranche : spring = abs > 0 (rejeté), SOS = abs < 0 (confirmé)"),
+    "lps": ("≈ 0 (sec)", "back-up sans agression, pas d'absorption ni de no-demand"),
+    "psy": ("naissante, faible", "premiers signes d'absorption de la demande"),
+    "bc":  ("abs > 0 côté offre, surtout MULTI-BARRES",
+            "l'achat agressif au plafond est encaissé par l'offre ; per-barre faible, net sur le swing"),
+    "ar-dist": ("≈ 0, ou flag no_supply",
+                "le repli baisse sans offre agressive (liquidation) → souvent no_supply ; pas "
+                "haussier, juste « pas encore de vraie offre »"),
+    "st-dist": ("≈ 0", "pas d'agression"),
+    "utad": ("abs > 0 côté offre (delta_z > 0) OU flag no_demand",
+             "deux variantes du piège : soit achat agressif rejeté (offre absorbe), soit hausse "
+             "SANS achat (no_demand) ; dans les deux cas, aucune vraie demande pour tenir au-dessus"),
+    "sow": ("abs < 0 (mouvement HONNÊTE confirmé)",
+            "un vrai SOW = vente agressive (CVD↓) ET prix qui baisse = ALIGNÉS → absorption NÉGATIVE "
+            "(flux confirmé). Le signe tranche : UTAD/faux SOW = abs > 0 (rejeté), SOW = abs < 0"),
+    "lpsy": ("≈ 0 (sec)", "rebond faible sans agression"),
+}
+
 
 def theory_rows(bias: str, th: Thresholds) -> list[dict]:
     """Lignes du mémo pour un schéma, à partir des seuils courants (OI + CVD)."""
@@ -79,6 +132,9 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
     def cvd(kind):
         return _CVD[(bias, kind)]
 
+    def absorp(kind):
+        return _ABS[(bias, kind)]
+
     return [
         {
             "ev": prelim_name,
@@ -90,6 +146,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": "qui s'élargit (premiers à-coups)",
             "oi": "premiers " + ("longs" if acc else "shorts") + " qui se positionnent",
             "cvd": "première agression " + ("acheteuse" if acc else "vendeuse") + " visible",
+            "absorp": absorp("prelim"),
             "cloture": "indécise (le combat commence)",
             "valide": "ralentissement du mouvement + pic de volume isolé",
             "invalide": "le mouvement continue sans réaction = pas encore de PS/PSY",
@@ -103,6 +160,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": f"≥ {th.wide_spread_atr} ATR (large)",
             "oi": oi("climax"),
             "cvd": cvd("climax"),
+            "absorp": absorp("climax"),
             "cloture": f"{cloture} (rejet → absorption)",
             "valide": f"vol climactique + spread large + clôture {cloture} + absorption CVD",
             "invalide": "vol non climactique, ou clôture du mauvais côté",
@@ -115,6 +173,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": "indifférent (souvent en repli)",
             "oi": oi("ar"),
             "cvd": cvd("ar"),
+            "absorp": absorp("ar"),
             "cloture": "indifférente",
             "valide": "volume EN REPLI ET OI EN REPLI (débouclage), CVD modeste",
             "invalide": "AR à fort volume OU OI en hausse OU CVD franc → engagement neuf",
@@ -127,6 +186,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": f"étroit ≤ {th.narrow_spread_atr} ATR (pas large)",
             "oi": oi("st"),
             "cvd": cvd("st"),
+            "absorp": absorp("st"),
             "cloture": "neutre (pas de débordement)",
             "valide": "volume sec + borne tenue + CVD plat (pas d'agression)",
             "invalide": f"volume élevé (> ×{th.test_vol}) ou cassure nette",
@@ -140,6 +200,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": "pic bref possible",
             "oi": oi("spring"),
             "cvd": cvd("spring"),
+            "absorp": absorp("spring"),
             "cloture": f"revient DANS la plage (clv {'≥ 0.5' if acc else '≤ 0.5'})",
             "valide": f"pénétration brève ≈ {th.pen_atr} ATR hors borne + clôture rentrée"
                       + (" + absorption CVD" if acc else " + CVD divergent (pas de demande)"),
@@ -154,6 +215,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": f"≥ {th.wide_spread_atr} ATR (large)",
             "oi": oi("sign"),
             "cvd": cvd("sign"),
+            "absorp": absorp("sign"),
             "cloture": f"{cloture} — clv {clv_dir}",
             "valide": f"vol soutenu + spread large + clôture {cloture} + OI↑ + CVD franc",
             "invalide": "vol faible / clôture molle / OI plat / CVD divergent (= squeeze/covering)",
@@ -167,6 +229,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "spread": "étroit (réaction sans engagement)",
             "oi": oi("lp"),
             "cvd": cvd("lp"),
+            "absorp": absorp("lp"),
             "cloture": f"{'creux plus HAUT' if acc else 'sommet plus BAS'} que le climax",
             "valide": f"réaction sèche + {'creux' if acc else 'sommet'} qui tient la borne + CVD sec",
             "invalide": f"volume lourd ou {'nouveau plus-bas' if acc else 'nouveau plus-haut'}",
@@ -294,7 +357,8 @@ def _table_html(bias: str, th: Thresholds) -> str:
             f'{"▲" if acc else "▼"} {bias.upper()} <span style="font-weight:400;'
             f'font-size:.7em;color:#555">({seq})</span></h3>')
     cols = ["Évén.", "Rôle dans la séquence", "Volume (vol×)", "Spread (ATR)",
-            "OI attendu", "CVD attendu", "Clôture", "✅ Validé si", "❌ Invalidé si"]
+            "OI attendu", "CVD attendu", "Absorption (indice)", "Clôture",
+            "✅ Validé si", "❌ Invalidé si"]
     th_html = "".join(f"<th>{c}</th>" for c in cols)
     body = ""
     for r in theory_rows(bias, th):
@@ -306,6 +370,7 @@ def _table_html(bias: str, th: Thresholds) -> str:
             f'<td class="num">{html.escape(r["spread"])}</td>',
             f'<td class="oi">{html.escape(r["oi"])}</td>',
             f'<td class="cvd">{html.escape(r["cvd"])}</td>',
+            f'<td class="abs">{html.escape(r["absorp"])}</td>',
             f'<td>{html.escape(r["cloture"])}</td>',
             f'<td class="ok">{html.escape(r["valide"])}</td>',
             f'<td class="ko">{html.escape(r["invalide"])}</td>',
@@ -319,7 +384,10 @@ def _tables_section(th: Thresholds) -> str:
     <section id="tables">
       <h2>1 · Tables de référence (accumulation &amp; distribution)</h2>
       <p class="muted">Confronter chaque observation à ces seuils : c'est le « validé / ambigu /
-      non validé » event par event. Les colonnes OI et CVD donnent la signature de flux attendue.</p>
+      non validé » event par event. Les colonnes <b>OI</b>, <b>CVD</b> et <b>Absorption (indice)</b>
+      donnent la signature de flux attendue — le SIGNE de l'absorption tranche : <b>Spring/climax =
+      absorption &gt; 0 (flux rejeté)</b> vs <b>SOS/SOW = absorption &lt; 0 (mouvement honnête,
+      flux confirmé par la clôture)</b> ; <b>≈ 0</b> = flux faible (AR/ST).</p>
       {_table_html("accumulation", th)}
       {_table_html("distribution", th)}
     </section>"""
@@ -451,9 +519,66 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("CVD", "pic ↓ sur la mèche puis récupération = absorption", "vente agressive sur la cassure absorbée → shorts piégés"),
                 ("Tierces", "short liqs sur la récupération, funding qui peut passer négatif", "le squeeze des shorts piégés alimente la reprise"),
             ],
-            "trap": "Si la clôture reste SOUS le plancher (clv faible, pas de récupération), ce n'est pas "
-                    "un spring mais une VRAIE cassure : la redistribution gagne. Tout l'art est de "
-                    "distinguer le piège (rejet rapide + absorption CVD) de la cassure (suivi vendeur).",
+            "extra": f"""
+            <div class="deep">
+              <h5>Micro-comportement sur TF inférieure (zoomer un spring)</h5>
+              <p class="muted">Ce qui, sur la TF d'analyse, n'est qu'<b>une bougie</b> (mèche basse +
+              clôture haute dans la plage) se décompose ainsi sur la TF inférieure (ex. lire un spring
+              H4 en regardant le M15/H1) :</p>
+              <ol>
+                <li><b>Approche du plancher</b> : dérive lente vers le support, <b>volume qui sèche</b>
+                (la baisse n'a plus de carburant).</li>
+                <li><b>Stop-run sous le support</b> : pic baissier — bougie LTF à <b>longue mèche
+                basse</b>, <b>volume qui explose</b> (stops des longs déclenchés + shorts qui sautent
+                sur la « cassure »). <b>OI↑</b> (shorts neufs), <b>CVD↓ violent</b>.</li>
+                <li><b>Rejet immédiat</b> : en quelques bougies LTF, une <b>grosse bougie de reprise à
+                clôture haute</b> (CLV élevé) ravale le support. La vente agressive est <b>absorbée</b>
+                (CVD↓ mais prix↑ = <b>absorption forte, abs &gt; 0</b>), <b>OI↓</b> (shorts squeezés).</li>
+                <li><b>Réintégration + higher low</b> : le prix tient au-dessus du support, fait un
+                <b>creux plus haut</b> sur volume sec. C'est le départ potentiel du markup.</li>
+              </ol>
+
+              <h5>Les types de spring (par pénétration × volume)</h5>
+              <p class="muted">Axe fiable = <b>profondeur de pénétration × volume</b> : plus c'est
+              <i>peu profond et sec</i>, plus l'offre est épuisée (haussier). La numérotation #1/#2/#3
+              (convention Pruden) varie selon les sources — se fier au comportement, pas au numéro.</p>
+              <table class="ind">
+                <thead><tr><th>Type</th><th>Pénétration</th><th>Volume</th><th>Récupération</th>
+                  <th>Offre restante → suite</th></tr></thead>
+                <tbody>
+                  <tr><td class="ev2"><b>Spring « #3 »</b> (le plus propre)</td><td>minime (effleure / undercut)</td>
+                    <td>SEC</td><td>immédiate</td><td>offre épuisée → markup possible <b>sans test</b> ; le plus haussier</td></tr>
+                  <tr><td class="ev2"><b>Spring « #2 »</b></td><td>modérée</td><td>moyen</td><td>rapide</td>
+                    <td>offre résiduelle → demande un <b>test secondaire</b> avant le markup</td></tr>
+                  <tr><td class="ev2"><b>Spring « #1 » / Shakeout</b></td><td>profonde (stop-run large)</td>
+                    <td>FORT</td><td>en V, plus lente</td><td>offre encore présente → le moins « propre »,
+                    exige <b>confirmation + test</b> ; « <b>terminal shakeout</b> » s'il clôt la Phase C</td></tr>
+                </tbody>
+              </table>
+
+              <h5>Le « test du spring » (confirmation, Phase C)</h5>
+              <p>Après un spring (surtout #1/#2), le prix <b>revient sonder le low du spring</b> sur un
+              <b>volume encore PLUS sec</b> et un <b>creux plus haut</b> qui tient : c'est le test qui
+              confirme que l'offre est épuisée. Pas de test nécessaire pour un spring #3 (déjà sec).</p>
+
+              <h5>Spring vs SOS vs vraie cassure — <b>comment trancher</b></h5>
+              <p class="muted">Le spring (bas, Phase C) PRÉCÈDE le SOS (haut, Phase D) : ce ne sont pas
+              deux lectures du même geste, mais deux étapes. La confusion courante est <i>spring vs vraie
+              cassure baissière</i> (au plancher) ; et au plafond, <i>SOS vs upthrust</i>. L'<b>absorption
+              tranche</b> : rejetée (spring) vs honnête (SOS / cassure).</p>
+              <table class="ind">
+                <thead><tr><th></th><th>Spring (Phase C)</th><th>SOS (Phase D)</th><th>Vraie cassure baissière</th></tr></thead>
+                <tbody>
+                  <tr><td class="ev2">Lieu</td><td>sous le PLANCHER</td><td>au-dessus du PLAFOND</td><td>sous le plancher</td></tr>
+                  <tr><td class="ev2">Séquence</td><td>vient AVANT le SOS</td><td>vient APRÈS le spring</td><td>invalide l'accumulation</td></tr>
+                  <tr><td class="ev2">Geste</td><td>faux breakdown + REJET rapide</td><td>vrai breakout + SUIVI</td><td>breakdown qui TIENT</td></tr>
+                  <tr><td class="ev2">Clôture</td><td>revient DANS la plage (clv ≥ {th.reclaim_clv})</td><td>au-dessus du plafond (clv haut)</td><td>reste SOUS (clv bas)</td></tr>
+                  <tr><td class="ev2">OI</td><td>↑ mèche puis ↓ (shorts squeezés)</td><td>↑ avec le prix (longs neufs)</td><td>↑ soutenu (shorts neufs, pas de squeeze)</td></tr>
+                  <tr><td class="ev2">CVD</td><td>↓ rejeté = absorption</td><td>↑ FRANC (honnête)</td><td>↓ FRANC en phase (honnête)</td></tr>
+                  <tr><td class="ev2"><b>absorption (indice)</b></td><td><b>&gt; 0 FORT côté demande</b></td><td><b>&lt; 0 (honnête confirmé)</b></td><td><b>&lt; 0 (honnête baissier)</b></td></tr>
+                </tbody>
+              </table>
+            </div>""",
         },
         {
             "id": "sos", "schema": "accumulation", "phase": "Phase D",
@@ -611,9 +736,62 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("CVD", "prix↑ MAIS CVD plat/divergent = pas de demande", "LA divergence clé : le prix monte sans achat agressif = piège confirmé"),
                 ("Tierces", "long liqs sur la rejection, funding qui peut pointer", "les longs piégés se font flusher en redescendant"),
             ],
-            "trap": "Si la clôture tient AU-DESSUS du plafond sur OI↑ + CVD↑, ce n'est pas un upthrust "
-                    "mais un vrai SOS (accumulation) : le cadre bascule. Tout l'art = distinguer le piège "
-                    "(rejet + CVD divergent) du vrai breakout (suivi + CVD franc).",
+            "extra": f"""
+            <div class="deep">
+              <h5>Micro-comportement sur TF inférieure (zoomer un upthrust)</h5>
+              <p class="muted">Ce qui, sur la TF d'analyse, n'est qu'<b>une bougie</b> (mèche haute +
+              clôture basse dans la plage) se décompose ainsi sur la TF inférieure :</p>
+              <ol>
+                <li><b>Approche du plafond</b> : dérive vers la résistance, <b>volume qui sèche</b>
+                (la hausse n'a plus de carburant).</li>
+                <li><b>Stop-run au-dessus</b> : pic haussier — bougie LTF à <b>longue mèche haute</b>,
+                <b>volume qui explose</b> (stops des shorts + breakout buyers FOMO). <b>OI↑</b> (longs
+                neufs), <b>CVD↑ violent</b>.</li>
+                <li><b>Rejet immédiat</b> : une <b>grosse bougie de reprise à clôture basse</b> ravale la
+                résistance. Soit l'achat agressif est <b>absorbé</b> (CVD↑ mais prix↓ = <b>abs &gt; 0
+                côté offre</b>), soit il n'y avait <b>aucune demande</b> (<b>no_demand</b> : prix↑ sans
+                CVD). <b>OI↓</b> (longs piégés liquidés).</li>
+                <li><b>Réintégration + lower high</b> : le prix retombe sous la résistance, fait un
+                <b>sommet plus bas</b> sur volume sec. Départ potentiel du markdown.</li>
+              </ol>
+
+              <h5>Les types d'upthrust</h5>
+              <table class="ind">
+                <thead><tr><th>Type</th><th>Lieu / phase</th><th>Volume</th><th>Suite</th></tr></thead>
+                <tbody>
+                  <tr><td class="ev2"><b>UT ordinaire</b></td><td>au-dessus du plafond, <b>Phase B</b></td>
+                    <td>variable</td><td>rejet ; test précoce de l'offre, <b>pas encore terminal</b></td></tr>
+                  <tr><td class="ev2"><b>UTAD à fort volume</b> (FOMO)</td><td>nouveau plus-haut marginal (peut <b>dépasser le BC</b>), <b>Phase C</b></td>
+                    <td>FORT</td><td>piège les breakout buyers → markdown ; achat <b>absorbé</b> (abs &gt; 0)</td></tr>
+                  <tr><td class="ev2"><b>UTAD à faible volume</b></td><td>au-dessus du plafond, <b>Phase C</b></td>
+                    <td>FAIBLE</td><td>personne ne suit = <b>no_demand</b> pur → rejet → markdown</td></tr>
+                </tbody>
+              </table>
+              <p class="muted">Un <b>UTAD peut faire un plus-haut au-dessus du BC</b> (plus-haut marginal
+              pour piéger un maximum de stops/FOMO) — c'est normal, ça reste un piège tant que la clôture
+              revient dans la plage.</p>
+
+              <h5>Le « test de l'upthrust »</h5>
+              <p>Après l'UTAD, le prix peut <b>re-sonder la résistance</b> sur volume sec et faire un
+              <b>sommet plus bas</b> (LPSY) qui cale : confirmation que la demande est épuisée.</p>
+
+              <h5>Upthrust vs SOW vs vraie cassure haussière — <b>comment trancher</b></h5>
+              <p class="muted">L'upthrust (haut, Phase C) PRÉCÈDE le SOW (bas, Phase D). La confusion
+              courante est <i>upthrust vs vraie cassure haussière (SOS)</i> au plafond. L'<b>absorption /
+              no_demand tranche</b> : achat rejeté ou absent (upthrust) vs achat honnête qui tient (SOS).</p>
+              <table class="ind">
+                <thead><tr><th></th><th>UTAD (Phase C)</th><th>SOW (Phase D)</th><th>Vraie cassure haussière (SOS)</th></tr></thead>
+                <tbody>
+                  <tr><td class="ev2">Lieu</td><td>au-dessus du PLAFOND</td><td>sous le PLANCHER</td><td>au-dessus du plafond</td></tr>
+                  <tr><td class="ev2">Séquence</td><td>vient AVANT le SOW</td><td>vient APRÈS l'UTAD</td><td>invalide la distribution</td></tr>
+                  <tr><td class="ev2">Geste</td><td>faux breakout + REJET</td><td>vrai breakdown + SUIVI</td><td>breakout qui TIENT</td></tr>
+                  <tr><td class="ev2">Clôture</td><td>revient DANS la plage (clv ≤ {th.reclaim_clv})</td><td>sous le plancher (clv bas)</td><td>reste AU-DESSUS (clv haut)</td></tr>
+                  <tr><td class="ev2">OI</td><td>↑ mèche puis ↓ (longs piégés)</td><td>↑ avec la baisse (shorts neufs)</td><td>↑ avec le prix (longs neufs)</td></tr>
+                  <tr><td class="ev2">CVD</td><td>↑ rejeté / plat = pas de demande</td><td>↓ FRANC (honnête)</td><td>↑ FRANC (honnête)</td></tr>
+                  <tr><td class="ev2"><b>absorption (indice)</b></td><td><b>&gt; 0 côté offre / no_demand</b></td><td><b>&lt; 0 (honnête confirmé)</b></td><td><b>&lt; 0 (honnête haussier)</b></td></tr>
+                </tbody>
+              </table>
+            </div>""",
         },
         {
             "id": "sow", "schema": "distribution", "phase": "Phase D",
@@ -675,11 +853,17 @@ def _event_cards_html(th: Thresholds) -> str:
                       f'{"▲ ACCUMULATION" if acc else "▼ DISTRIBUTION"}</h3>')
         acc = ev["schema"] == "accumulation"
         accent = "#1b6b1b" if acc else "#a11"
+        # ligne Absorption injectée depuis _ABS_EVENT (juste après les indices propres)
+        indices = list(ev["indices"])
+        if ev["id"] in _ABS_EVENT:
+            a_att, a_why = _ABS_EVENT[ev["id"]]
+            indices.append(("Absorption", a_att, a_why))
         rows = "".join(
             f'<tr><td class="ev2"><b>{html.escape(ind)}</b></td>'
             f'<td class="exp">{att}</td>'
             f'<td>{pourquoi}</td></tr>'
-            for ind, att, pourquoi in ev["indices"])
+            for ind, att, pourquoi in indices)
+        extra = ev.get("extra", "")
         cards += f"""
         <div class="card event" id="ev-{ev['id']}">
           <h4 style="color:{accent}">{html.escape(ev['title'])}
@@ -689,7 +873,7 @@ def _event_cards_html(th: Thresholds) -> str:
           <table class="ind"><thead><tr><th>Indice</th><th>Attendu</th>
             <th>Pourquoi (le narratif → l'indice)</th></tr></thead>
             <tbody>{rows}</tbody></table>
-          <p class="trap"><b>Piège / invalidation.</b> {ev['trap']}</p>
+          {extra}
         </div>"""
     return f"""
     <section id="events">
@@ -827,13 +1011,15 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
                       "résultat fort mais effort <i>absent</i> (le prix bouge sans participation agressive). "
                       "L'absorption ne voit PAS le no-demand et vice-versa — d'où les deux.",
             "role": "Tierce, dérivée du CVD (donc lue après volume+OI, à froid). Confirme/affaiblit "
-                    "l'hypothèse du tableau. <b>absorption > 0</b> : delta_z < 0 = demande absorbe l'offre "
-                    "(haussier) ; delta_z > 0 = offre absorbe la demande (baissier). <b>≈ 0</b> = mouvement "
-                    "honnête.",
+                    "l'hypothèse du tableau. Le <b>signe</b> discrimine : <b>absorption &gt; 0</b> = flux "
+                    "rejeté (delta_z &lt; 0 = demande absorbe, haussier ; delta_z &gt; 0 = offre absorbe, "
+                    "baissier) ; <b>&lt; 0</b> = mouvement HONNÊTE confirmé (effort aligné avec la clôture — "
+                    "un SOS/SOW franc) ; <b>≈ 0</b> = flux faible ou clôture neutre.",
             "attendu": [
                 ("SC / Spring (accu)", "absorption > 0 côté demande (vente rejetée au plancher)"),
                 ("BC / UTAD (distrib)", "absorption > 0 côté offre, OU no_demand (achat rejeté / hausse sans flux)"),
-                ("SOS / SOW honnêtes", "absorption ≈ 0 ou négatif (effort ET résultat alignés)"),
+                ("SOS / SOW (honnêtes)", "absorption < 0 (effort ET résultat alignés = flux confirmé)"),
+                ("AR / ST (réflexe)", "absorption ≈ 0 (flux faible, aucune agression)"),
                 ("Markup/markdown passif", "no_demand (hausse sans achat) / no_supply (baisse sans vente)"),
             ],
             "piege": "Per-barre c'est BRUITÉ — l'absorption se lit mieux sur un SWING. Relatif et "
@@ -972,12 +1158,14 @@ def build_theory_html(th: Thresholds | None = None,
       td.num{font-variant-numeric:tabular-nums;background:#fafafa}
       td.oi{background:#eef5ff;color:#234}
       td.cvd{background:#fff4e8;color:#6a3d00}
+      td.abs{background:#f3ecff;color:#3a1d6e}
       td.exp{background:#fafafa;font-weight:600}
       td.ok{color:var(--acc)}
       td.ko{color:var(--dis)}
       tr:nth-child(even) td{background:#fcfcfc}
       tr:nth-child(even) td.oi{background:#e7f0fc}
       tr:nth-child(even) td.cvd{background:#fdebd6}
+      tr:nth-child(even) td.abs{background:#ece1fb}
       .toc{background:#f7f9fc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 18px;margin:14px 0 4px;font-size:.9em}
       .toc ol{margin:6px 0 0;padding-left:20px}
       .toc a{color:#2456a6;text-decoration:none}
@@ -988,8 +1176,8 @@ def build_theory_html(th: Thresholds | None = None,
       .card .phase{font-size:.72em;color:var(--mut);font-weight:400;border:1px solid #ddd;
            border-radius:10px;padding:1px 8px;margin-left:6px;white-space:nowrap}
       .card .who{color:#444}
-      .card .trap{background:#fff7f7;border-left:3px solid var(--dis);padding:6px 10px;
-           margin:8px 0 0;font-size:.92em;border-radius:0 4px 4px 0}
+      .card .deep{margin-top:10px;border-top:1px dashed #ddd;padding-top:6px}
+      .card .deep h5{margin:12px 0 4px;font-size:.95em;color:#333}
       table.ind{font-size:.84em;margin:8px 0}
       @media print{
         .card{page-break-inside:avoid}

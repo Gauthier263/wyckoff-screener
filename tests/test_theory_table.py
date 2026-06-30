@@ -36,6 +36,37 @@ def test_theory_rows_include_cvd():
         assert "absorption" in climax["cvd"].lower()
 
 
+def test_theory_rows_absorption_column():
+    """Chaque ligne porte l'absorption attendue ; SOS/SOW = honnête (≈0), Spring = abs>0."""
+    th = Thresholds()
+    for bias in ("accumulation", "distribution"):
+        rows = theory_rows(bias, th)
+        for r in rows:
+            assert r.get("absorp"), f"absorp manquant pour {r['ev']} ({bias})"
+        signe = "SOS" if bias == "accumulation" else "SOW"
+        sgn = next(r for r in rows if r["ev"] == signe)
+        # SOS/SOW = mouvement honnête = absorption NÉGATIVE (pas ≈0), distincte du spring (>0)
+        assert "< 0" in sgn["absorp"] and "HONNÊTE" in sgn["absorp"]
+        spring = next(r for r in rows if r["ev"] in ("SPRING", "UTAD"))
+        assert "> 0" in spring["absorp"]
+
+
+def test_event_cards_no_trap_but_spring_detail():
+    """Le « piège » des fiches event est retiré ; Spring/UTAD ont le détail (micro LTF + types)."""
+    out = build_theory_html(Thresholds(), out_path=None) if False else None
+    import tempfile, os
+    p = build_theory_html(Thresholds(), out_path=os.path.join(tempfile.mkdtemp(), "m.html"))
+    doc = open(p, encoding="utf-8").read()
+    assert "Piège / invalidation" not in doc          # retiré des fiches event
+    assert "Piège / caveat" in doc                     # conservé sur les fiches INDICE
+    assert "Absorption (indice)" in doc                # colonne table
+    assert "Micro-comportement sur TF inférieure" in doc
+    assert 'Spring « #3 »' in doc and "terminal shakeout" in doc
+    assert "Spring vs SOS vs vraie cassure" in doc
+    assert "Les types d'upthrust" in doc
+    assert doc.count(">Absorption<") >= 12             # ligne absorption dans les fiches event
+
+
 def test_build_theory_html(tmp_path):
     th = Thresholds(climax_vol=2.5, sos_vol=1.4, test_vol=0.8, wide_spread_atr=1.2)
     out = build_theory_html(th, out_path=str(tmp_path / "memo.html"))
