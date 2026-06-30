@@ -124,7 +124,7 @@ def theory_rows(bias: str, th: Thresholds) -> list[dict]:
             "nom": "Secondary Test",
             "role": f"Retour sonder le {borne_climax} : {test_creux}.",
             "volx": f"SEC ≤ ×{th.test_vol} (et < climax)",
-            "spread": f"ÉTROIT < {th.wide_spread_atr} ATR",
+            "spread": f"étroit ≤ {th.narrow_spread_atr} ATR (pas large)",
             "oi": oi("st"),
             "cvd": cvd("st"),
             "cloture": "neutre (pas de débordement)",
@@ -363,8 +363,8 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                  "effort vendeur maximal — mais c'est justement là que l'absorption se produit"),
                 ("Spread/ATR", f"≥ {th.wide_spread_atr} ATR, très large",
                  "amplitude énorme = capitulation, le prix parcourt une grande distance"),
-                ("CLV", "haut (≥ 0.6) : clôture loin du bas",
-                 "malgré la vente panique, le prix récupère = la demande a absorbé (effort vs résultat)"),
+                ("CLV", f"≥ reclaim_clv ({th.reclaim_clv}) : clôture moitié haute",
+                 "le prix récupère DANS la barre = absorption visible (effort vs résultat). Une clôture sur le bas n'est pas encore validée SC par le détecteur : l'absorption se lira alors sur l'AR"),
                 ("OI", "↑ puis purge : shorts agressifs entrent + longs liquidés de force",
                  "le bas attire de nouveaux shorts (qui seront piégés) et flush les derniers longs"),
                 ("CVD", "↓ FORT (vente agressive massive) MAIS prix qui récupère",
@@ -392,7 +392,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("Spread/ATR", "souvent en repli", "mouvement moins violent que le climax"),
                 ("CLV", "indifférente", "le rebond peut clôturer haut sans signifier de la vraie demande"),
                 ("OI", "↓ short covering : les shorts ferment", "preuve que le rebond est un débouclage, pas de l'argent neuf"),
-                ("CVD", "modéré (covering, pas de demande agressive)", "peu de market-buys agressifs : la hausse est portée par le rachat de shorts"),
+                ("CVD", "modéré (covering, pas de demande agressive)", "la hausse est portée par le rachat des shorts (covering), pas par une demande agressive nouvelle"),
                 ("Tierces", "short liqs possibles sur le rebond", "les shorts trop tôt se font sortir, alimentant le rebond"),
             ],
             "trap": "Un AR à fort volume OU à OI montant n'est PAS un AR : c'est déjà un signe de force "
@@ -434,7 +434,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 "Mains faibles = stoppées (longs) ou piégées (nouveaux shorts). Mains fortes = absorbent "
                 "le shakeout et déclenchent ensuite le squeeze.",
             "indices": [
-                ("Volume", "modéré→fort, mais la cassure NE TIENT PAS", "un spring #1 sur faible volume = très haussier ; un shakeout sur fort volume + récupération aussi"),
+                ("Volume", "modéré→fort, mais la cassure NE TIENT PAS", "faible volume + pénétration minime = le plus haussier (offre épuisée) ; un shakeout à fort volume qui récupère reste valide mais demande confirmation"),
                 ("Spread/ATR", "pic bref possible sur la mèche", "le mouvement de piège peut être violent mais éphémère"),
                 ("CLV", f"clôture qui revient DANS la plage (clv ≥ {th.reclaim_clv})", "le rejet de la cassure = la signature du spring"),
                 ("OI", "↑ sur la mèche (shorts piégés) puis ↓ (squeeze)", "les nouveaux shorts de la cassure se font liquider en remontant"),
@@ -528,7 +528,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
             "indices": [
                 ("Volume", f"≥ ×{th.climax_vol} (climactique, le + fort)", "effort acheteur maximal — mais c'est là que la distribution se produit"),
                 ("Spread/ATR", f"≥ {th.wide_spread_atr} ATR, très large", "amplitude énorme = euphorie, grande distance parcourue"),
-                ("CLV", "bas (≤ 0.4) : clôture loin du haut", "malgré l'achat panique, le prix cale = l'offre a absorbé"),
+                ("CLV", f"≤ {round(1 - th.reclaim_clv, 2)} : clôture moitié basse", "le prix cale DANS la barre = l'offre a absorbé (effort vs résultat). Une clôture sur le haut n'est pas encore validée BC : l'absorption se lira sur l'AR"),
                 ("OI", "↑ puis purge : FOMO longs entrent + shorts liquidés", "le haut attire de nouveaux longs (piégés) et flush les shorts"),
                 ("CVD", "↑ FORT (achat agressif/FOMO) MAIS prix qui cale", "ABSORPTION : énorme agression acheteuse sans résultat haussier durable"),
                 ("Tierces", "funding très positif, shorts liquidés, crowd long", "longs encombrés au sommet = base d'un futur markdown"),
@@ -552,7 +552,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("Spread/ATR", "souvent en repli", "mouvement moins violent que le climax"),
                 ("CLV", "indifférente", "le repli peut clôturer bas sans signifier de la vraie offre"),
                 ("OI", "↓ longs liquidés : les longs ferment", "preuve que le repli est un débouclage, pas de l'argent neuf short"),
-                ("CVD", "modéré (liquidation, pas d'offre agressive)", "peu de market-sells agressifs : la baisse est portée par la sortie des longs"),
+                ("CVD", "modéré (liquidation, pas d'offre agressive)", "la baisse est portée par la liquidation des longs, pas par une offre agressive qui ouvre des shorts neufs"),
                 ("Tierces", "long liqs possibles sur le repli", "les longs en retard se font sortir, alimentant la baisse"),
             ],
             "trap": "Un AR à fort volume OU à OI montant (shorts neufs) n'est pas un AR : c'est déjà un "
@@ -620,7 +620,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 ("Volume", f"SOUTENU ≥ ×{th.sos_vol}", "il faut de la vraie offre pour casser et tenir sous le support"),
                 ("Spread/ATR", f"≥ {th.wide_spread_atr} ATR (large)", "expansion de range = conviction vendeuse"),
                 ("CLV", "basse (≤ 0.4)", "le prix clôture près du bas = les vendeurs dominent la barre"),
-                ("OI", "↑ avec la baisse (shorts neufs)", "argent neuf à la vente = markdown réel, PAS un simple déboucla­ge de longs"),
+                ("OI", "↑ avec la baisse (shorts neufs)", "argent neuf à la vente = markdown réel, PAS une simple liquidation de longs"),
                 ("CVD", "↓ FRANC (offre agressive) — sinon faux SOW", "un SOW sans CVD↓ = porté par de la liquidation = cassure fragile"),
                 ("Tierces", "funding passe négatif, long liqs", "la bascule du positionnement confirme l'engagement vendeur"),
             ],
@@ -735,8 +735,9 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
         },
         {
             "id": "clv", "name": "CLV (Close Location Value)", "rank": "Force PRIMAIRE (qualité de barre)",
-            "def": "CLV = [(close − low) − (high − close)] ÷ (high − low). Borné entre <b>−1</b> (clôture "
-                   "sur le bas) et <b>+1</b> (clôture sur le haut) ; 0 = milieu.",
+            "def": "CLV = (close − low) ÷ (high − low), borné et clippé sur <b>[0, 1]</b> : <b>0</b> = "
+                   "clôture sur le bas, <b>1</b> = clôture sur le haut, <b>0.5</b> = milieu (convention "
+                   "du screener — ce n'est pas la variante Williams [−1, +1]).",
             "mesure": "<b>Qui gagne la barre à la clôture.</b> CLV haut = les acheteurs ont repris le "
                       "contrôle en fin de barre (rejet du bas) ; CLV bas = les vendeurs dominent (rejet du "
                       "haut). C'est le détail qui révèle l'absorption sur une barre de climax.",
@@ -744,10 +745,10 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
                     "HAUT (clv élevé) = absorption (SC) ; une grosse barre de hausse qui clôture BAS = "
                     "distribution (BC).",
             "attendu": [
-                ("SC (accu)", "haut ≥ 0.6 (récupération = absorption)"),
-                ("BC (distrib)", "bas ≤ 0.4 (cale = absorption par l'offre)"),
-                ("SOS", "haut ≥ 0.6"),
-                ("SOW", "bas ≤ 0.4"),
+                ("SC (accu)", f"≥ reclaim_clv ({th.reclaim_clv}) : moitié haute = récupération/absorption"),
+                ("BC (distrib)", f"≤ {round(1 - th.reclaim_clv, 2)} : moitié basse = cale/absorption par l'offre"),
+                ("SOS", "≥ 0.6 (clôture forte exigée par le détecteur)"),
+                ("SOW", "≤ 0.4 (clôture faible exigée par le détecteur)"),
                 ("Spring", f"revient dans la plage, clv ≥ {th.reclaim_clv}"),
                 ("UTAD", f"revient dans la plage, clv ≤ {th.reclaim_clv}"),
             ],
