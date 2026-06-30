@@ -34,9 +34,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
   `add_absorption(df, delta)` — **effort (CVD) vs résultat (prix)** : `delta_z` (flux net en σ),
-  `ret_atr`, `absorption` = `−delta_z·(2·clv−1)` (>0 = flux rejeté ; signe de delta_z = côté
-  absorbant), `no_demand`/`no_supply` (prix qui voyage ≥ `move_atr` ATR avec effort faible). Deux
-  divergences OPPOSÉES du 2×2 (absorption ≠ no-demand).
+  `ret_atr`, `absorption` = `−delta_z·(2·clv−1)` (per-barre ; >0 = flux rejeté, <0 = honnête
+  confirmé, signe de delta_z = côté absorbant), **`absorption_w`** (même formule sur `win`=3 barres
+  = flux cumulé vs clôture dans le range des 3 dernières → **lecture de référence, robuste à la
+  TF** car le per-barre dépend du CLV d'UNE bougie qui perd la structure intra-barre),
+  `no_demand`/`no_supply` (prix qui voyage ≥ `move_atr` ATR avec effort faible). Deux divergences
+  OPPOSÉES du 2×2 (absorption ≠ no-demand).
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
   qu'un spring récent soit mesuré contre la plage qui le précède.
 - `screener/events.py` — `detect_events` : SPRING, UTAD, SC, BC, SOS, SOW, ST,
@@ -194,9 +197,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   · **prix et CVD en phase** = mouvement « honnête », **pas d'absorption, signal non concluant**.
   **Quantifié** via `features.add_absorption(df, fetch_taker_delta(...))` : colonne `absorption`
   (`−delta_z·(2·clv−1)`, >0 = flux rejeté ; delta_z<0 = demande absorbe (haussier), delta_z>0 =
-  offre absorbe (baissier)) + `no_demand`/`no_supply` (prix qui voyage sans flux = l'**autre**
-  divergence, que l'absorption ne voit pas). Citer la valeur d'absorption et/ou le flag dans la
-  lecture event par event. Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une
+  offre absorbe (baissier)) + **`absorption_w`** (version 3 barres, **à citer en priorité** car
+  stable d'une TF à l'autre — le per-barre dépend du CLV d'une seule bougie, donc varie fortement
+  selon la TF, ex. SC 58 115 : abs per-barre −0.68 (H8) à −3.85 (H1) mais `absorption_w` +0.18→+0.41
+  homogène) + `no_demand`/`no_supply` (prix qui voyage sans flux = l'**autre** divergence, que
+  l'absorption ne voit pas). Citer la valeur d'absorption et/ou le flag dans la lecture event par event. Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une
   thèse, **ou rien d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp
   `fapi` 451-bloqué) = proxy du flux ; une divergence **CVD spot vs OI perp** est elle-même
   lisible (spot achète / perp déboucle). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD

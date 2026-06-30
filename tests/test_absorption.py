@@ -78,5 +78,29 @@ def test_no_demand_and_no_supply_flags():
 
 def test_columns_present():
     out = _build()
-    for col in ("delta", "delta_z", "ret_atr", "absorption", "no_demand", "no_supply"):
+    for col in ("delta", "delta_z", "ret_atr", "absorption", "absorption_w",
+                "no_demand", "no_supply"):
         assert col in out.columns
+
+
+def test_windowed_absorption_catches_multibar():
+    """Vente sur la barre N puis rejet sur la barre N+1 : le per-barre RATE l'absorption,
+    la version fenêtrée (absorption_w) la CAPTE."""
+    df, delta = _base(30)
+    # bar 25 : vente agressive, clôture sur le bas (per-barre = honnête, abs < 0)
+    df.iloc[25, df.columns.get_loc("open")] = 100.0
+    df.iloc[25, df.columns.get_loc("high")] = 105.0
+    df.iloc[25, df.columns.get_loc("low")] = 90.0
+    df.iloc[25, df.columns.get_loc("close")] = 90.0      # clv = 0
+    delta.iloc[25] = -30.0
+    # bar 26 : reprise franche (reclaim), peu de flux
+    df.iloc[26, df.columns.get_loc("open")] = 90.0
+    df.iloc[26, df.columns.get_loc("high")] = 102.0
+    df.iloc[26, df.columns.get_loc("low")] = 90.0
+    df.iloc[26, df.columns.get_loc("close")] = 101.0     # ravale la vente
+    delta.iloc[26] = 0.0
+    out = add_absorption(add_features(df), delta, win=3)
+    # per-barre sur la barre de vente = honnête (négatif), rate l'absorption
+    assert out["absorption"].iloc[25] < 0
+    # fenêtré sur la barre de reprise = absorption captée (vente nette rejetée sur 3 barres)
+    assert out["absorption_w"].iloc[26] > 0

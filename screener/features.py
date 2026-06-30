@@ -51,7 +51,8 @@ def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd
 
 
 def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
-                   move_atr: float = 1.0, weak_eff: float = 0.5) -> pd.DataFrame:
+                   move_atr: float = 1.0, weak_eff: float = 0.5,
+                   win: int = 3) -> pd.DataFrame:
     """Effort (CVD) vs résultat (prix) : **absorption** et **no-demand / no-supply**.
 
     Deux lectures opposées de la loi effort-vs-résultat, à partir du flux d'ordres agressifs.
@@ -63,11 +64,16 @@ def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
       - ``delta``      : flux agressif net par barre (coin).
       - ``delta_z``    : delta / écart-type glissant — **EFFORT** en σ (signe = côté agressif).
       - ``ret_atr``    : (close − open) / atr — **RÉSULTAT** directionnel, en ATR.
-      - ``absorption`` : ``−delta_z · (2·clv − 1)``. Le **signe** discrimine :
-        **> 0 = flux rejeté = absorption** (``delta_z < 0`` vente rejetée → demande absorbe,
-        haussier ; ``delta_z > 0`` achat rejeté → offre absorbe, baissier) ;
+      - ``absorption`` : ``−delta_z · (2·clv − 1)`` — version **per-barre** (in-barre). Le **signe**
+        discrimine : **> 0 = flux rejeté = absorption** (``delta_z < 0`` vente rejetée → demande
+        absorbe, haussier ; ``delta_z > 0`` achat rejeté → offre absorbe, baissier) ;
         **< 0 = mouvement honnête confirmé** (effort ET clôture alignés : un SOS/SOW franc sort
         nettement négatif) ; **≈ 0 = flux faible** ou clôture neutre (AR/ST).
+      - ``absorption_w`` : **même formule sur une fenêtre de ``win`` barres** (défaut 3) — flux net
+        cumulé vs position de la clôture dans le range des ``win`` dernières barres. **Plus
+        robuste** : capture l'absorption même quand la vente et le rejet sont sur des barres
+        DIFFÉRENTES (ce que le per-barre rate), donc moins sensible au découpage de TF. **C'est la
+        lecture de référence ; ``absorption`` per-barre sert pour la barre d'événement précise.**
       - ``no_demand``  : prix MONTE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (hausse
         sans demande agressive = faiblesse / distribution).
       - ``no_supply``  : prix BAISSE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (baisse
@@ -84,6 +90,14 @@ def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
 
     clv_s = 2.0 * out["clv"] - 1.0                 # clôture dans le range, [-1, +1]
     out["absorption"] = -out["delta_z"] * clv_s
+
+    # ── version fenêtrée (option A) : même formule sur `win` barres ──────────
+    dsum = d.rolling(win, min_periods=1).sum()                       # flux net cumulé
+    dsum_z = dsum / dsum.rolling(vol_window, min_periods=max(3, vol_window // 4)).std().replace(0, np.nan)
+    hi_w = out["high"].rolling(win, min_periods=1).max()
+    lo_w = out["low"].rolling(win, min_periods=1).min()
+    clv_w = ((out["close"] - lo_w) / (hi_w - lo_w).replace(0, np.nan)).clip(0, 1)
+    out["absorption_w"] = -dsum_z * (2.0 * clv_w - 1.0)
 
     weak = out["delta_z"].abs() <= weak_eff        # NaN → False (pas de faux flag)
     out["no_demand"] = (out["ret_atr"] >= move_atr) & weak

@@ -1003,8 +1003,11 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
                    "du flux agressif. <b>EFFORT</b> = <code>delta_z</code> = delta ÷ écart-type glissant "
                    "(le flux net en σ, signe = côté). <b>RÉSULTAT</b> = soit <code>clv_s = 2·clv − 1</code> "
                    "(clôture dans le range), soit <code>ret_atr = (close − open)/atr</code> (déplacement). "
-                   "<b>absorption = −delta_z · clv_s</b> ; <b>no_demand/no_supply</b> = prix qui voyage "
-                   "(|ret_atr| ≥ ~1 ATR) avec un effort faible (|delta_z| ≤ ~0.5σ).",
+                   "<b>absorption = −delta_z · clv_s</b> (per-barre). <b>absorption_w</b> = même formule "
+                   "sur <b>3 barres</b> (flux net cumulé vs clôture dans le range des 3 dernières) = la "
+                   "<b>lecture de référence</b>, robuste à la TF (capte le rejet même s'il tombe sur la "
+                   "barre suivante). <b>no_demand/no_supply</b> = prix qui voyage (|ret_atr| ≥ ~1 ATR) "
+                   "avec un effort faible (|delta_z| ≤ ~0.5σ).",
             "mesure": "<b>Deux divergences OPPOSÉES</b> du 2×2 effort/résultat : "
                       "(1) <b>Absorption</b> = effort fort mais flux <i>rejeté</i> (gros delta, clôture "
                       "contraire) → quelqu'un encaisse passivement. (2) <b>No-demand / No-supply</b> = "
@@ -1022,10 +1025,11 @@ def _indicator_cards(th: Thresholds) -> list[dict]:
                 ("AR / ST (réflexe)", "absorption ≈ 0 (flux faible, aucune agression)"),
                 ("Markup/markdown passif", "no_demand (hausse sans achat) / no_supply (baisse sans vente)"),
             ],
-            "piege": "Per-barre c'est BRUITÉ — l'absorption se lit mieux sur un SWING. Relatif et "
-                     "dépendant de la TF/de l'actif (le σ glissant est la référence). CVD = spot (proxy). "
-                     "Ne pas confondre absorption (flux rejeté) et no-demand (prix sans flux) : ce sont "
-                     "deux signaux distincts.",
+            "piege": "Le per-barre <code>absorption</code> est BRUITÉ et <b>dépend de la TF</b> (le CLV "
+                     "d'une bougie perd la structure intra-barre) → privilégier <code>absorption_w</code> "
+                     "(3 barres), nettement plus stable d'une TF à l'autre. Relatif à l'actif (le σ "
+                     "glissant est la référence). CVD = spot (proxy). Ne pas confondre absorption (flux "
+                     "rejeté) et no-demand (prix sans flux) : deux signaux distincts.",
         },
         {
             "id": "funding", "name": "Funding rate", "rank": "TIERCE de positionnement",
