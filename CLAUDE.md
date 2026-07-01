@@ -28,9 +28,20 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   OI Binance brut (mode `days` ou `start`/`end`). **Métriques tierces pour départager
   longs/shorts** (Binance via Coinalyze, `_coinalyze_history`) : `fetch_funding_rate`,
   `fetch_long_short_ratio` ([ratio, pct_long]), `fetch_liquidations` ([long_liq, short_liq]).
+  `fetch_taker_delta()` — **delta agressif par barre** (taker_buy − taker_sell, en coin) depuis
+  les klines Binance (col 9 `publicGetKlines`), base du CVD/absorption (proxy **spot**).
   Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
+  `add_absorption(df, delta)` — **effort (CVD) vs résultat (prix)** : `delta_z` (flux net en σ),
+  `ret_atr`, `absorption` = `−delta_z·(2·clv−1)` (per-barre ; >0 = flux rejeté, <0 = honnête
+  confirmé, signe de delta_z = côté absorbant), **`absorption_w`** (même formule sur `win`=3 barres
+  = flux cumulé vs clôture dans le range des 3 dernières → **robuste à la TF**, mais
+  **COMPLÉMENTAIRE du per-barre, pas un remplaçant** : backtest BTC = abs_w fiable sur la DEMANDE
+  aux creux et les mouvements honnêtes, mais **masque** l'absorption d'OFFRE au sommet d'un rallye
+  car le contexte multi-barres haussier domine. **Lire les DEUX** ; un désaccord = absorption
+  locale), `no_demand`/`no_supply` (prix qui voyage ≥ `move_atr` ATR avec effort faible). Deux
+  divergences OPPOSÉES du 2×2 (absorption ≠ no-demand).
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
   qu'un spring récent soit mesuré contre la plage qui le précède.
 - `screener/events.py` — `detect_events` : SPRING, UTAD, SC, BC, SOS, SOW, ST,
@@ -107,6 +118,36 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   *contexte/biais* sans écraser les étiquettes locales ; (5) **cartographier l'emboîtement**
   (la structure locale exécute une sous-phase de la supérieure) ; la **confluence** local↔macro
   donne le signal le plus fort. Ne pas plaquer les étiquettes macro sur une analyse locale.
+- **AR/ST sont ANCRÉS sur le climax — cohérence de cadre obligatoire.** L'AR part toujours
+  dans le sens **opposé** au climax, et l'ST **reteste le climax** :
+  - **Accumulation** (climax = **SC**, bas) : **AR** rebondit **vers le HAUT** → fixe la **borne
+    haute** ; **ST** reteste **vers le bas** (le SC) → borne basse.
+  - **Distribution** (climax = **BC**, haut) : **AR** réagit **vers le BAS** → fixe la **borne
+    basse** ; **ST** reteste **vers le HAUT** (le BC) → **borne haute** (un lower high qui cale
+    sous le BC = offre confirmée).
+  **Erreur à NE PLUS refaire** : importer la grammaire d'accumulation (climax-bas = « SC » →
+  rallye = « AR-haut ») dans une structure qu'on a classée **distribution**. Dans un cadre
+  distribution, un **climax-bas suivi d'un rallye** se lit **AR-bas (borne basse) puis ST-haut
+  (test de la borne haute)** — JAMAIS « SC puis AR ». Avant d'étiqueter un rebond « AR », se
+  demander : *quel climax l'ancre, et de quel côté ?* Si le cadre est distribution, le test de
+  la résistance est un **ST/UTAD**, pas un AR. Tenir les deux jeux d'étiquettes en parallèle
+  tant que la plage n'est pas cassée (cf. top-down), mais ne jamais **mélanger** les deux
+  grammaires dans un même cadre committé.
+  - **L'OI sur le rebond DÉSAMBIGUÏSE accumulation vs redistribution — c'est toute la nuance du
+    début.** Le prix seul ne distingue pas les deux : il faut lire **QUI porte le rebond** via
+    l'OI coin. Décomposer le rebond climax→test en phases :
+    · **prix↑ + OI↓ = short covering** = « rebond effectif » : les shorts du markdown se
+      rachètent, la pression vendeuse s'épuise. **Constructif / AMBIGU — ne confirme PAS la
+      distribution** (penche même vers l'accumulation : le carburant baissier se retire).
+    · **prix↑ + OI↑ = nouveaux longs** : demande qui entre. Au **test de la résistance** dans un
+      downtrend = **demande piégée** = signature **redistribution** (ces longs deviennent le
+      carburant du markdown suivant, liquidés ensuite).
+    La distribution n'est **confirmée** que si le test de la borne haute est porté par des
+    **nouveaux longs (OI↑) qui échouent**, suivi de la cassure. Un rebond entièrement en
+    covering (OI↓) laisse le scénario **ouvert**. Ex. BTC H8 15/06 : rebond AR-bas→ST en 2
+    phases — Phase 1 covering (prix +4,1 % / OI −3,4 %, ambigu) puis Phase 2 new longs (prix
+    +5,8 % / OI +6,8 %, piégés au test) → redistribution gagnée à la cassure du 24/06. Toujours
+    annoter ces phases sur le panneau OI quand un rebond porte la décision accu-vs-distrib.
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
@@ -116,6 +157,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   tierces ensemble** comme un tout cohérent (en dégager un *sens commun*) plutôt que de les
   lister séparément — ex. « prix↑ + OI coin↑ + shorts liquidés + funding contenu = vraie
   demande qui squeeze les shorts ». Le volume reste traité en premier (force primaire).
+  **Lecture FROIDE, jamais orientée vers la thèse** : le « sens commun » n'est pas un outil
+  pour *valider* ce qu'on veut voir. Si les tierces **contredisent ou affaiblissent** la thèse
+  établie par volume+OI, le **relater explicitement** comme **risque / invalidation partielle**
+  (ex. « le tableau penche distribution, MAIS funding négatif + crowd déjà short = carburant
+  haussier latent, la thèse est fragilisée »). Ne jamais tordre les tierces pour forcer le
+  consensus : une divergence tierce **est** un signal, pas un bruit à gommer.
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
@@ -139,27 +186,71 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **liquidations** (`fetch_liquidations` — long_liq vs short_liq ; ≈0 = mouvement ordonné, pas
   de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
   prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
+- **CVD (Cumulative Volume Delta) — tierce d'ABSORPTION, lue en première parmi les tierces.**
+  Le CVD = somme cumulée du delta (acheteurs agressifs − vendeurs agressifs), où le delta par
+  barre = `taker_buy − taker_sell` (taker_buy = col 9 des klines Binance `publicGetKlines`,
+  taker_sell = volume total − taker_buy). C'est du **flux d'ordres agressifs** → la tierce la
+  plus proche du volume primaire, donc **traitée en tête des tierces** (avant funding/L-S/liq).
+  **Job unique : détecter l'absorption via la divergence prix↔CVD** :
+  · **prix↑ + CVD plat/↓** = hausse sans demande agressive (passive/covering) → **offre absorbe
+    la demande = signe de distribution / faiblesse** ;
+  · **prix↓ + CVD plat/↑** (ou grosse vente agressive mais prix qui tient/récupère) = **demande
+    absorbe l'offre = signe d'accumulation / absorption au plancher** ;
+  · **prix et CVD en phase** = mouvement « honnête », **pas d'absorption, signal non concluant**.
+  **Quantifié** via `features.add_absorption(df, fetch_taker_delta(...))` : colonne `absorption`
+  (`−delta_z·(2·clv−1)`, >0 = flux rejeté ; delta_z<0 = demande absorbe (haussier), delta_z>0 =
+  offre absorbe (baissier)) + **`absorption_w`** (version 3 barres, stable d'une TF à l'autre —
+  ex. SC 58 115 : abs per-barre −0.68 (H8) à −3.85 (H1) mais `absorption_w` +0.18→+0.41 homogène).
+  **Citer les DEUX, complémentaires** (backtest BTC) : per-barre = rejet d'**une** bougie (fiable
+  100% des deux côtés mais fragile à la TF) ; `absorption_w` = contexte multi-barres robuste à la
+  TF (fiable sur DEMANDE/honnêtes, mais **masque l'absorption d'OFFRE au sommet d'un rallye**).
+  **Formule prouvée symétrique** (test miroir, écart 10⁻¹³ : aucun bug de signe) — la fenêtre
+  dilue un rejet isolé dans une tendance forte des DEUX côtés ; ça touche plus l'offre car les
+  rallyes BTC sont plus directionnels (~+1 ATR) que les descentes (~−0.5 ATR). À un sommet, lire
+  le per-barre. Désaccord (per-barre >0, abs_w <0) = absorption **locale** dans un mouvement de fond. Plus
+  `no_demand`/`no_supply` (prix qui voyage sans flux = l'**autre** divergence). Citer la valeur
+  et/ou le flag event par event. Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une
+  thèse, **ou rien d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp
+  `fapi` 451-bloqué) = proxy du flux ; une divergence **CVD spot vs OI perp** est elle-même
+  lisible (spot achète / perp déboucle). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD
+  +1 023 (rallye sans demande agressive → confirme distribution) ; barre SC 58 115 = vente
+  agressive (delta −1 822) mais prix qui récupère (absorption au plancher → affaiblit la
+  continuation baissière). **Fuseau horaire — OBLIGATOIRE de vérifier** : `publicGetKlines`
+  renvoie les **mêmes open times UTC réel** que `fetch_ohlcv` (vérifié : timestamps + close
+  identiques bougie par bougie, écart 0) → appliquer le **même décalage +2h** (`index += 2h`,
+  tz=UTC) qu'au prix et à l'OI. Ne jamais laisser le CVD sur un fuseau différent : une barre
+  CVD décalée fausse la lecture de divergence. Toujours réaligner sur l'index des bougies prix.
 - **Illustration d'une analyse** (préférences Gauthier) :
-  - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
-    lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
-    dans le fil** (outil d'envoi de fichier) — Gauthier veut le voir sans cliquer.
+  - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
+    distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
+    dans le fil** ; `SendUserFile` ne le livre qu'en **pièce jointe plus petite**. Donc pour
+    CHAQUE graphe, à CHAQUE fois : (1) **Read le PNG** → grand rendu inline (obligatoire,
+    systématique, jamais omis — c'est ce qui le rend grand) ; (2) **SendUserFile** le même PNG
+    → version téléchargeable. **Ne JAMAIS se contenter de SendUserFile seul** (sinon le graphe
+    reste petit). Le Read inline n'est pas optionnel : c'est la règle par défaut pour tout
+    graphe livré. Pas de lien cliquable `[texte](...)`.
   - **Bougies dans la MÊME TF que l'analyse** (analyse H4 → bougies H4, H1 → bougies H1).
   - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
     commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
     est le plus pertinent pour la lecture.
-  - **Code couleur texte↔graphe** : préfixer les mots-clés du texte inline d'une pastille
-    de couleur assortie à la couleur de l'élément sur le graphe. **Forme = type** : **ronds
-    pour les ÉVÉNEMENTS** (🟢🟠🔵🟣🔴) · **carrés pour les NIVEAUX de prix** (🟩🟧🟦🟪🟥).
-    Palette fixe (couleur = sens) : **vert** demande/force (SC, SOS, OI coin↑) · **rouge**
-    offre/résistance (BC, SOW, distribution) · **orange** piège/faux signal (faux SOS, UTAD,
-    upthrust) · **bleu** bornes de plage / support / repli (LPS) · **violet** spring / pivot /
-    Phase C. Mêmes couleurs sur les marqueurs du graphe.
+  - **PAS de code couleur emoji dans le texte** (🟢🔴🔵🟣🟠🟩🟥 etc. bannis du corps de
+    l'analyse). Les couleurs restent sur le graphe uniquement (marqueurs, flèches, traits
+    verticaux). Dans le texte, nommer directement l'événement sans pastille.
   - **Alignement des étiquettes** (bug récurrent des scripts ad hoc) : les bougies sont
     décalées +2h en gardant `tz=UTC` ; les timestamps d'événements doivent l'être *aussi*
     (`pd.Timestamp('HH:MM', tz='UTC')` = heure CEST étiquetée UTC), JAMAIS `+02:00` (que
     matplotlib reconvertit → étiquette 2 bougies trop à gauche). Vérifier l'alignement.
   - Toujours : panneau **volume avec moyenne (vol MA) + étiquettes d'événements** (nom +
     ×vol_ratio), et panneau **OI à la MÊME TF que le cours** (jamais une TF d'OI différente).
+  - **Panneau OI = BOUGIES OHLC, jamais une ligne.** L'OI se trace en **chandeliers de la
+    MÊME TF que le cours** (vert = OI↑ sur la barre, rouge = OI↓), comme `plot.py`. Source
+    `fetch_open_interest_ohlc` (défaut coin, `usd=False`). Pour la profondeur historique
+    (archive Binance en USD), **construire les bougies d'OI en coin** (O/H/L/C de l'OI_coin
+    sur chaque barre, OI_coin = OI_usd / prix) — ne jamais se contenter d'une courbe lissée.
+  - **Export PNG = RGB haute résolution** (clic-pour-agrandir fiable côté web). Toujours :
+    `savefig(..., dpi=200, bbox_inches='tight', facecolor='white')` **puis aplatir
+    RGBA→RGB sur fond blanc via PIL** (un PNG en RGBA n'active pas toujours le zoom au clic).
+    Vérifier `Image.open(...).mode == 'RGB'` avant de livrer.
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
     confirment la thèse, et rappeler ce que dit la théorie sur cet événement dans le
     schéma (accumulation / distribution) — colonne dédiée.
@@ -168,11 +259,167 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     test ≤ ×test_vol, SOS/SOW ≥ ×sos_vol, spread vs wide_spread_atr). Texte généré par
     `window._theory(bias, name, th)` à partir des `Thresholds` courants — but : développer
     des automatismes de lecture event par event.
-  - **Mémo théorie** : à *chaque* demande d'analyse, livrer dans le fil le **HTML
-    cliquable** (`theory_table.build_theory_html` → `memo_theorie.html`) — rôle + seuils de
-    validité (vol×, ATR, clôture) + OI attendu de chaque événement, accumulation et
-    distribution, pour mémoriser ce qui rend un événement valide ou non. À la **fin** de
-    chaque analyse, proposer explicitement à Gauthier de pouvoir y référer.
+  - **Mémo théorie** : à *chaque* demande d'analyse, **livrer obligatoirement** dans le fil
+    le **HTML cliquable** (`theory_table.build_theory_html` → `memo_theorie.html`) via
+    SendUserFile — rôle + seuils de validité (vol×, ATR, clôture) + OI attendu de chaque
+    événement, accumulation et distribution. Ce mémo est le référentiel pour confronter les
+    observations du tableau aux seuils théoriques. **À la fin de chaque analyse**, rappeler
+    en une phrase ce que ce mémo permet de vérifier pour CETTE structure spécifique (ex.
+    « Le mémo théorie est joint — il permet ici de vérifier les seuils vol× qui distinguent
+    un vrai SOS d'un faux SOS / covering »). Ne pas juste "proposer" de s'y référer :
+    le livrer systématiquement.
+
+## Format canonique des analyses Wyckoff texte
+
+Structure imposée pour toute analyse Wyckoff manuelle (ad hoc ou sur demande).
+**Gauthier valide ce format** — ne jamais en dévier sans raison explicite.
+
+### Mots-clés déclencheurs
+Le format complet (graphe bougies OI + mémo théorie + 5 sections) se déclenche dès que la
+demande contient **« analyse wyckoff » / « analyse de la séquence »** sur un actif. Forme
+canonique : **`analyse wyckoff [ACTIF] [TF] [depuis quand]`** (ex. « analyse wyckoff BTCUSDT
+H8 depuis 02/06 »). Les 3 paramètres utiles :
+- **Actif** (obligatoire) — BTCUSDT.P, XAU, VELVET…
+- **TF** (optionnel) — H8, H1, 5m, 3m… ; à défaut, choisir celle qui colle le mieux à la lecture.
+- **Fenêtre / point de départ** (optionnel) — « depuis 02/06 », « depuis 16h » ; à défaut,
+  remonter au début de structure pertinent (≥ 80 bougies).
+
+**Distinguer du suivi rapide** : une simple question d'état (« où en est BTC », « réactualise
+sur la dernière bougie », « le niveau X tient ? ») n'est PAS une analyse de séquence → réponse
+courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd est réservé aux
+**analyses de séquence**.
+
+### Livrables dans le fil
+1. PNG du graphe (via SendUserFile — jamais un lien cliquable)
+2. HTML mémo théorie (via SendUserFile — `memo_theorie.html`)
+
+### Corps de l'analyse — sections numérotées dans cet ordre
+
+**Titre en en-tête** : `ACTIF TF — description courte de la séquence et des dates`
+
+**1. Contexte macro (top-down)**
+Toujours en premier, avant toute étiquette. Identifier :
+- Tendance HTF (Daily/H4) : plus-hauts/plus-bas, sommet de référence, amplitude du markdown
+- Position dans le cycle : la plage est-elle après montée ou après baisse ?
+- Classification par défaut : redistribution si downtrend, à défaut de preuve contraire
+- Conséquence sur les étiquettes (conditionnel tant que la plage n'est pas cassée)
+
+**2. Lecture événement par événement**
+Tableau obligatoire. Chaque ligne confronte ce qui est observé aux seuils théoriques de
+l'événement (vol×, spread/ATR, CLV attendus selon `Thresholds`). La colonne "Lecture" doit
+dire : (a) ce que la théorie attend pour cet événement, (b) ce qu'on observe, (c) si c'est
+validé ou non. C'est le cœur pédagogique : développer les automatismes event par event.
+
+Colonnes selon disponibilité des données :
+
+— VSA pur (OI indisponible, ex. XAU) :
+`Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Lecture VSA`
+
+La colonne "Lecture VSA" inclut systématiquement : seuil théorique attendu pour cet
+événement (ex. SC : vol ≥ climax_vol×, spread large, clv ≤ 0.3 pour capitulation pure) +
+valeur observée + verdict (validé / ambigu / non validé).
+
+— Avec OI (ex. BTC via Coinalyze) :
+`Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Volume + OI = sens`
+
+La colonne "Volume + OI = sens" dit la signature théorique attendue (ex. AR : OI en repli
+attendu = débouclage) + ce qu'on observe + interprétation (covering / nouveaux longs /
+nouveaux shorts / liq forcée).
+
+Le **CVD** ne va PAS dans le tableau événement (c'est une tierce) : il est lu après, en
+section "Confirmation tierce" (1. CVD/absorption), pour confirmer/affaiblir les lignes ci-dessus.
+
+**Confirmation tierce — deux lectures froides** (après le tableau, quand OI ambigu ou quand
+les tierces ont été consultées) — plus une **3ᵉ de repli (RSI) seulement si CVD/OI manquent**.
+Vient *en second temps* valider / affaiblir / renforcer les hypothèses du tableau — ou conclure
+qu'il n'y a rien d'exploitable.
+
+1. **CVD / absorption** (flux d'ordres agressifs, lu en premier car le plus proche du volume).
+   **Hors du tableau événement** (sinon il devient co-primaire et casse l'ordre volume→OI→tierces
+   + le tableau s'alourdit + le delta 1 barre est bruité), mais structuré en **mini-liste
+   event-ancrée** — PAS un paragraphe global. Pour chaque événement où le CVD parle, une ligne :
+   `Événement — théorie (CVD attendu) — observé (Δ CVD / divergence) — verdict`.
+   Attentes théoriques par event :
+   · **SC/climax** : vente agressive massive (CVD↓ fort) **mais** absorption (prix qui récupère)
+     = climax absorbé → constructif ;
+   · **SOS** : exige **CVD↑ franc** (demande agressive) ; un SOS sans CVD↑ = covering, faux SOS ;
+   · **SOW** : **CVD↓ franc** en phase avec le prix = offre agressive réelle ;
+   · **UTAD / upthrust** : prix↑ **mais CVD plat/divergent** = pas de demande = piège confirmé ;
+   · **AR / ST** : CVD plat/modeste attendu (réflexe, pas d'agression).
+   **Chiffrer avec `add_absorption`** (cf. `data.fetch_taker_delta` + `features.add_absorption`,
+   même décalage +2h que le prix) : citer pour chaque event la valeur `absorption` (>0 = flux
+   rejeté ; signe de delta_z = côté) **OU** le flag `no_demand`/`no_supply` (prix qui voyage sans
+   flux — l'autre divergence, que l'absorption ne voit pas). Toujours distinguer les deux :
+   *absorption* = effort fort rejeté ; *no-demand* = résultat fort sans effort.
+   La divergence décisive est souvent **multi-barres** (sur un swing), pas 1 bougie — la signaler
+   comme telle (per-barre l'absorption est bruitée). Conclure chaque ligne par l'un des 4 cas :
+   **confirme distrib / confirme accu / affaiblit / rien d'exploitable**. CVD = spot (proxy).
+
+2. **Positionnement — synthèse en sens commun** (funding, ratio L/S, liquidations) :
+   ne pas lister séparément. Les lire ensemble pour un sens unique en une ou deux phrases : ex.
+   « Liquidations nulles des deux côtés + funding négatif + crowd 68% long = rebond en covering
+   volontaire, pas un squeeze forcé — longs encombrés = fragilité dominante ».
+
+3. **Divergence prix/RSI — tierce de REPLI, uniquement quand CVD/OI sont indisponibles.**
+   Le RSI est un **résultat prix pur** (retour clôture-à-clôture lissé, sans volume ni effort) —
+   c'est l'angle mort du VSA, donc **jamais** une tierce primaire et **jamais** dans le tableau
+   événement. Il n'est mobilisé **qu'en dernier recours**, là où les tierces normales manquent :
+   actif spot sans taker data (pas de CVD), actif sans dérivés (XAU, pas d'OI/funding/L-S/liq).
+   Quand CVD/OI existent, **ne pas le citer** (redondant, plus faible que le flux réel).
+   Lecture : la **divergence aux pivots** (`features.add_rsi_divergence`) — `rsi_bear_div` (prix
+   plus-haut, RSI plus-bas = non-confirmation du momentum à un sommet → renforce un UTAD/BC),
+   `rsi_bull_div` (prix plus-bas, RSI plus-haut à un creux → renforce un SC/spring absorbé).
+   Caveat : en tendance forte un oscillateur borné reste « en surchauffe » sans invalider le
+   mouvement — donc lecture **froide**, jamais un signal autonome, jamais pour forcer un consensus
+   (mêmes cas que les autres tierces : confirme / affaiblit / contredit / rien d'exploitable).
+
+Les tierces confirment ou infirment ce que le tableau a établi ; elles ne s'y substituent pas,
+et se lisent **à froid** (cf. interdits : ne jamais tordre une tierce pour forcer le consensus).
+**Lecture froide, pas de biais de confirmation** : l'objectif n'est PAS de faire converger les
+tierces vers la thèse. Trois cas à traiter honnêtement : (a) elles **confirment** → on renforce ;
+(b) elles **affaiblissent** → relater le risque (« la thèse tient mais X la fragilise ») ;
+(c) elles **contredisent** → relater l'**invalidation possible** depuis l'angle tierce, et
+réévaluer. Forcer le consensus = faute. Une tierce divergente est un signal à part entière.
+
+Chaque ligne = un seul événement, lecture factuelle et concise.
+
+**3. Note fractale**
+Comment cette structure locale (LTF) s'insère dans la TF supérieure.
+Préciser : quelle sous-phase macro elle représente. Ne pas plaquer les étiquettes macro.
+
+**4. Synthèse** (ou "Structure identifiée")
+- Séquence identifiée : SC → AR → ST → … (Phase A/B/C/D selon avancement)
+- Biais directionnel et degré de conviction (avec la raison)
+- Si verdict impossible : dire explicitement "trop tôt — attendre [tel signal]"
+
+**5. Niveaux (justifiés)**
+Bullet points — format : `prix (raison qui en fait un niveau clé)`. Toujours inclure :
+- Plafond (résistance, AR, rejet)
+- Support interne / pivot
+- Plancher (SC low, borne basse confirmée)
+- Stop (au-dessus/en dessous de quel événement Wyckoff, et pourquoi)
+- Cibles (avec les étapes intermédiaires)
+- Invalidation (ce qui remettrait en cause le biais)
+
+**Fin de chaque analyse** : rappeler en une phrase ce que le mémo théorie permet de
+vérifier pour CETTE structure spécifique (ex. « Le mémo théorie est joint — utile ici
+pour vérifier les seuils vol× qui distinguent un vrai SOS d'un covering »).
+
+### Ce qui est interdit dans le format
+- Code couleur emoji dans le texte (🟢🔴 etc.)
+- Niveaux sans justification entre parenthèses
+- Étiquetter l'accumulation sans preuve (toujours "à gagner")
+- Sauter la section contexte macro
+- Analyser bottom-up (étiquettes avant cadre)
+- Omettre le mémo théorie HTML (livré à chaque analyse, sans exception)
+- Décrire un événement sans confronter aux seuils théoriques (vol×, spread/ATR,
+  CLV, OI attendu) — l'observation seule ne suffit pas, le "validé / ambigu /
+  non validé" doit être explicite
+- Lister les métriques tierces en bullets séparés : elles se lisent ensemble
+  pour produire un sens commun en une phrase synthèse
+- Tordre les tierces pour forcer le consensus de la thèse : si elles affaiblissent
+  ou contredisent, relater le risque / l'invalidation (lecture froide, pas de
+  biais de confirmation)
 
 ## Commandes
 ```bash
