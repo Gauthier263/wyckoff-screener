@@ -220,6 +220,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   identiques bougie par bougie, écart 0) → appliquer le **même décalage +2h** (`index += 2h`,
   tz=UTC) qu'au prix et à l'OI. Ne jamais laisser le CVD sur un fuseau différent : une barre
   CVD décalée fausse la lecture de divergence. Toujours réaligner sur l'index des bougies prix.
+- **Actifs NON-24/7 (or/XAU, indices) — source + filtre week-end.** L'or réel (COMEX/forex) est
+  **fermé le week-end**, mais les perps crypto XAU trade 24/7 → ils affichent des bougies Sam/Dim
+  **artificielles** (volume ~11 % de la semaine, amplitude ~23 %) qui faussent le VSA (elles
+  tirent la vol MA et l'ATR vers le bas). **Règles** : (1) **source = `gate` `XAU/USDT:USDT`** —
+  de loin le meilleur volume parmi les perps XAU (vérifié vs okx/bitget/mexc/htx ; les
+  tokenisés XAUT/PAXG sont moins liquides) ; (2) **filtrer Sam & Dim** sur l'UTC réel
+  (`df[df.index.dayofweek < 5]`) **AVANT** `add_features` pour que vol_ratio/ATR se calculent sur
+  les seules bougies de trading ; (3) sur le graphe, **tracer en x entier** (index de barre) pour
+  **écraser les gaps** week-end (rendu continu comme une plateforme or), ticks sur le 1ᵉʳ barre de
+  chaque jour. Pas d'OI ni de CVD sur l'or (VSA pur).
 - **Illustration d'une analyse** (préférences Gauthier) :
   - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
     distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
