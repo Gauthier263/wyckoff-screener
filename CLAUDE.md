@@ -152,6 +152,22 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   (ex. « le tableau penche distribution, MAIS funding négatif + crowd déjà short = carburant
   haussier latent, la thèse est fragilisée »). Ne jamais tordre les tierces pour forcer le
   consensus : une divergence tierce **est** un signal, pas un bruit à gommer.
+- **Le TEST (ST / test sec) est l'événement PIVOT — mais c'est une ALERTE, pas un déclencheur.**
+  Un test sec (`vr ≤ test_vol`, `spread/ATR ≤ narrow_spread_atr`, clôture qui **tient** la borne,
+  en **higher low**) = signature *no supply* = le CO signale que l'offre est absorbée et qu'il
+  peut markup. **Filtre à haute valeur mais jamais suffisant seul** : backtest BTC (H4 1000
+  barres + D1 400 j) → **~71 % des tests secs précèdent une action du CO** (spring/markup), **mais
+  ~1 sur 5 échoue en markdown**. Ne JAMAIS acheter un test sec nu. **Le discriminant, c'est ce qui
+  SUIT le test** — fourche à trancher explicitement : (a) **spring qui TIENT** (poke sous la borne
+  puis **reclaim qui colle**) = **confirmation CO** (succès ~54 % H4 / 43 % D1, MFE médian ~2 ATR) ;
+  (b) **spring qui CASSE** (poke non repris, borne perdue) = **shakeout raté = redistribution**
+  (~12 % H4 / **0 % D1** → c'est le signal d'**invalidation le plus tranchant**) ; (c) **markup
+  direct** sans spring (demande si forte qu'aucun test bas n'est nécessaire — marche aussi bien).
+  Conséquence opérationnelle (cf. top-down §3) : **entrer sur le spring-qui-tient + LPS (ou la
+  cassure tenue), JAMAIS sur le test sec lui-même**. Caractériser le volume sec en **RELATIF**
+  (ratio à la `vol_MA`, **~15-30 % du volume du climax**, séquence **décroissante** sur tests
+  successifs) et **contextuel** : sec **au support** = *no supply* (constructif) ; sec **sur un
+  rallye vers la résistance** = *no demand* (baissier). Le lieu décide du sens.
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
@@ -286,6 +302,16 @@ Tableau obligatoire. Chaque ligne confronte ce qui est observé aux seuils théo
 l'événement (vol×, spread/ATR, CLV attendus selon `Thresholds`). La colonne "Lecture" doit
 dire : (a) ce que la théorie attend pour cet événement, (b) ce qu'on observe, (c) si c'est
 validé ou non. C'est le cœur pédagogique : développer les automatismes event par event.
+
+**Suivi des tests — traitement renforcé (obligatoire).** Les lignes de **test (ST / test sec)**
+sont les plus importantes du tableau : ce sont elles qui portent la décision. Pour CHAQUE test, la
+colonne Lecture doit (1) confronter au seuil *no supply* (`vr ≤ test_vol`, `spread/ATR ≤ narrow`,
+tenue de la borne en higher low), (2) donner le **verdict de sécheresse** (volume en **% du
+climax**, place dans la **séquence** de tests — décroît-il ?), puis (3) **trancher la fourche de
+suite** dès qu'elle est observable : **spring qui TIENT** (confirmation CO → biais renforcé),
+**spring qui CASSE** (invalidation → bascule redistribution), ou **markup direct**. Un test noté
+sans sa suite (a-t-il tenu ? qu'a fait le CO ensuite ?) est **incomplet** : c'est la **tenue**, pas
+le test brut, qui décide. L'entrée se justifie sur cette suite (spring-tient + LPS), pas sur le test.
 
 Colonnes selon disponibilité des données :
 
