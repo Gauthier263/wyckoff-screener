@@ -251,6 +251,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
     `savefig(..., dpi=200, bbox_inches='tight', facecolor='white')` **puis aplatir
     RGBA→RGB sur fond blanc via PIL** (un PNG en RGBA n'active pas toujours le zoom au clic).
     Vérifier `Image.open(...).mode == 'RGB'` avant de livrer.
+  - **Aspect ratio pour un grand rendu inline** : l'affichage inline (Read) est **plafonné à
+    ~2000 px de LARGE** → un graphe large/plat s'affiche petit. Viser un **ratio ~1.4–1.5**
+    (plutôt haut). 3 panneaux (prix/vol/OI) : `figsize=(19,14)`. **2 panneaux (prix/vol, ex. or
+    sans OI) : `figsize=(17,12.5)`, PAS (19,11)** qui donne un ratio trop large (rendu court).
   - Pour chaque événement détecté : expliquer *pourquoi le volume et le spread*
     confirment la thèse, et rappeler ce que dit la théorie sur cet événement dans le
     schéma (accumulation / distribution) — colonne dédiée.
