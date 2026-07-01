@@ -110,6 +110,58 @@ def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
     return out
 
 
+def rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
+    """RSI de Wilder (moyenne exponentielle des gains/pertes de clôture)."""
+    delta = df["close"].diff()
+    gain = delta.clip(lower=0.0)
+    loss = (-delta).clip(lower=0.0)
+    avg_gain = gain.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    out = 100.0 - 100.0 / (1.0 + rs)
+    return out.where(avg_loss != 0, 100.0)  # avg_loss nul → RSI=100 (que du gain)
+
+
+def add_rsi_divergence(df: pd.DataFrame, period: int = 14, left: int = 3,
+                        right: int = 3) -> pd.DataFrame:
+    """Divergence prix/RSI entre pivots consécutifs — **tierce de repli** n'exigeant
+    que l'OHLCV (contrairement à CVD/OI/funding), donc utilisable quand ces données
+    sont indisponibles (spot sans taker data, actifs sans dérivés type XAU). Le RSI
+    est un résultat prix pur, sans effort (volume) : il ne remplace jamais la lecture
+    VSA/OI, il ne fait que signaler un défaut de confirmation momentum aux extrêmes.
+
+    Compare chaque pivot à haut/bas confirmé (`swing_points`) au pivot précédent de
+    même sens :
+      - ``rsi_bear_div`` : prix fait un plus-haut, RSI fait un plus-bas (momentum ne
+        suit pas la nouvelle mèche haute — signal de non-confirmation à un sommet).
+      - ``rsi_bull_div`` : prix fait un plus-bas, RSI fait un plus-haut (idem, à un creux).
+    """
+    out = df.copy()
+    out["rsi"] = rsi(out, period)
+    out = swing_points(out, left=left, right=right)
+
+    n = len(out)
+    bear = np.zeros(n, dtype=bool)
+    bull = np.zeros(n, dtype=bool)
+    highs = out["high"].to_numpy()
+    lows = out["low"].to_numpy()
+    rsi_v = out["rsi"].to_numpy()
+
+    hi_idx = np.flatnonzero(out["swing_high"].to_numpy())
+    for a, b in zip(hi_idx[:-1], hi_idx[1:]):
+        if highs[b] > highs[a] and rsi_v[b] < rsi_v[a]:
+            bear[b] = True
+
+    lo_idx = np.flatnonzero(out["swing_low"].to_numpy())
+    for a, b in zip(lo_idx[:-1], lo_idx[1:]):
+        if lows[b] < lows[a] and rsi_v[b] > rsi_v[a]:
+            bull[b] = True
+
+    out["rsi_bear_div"] = bear
+    out["rsi_bull_div"] = bull
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Pivots / swings
 # --------------------------------------------------------------------------- #
