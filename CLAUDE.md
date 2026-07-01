@@ -330,8 +330,9 @@ Le **CVD** ne va PAS dans le tableau événement (c'est une tierce) : il est lu 
 section "Confirmation tierce" (1. CVD/absorption), pour confirmer/affaiblir les lignes ci-dessus.
 
 **Confirmation tierce — deux lectures froides** (après le tableau, quand OI ambigu ou quand
-les tierces ont été consultées). Vient *en second temps* valider / affaiblir / renforcer les
-hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
+les tierces ont été consultées) — plus une **3ᵉ de repli (RSI) seulement si CVD/OI manquent**.
+Vient *en second temps* valider / affaiblir / renforcer les hypothèses du tableau — ou conclure
+qu'il n'y a rien d'exploitable.
 
 1. **CVD / absorption** (flux d'ordres agressifs, lu en premier car le plus proche du volume).
    **Hors du tableau événement** (sinon il devient co-primaire et casse l'ordre volume→OI→tierces
@@ -358,6 +359,19 @@ hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
    ne pas lister séparément. Les lire ensemble pour un sens unique en une ou deux phrases : ex.
    « Liquidations nulles des deux côtés + funding négatif + crowd 68% long = rebond en covering
    volontaire, pas un squeeze forcé — longs encombrés = fragilité dominante ».
+
+3. **Divergence prix/RSI — tierce de REPLI, uniquement quand CVD/OI sont indisponibles.**
+   Le RSI est un **résultat prix pur** (retour clôture-à-clôture lissé, sans volume ni effort) —
+   c'est l'angle mort du VSA, donc **jamais** une tierce primaire et **jamais** dans le tableau
+   événement. Il n'est mobilisé **qu'en dernier recours**, là où les tierces normales manquent :
+   actif spot sans taker data (pas de CVD), actif sans dérivés (XAU, pas d'OI/funding/L-S/liq).
+   Quand CVD/OI existent, **ne pas le citer** (redondant, plus faible que le flux réel).
+   Lecture : la **divergence aux pivots** (`features.add_rsi_divergence`) — `rsi_bear_div` (prix
+   plus-haut, RSI plus-bas = non-confirmation du momentum à un sommet → renforce un UTAD/BC),
+   `rsi_bull_div` (prix plus-bas, RSI plus-haut à un creux → renforce un SC/spring absorbé).
+   Caveat : en tendance forte un oscillateur borné reste « en surchauffe » sans invalider le
+   mouvement — donc lecture **froide**, jamais un signal autonome, jamais pour forcer un consensus
+   (mêmes cas que les autres tierces : confirme / affaiblit / contredit / rien d'exploitable).
 
 Les tierces confirment ou infirment ce que le tableau a établi ; elles ne s'y substituent pas,
 et se lisent **à froid** (cf. interdits : ne jamais tordre une tierce pour forcer le consensus).
