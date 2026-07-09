@@ -80,3 +80,69 @@ def test_neutral_range_has_few_events():
     # une plage calme ne doit pas crouler sous les signaux de cassure
     breakout = [e for e in events if e.name in ("SOS", "SOW", "SPRING", "UTAD")]
     assert len(breakout) == 0, [e.name for e in events]
+
+
+# ── Climax, tests et back-ups (SC / BC / ST / LPS / LPSY) ──────────────────────
+# Ces détecteurs n'étaient exercés qu'indirectement via window.py ; on couvre ici
+# directement les branches de detect_events (barre large volumique au climax, test
+# à volume sec près d'une borne, back-up après cassure).
+
+def test_sc_selling_climax():
+    df = _range_base()
+    # barre large + volume climactique au support, clôture haute (reprise de la demande)
+    df = _append(df, 100.2, 103.0, 100.0, 102.5, 3000)
+    _, events = _analyze(df)
+    assert "SC" in [e.name for e in events], [e.name for e in events]
+
+
+def test_no_sc_when_volume_normal():
+    df = _range_base()
+    # même géométrie mais volume normal → pas de climax
+    df = _append(df, 100.2, 103.0, 100.0, 102.5, 1000)
+    _, events = _analyze(df)
+    assert "SC" not in [e.name for e in events]
+
+
+def test_bc_buying_climax():
+    df = _range_base()
+    # barre large + volume climactique à la résistance, clôture basse (l'offre absorbe)
+    df = _append(df, 109.8, 110.0, 107.0, 107.5, 3000)
+    _, events = _analyze(df)
+    assert "BC" in [e.name for e in events], [e.name for e in events]
+
+
+def test_st_secondary_test_near_support():
+    df = _range_base()
+    # barre étroite à volume sec collée au support → test secondaire (accumulation)
+    df = _append(df, 100.5, 100.8, 100.2, 100.6, 650)
+    _, events = _analyze(df)
+    sts = [e for e in events if e.name == "ST" and e.bias == "accumulation"]
+    assert sts, [e.name for e in events]
+
+
+def test_no_st_when_volume_high():
+    df = _range_base()
+    # même barre near-support mais volume élevé → ce n'est pas un test « sec »
+    df = _append(df, 100.5, 100.8, 100.2, 100.6, 2000)
+    _, events = _analyze(df)
+    assert "ST" not in [e.name for e in events]
+
+
+def test_lps_backup_after_sos():
+    df = _range_base()
+    # cassure franche (SOS) puis repli à volume sec tenant au-dessus de la résistance
+    df = _append(df, 110.0, 113.0, 109.8, 112.8, 2500)   # SOS
+    df = _append(df, 112.0, 111.6, 110.3, 111.2, 650)    # LPS (back-up)
+    _, events = _analyze(df)
+    names = [e.name for e in events]
+    assert "SOS" in names and "LPS" in names, names
+
+
+def test_lpsy_backup_after_sow():
+    df = _range_base()
+    # cassure baissière (SOW) puis rebond faible à volume sec sous le support
+    df = _append(df, 100.0, 100.2, 97.0, 97.2, 2500)     # SOW
+    df = _append(df, 98.0, 99.5, 98.5, 98.8, 650)        # LPSY (rebond faible)
+    _, events = _analyze(df)
+    names = [e.name for e in events]
+    assert "SOW" in names and "LPSY" in names, names
