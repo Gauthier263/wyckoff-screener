@@ -23,6 +23,11 @@ def get_exchange(name: str = "binance"):
         # géo-bloqués) qui n'apportent rien ici.
         opts["options"] = {"fetchMarkets": ["spot"]}
     ex = klass(opts)
+    # ccxt met trust_env=False sur sa session requests, ce qui ignore les variables
+    # d'environnement HTTPS_PROXY / REQUESTS_CA_BUNDLE. En environnement d'exécution
+    # derrière un proxy egress (TLS re-terminé avec un CA maison), on réactive
+    # trust_env pour que la session honore le proxy et le CA bundle du système.
+    ex.session.trust_env = True
     if name == "binance":
         # Route les endpoints publics vers le miroir officiel data-only de Binance :
         # mêmes données et mêmes volumes, sans clé API, et non géo-restreint —
@@ -483,6 +488,7 @@ def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
     for name in ccxt_venues:
         try:
             ex = getattr(ccxt, name)({"enableRateLimit": True})
+            ex.session.trust_env = True  # honore proxy egress + CA bundle (cf. get_exchange)
             ex.load_markets()
             series.append(_oi_series(ex, symbol, timeframe, limit))
         except Exception:
