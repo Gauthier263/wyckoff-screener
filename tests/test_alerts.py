@@ -125,3 +125,200 @@ def test_scan_catches_stop_break():
     closed = _closed(rows)
     res = scan_window(closed, None, LEVELS, since_ts=closed.index[0] - pd.Timedelta(minutes=1))
     assert res is not None and res[0] == "STOP"
+
+
+def test_scan_empty_window_returns_none():
+    assert scan_window(None, None, LEVELS) is None
+    closed = _closed(_flat(5))
+    # since_ts après la dernière barre → rien de nouveau à évaluer
+    assert scan_window(closed, None, LEVELS, since_ts=closed.index[-1]) is None
+
+
+def test_scan_exhaustion_on_last_bar():
+    # dernière barre clôturée : vol fort + clôture faible au-dessus de resist → EXH
+    rows = _flat(4) + [(64550, 64790, 64500, 64600, 2.8, 0.2)]
+    closed = _closed(rows)
+    res = scan_window(closed, None, LEVELS, since_ts=closed.index[0])
+    assert res is not None and res[0] == "EXH" and res[2] == closed.index[-1]
+
+
+def test_scan_weakness_supply_via_window():
+    # pas de TP/stop/EXH, mais barre de vente volumique en profit → SUPPLY remonte
+    rows = _flat(13) + [(64200, 64250, 63900, 63950, 2.4, 0.15), (63950, 64000, 63900, 63960, 0.5, 0.5)]
+    closed = _closed(rows)
+    res = scan_window(closed, None, LEVELS, since_ts=closed.index[0])
+    assert res is not None and res[0] == "SUPPLY"
+
+
+# ── ΔOI aligné (_oi_chg_at) ─────────────────────────────────────────────────────
+from screener.alerts import _oi_chg_at
+
+
+def test_oi_chg_at():
+    idx = pd.date_range("2026-06-22", periods=6, freq="15min", tz="UTC")
+    oi = pd.Series([100.0, 100, 100, 100, 100, 102.0], index=idx)
+    assert abs(_oi_chg_at(oi, idx, idx[-1], bars_back=2) - 2.0) < 1e-9
+    assert np.isnan(_oi_chg_at(None, idx, idx[-1]))                    # pas d'OI
+    assert np.isnan(_oi_chg_at(oi, idx, idx[1], bars_back=2))          # pas assez d'historique
+    assert np.isnan(_oi_chg_at(oi, idx, pd.Timestamp("2030-01-01", tz="UTC")))  # ts hors index
+
+
+# ── État persistant + run_once (dédup, cooldown) ───────────────────────────────
+from screener import alerts as alerts_mod
+from screener.alerts import _load_state, _save_state, run_once
+
+
+def test_state_roundtrip(tmp_path):
+    p = str(tmp_path / "state.json")
+    _save_state(p, {"evaluated_until": "2026-06-22T10:00:00+00:00"})
+    assert _load_state(p) == {"evaluated_until": "2026-06-22T10:00:00+00:00"}
+
+
+def test_state_missing_or_corrupt_returns_empty(tmp_path):
+    assert _load_state(str(tmp_path / "absent.json")) == {}
+    bad = tmp_path / "bad.json"
+    bad.write_text("{pas du json")
+    assert _load_state(str(bad)) == {}
+
+
+def _patch_notify(monkeypatch):
+    sent = []
+    monkeypatch.setattr(alerts_mod, "_notify", lambda msg: sent.append(msg))
+    return sent
+
+
+def test_run_once_sends_and_records_state(tmp_path, monkeypatch):
+    sent = _patch_notify(monkeypatch)
+    ts = pd.Timestamp("2026-06-22 10:00", tz="UTC")
+    monkeypatch.setattr(alerts_mod, "evaluate",
+                        lambda s, tf, lv, since: (ts, "TP1", "msg TP1"))
+    p = str(tmp_path / "state.json")
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is True
+    assert sent == ["msg TP1"]
+    assert _load_state(p)["evaluated_until"] == ts.isoformat()
+
+
+def test_run_once_passes_since_ts_from_state(tmp_path, monkeypatch):
+    _patch_notify(monkeypatch)
+    seen = {}
+    ts = pd.Timestamp("2026-06-22 10:15", tz="UTC")
+
+    def fake_eval(s, tf, lv, since):
+        seen["since"] = since
+        return (ts, None, None)
+
+    monkeypatch.setattr(alerts_mod, "evaluate", fake_eval)
+    p = str(tmp_path / "state.json")
+    _save_state(p, {"evaluated_until": "2026-06-22T10:00:00+00:00"})
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is False       # rien déclenché
+    assert seen["since"] == pd.Timestamp("2026-06-22 10:00", tz="UTC")
+
+
+def test_run_once_weakness_cooldown_2h(tmp_path, monkeypatch):
+    sent = _patch_notify(monkeypatch)
+    p = str(tmp_path / "state.json")
+    t0 = pd.Timestamp("2026-06-22 10:00", tz="UTC")
+
+    def eval_at(ts):
+        return lambda s, tf, lv, since: (ts, "SUPPLY", f"faiblesse @ {ts}")
+
+    monkeypatch.setattr(alerts_mod, "evaluate", eval_at(t0))
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is True        # 1re faiblesse : envoyée
+    monkeypatch.setattr(alerts_mod, "evaluate", eval_at(t0 + pd.Timedelta(minutes=30)))
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is False       # < 2h : silencieux
+    monkeypatch.setattr(alerts_mod, "evaluate", eval_at(t0 + pd.Timedelta(hours=3)))
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is True        # > 2h : ré-armé
+    assert len(sent) == 2
+
+
+def test_run_once_tp_not_subject_to_cooldown(tmp_path, monkeypatch):
+    sent = _patch_notify(monkeypatch)
+    p = str(tmp_path / "state.json")
+    t0 = pd.Timestamp("2026-06-22 10:00", tz="UTC")
+    monkeypatch.setattr(alerts_mod, "evaluate",
+                        lambda s, tf, lv, since: (t0, "TP1", "tp"))
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is True
+    monkeypatch.setattr(alerts_mod, "evaluate",
+                        lambda s, tf, lv, since: (t0 + pd.Timedelta(minutes=15), "TP2", "tp2"))
+    assert run_once("BTC/USDT", "15m", LEVELS, p) is True        # pas de cooldown sur les TP
+    assert sent == ["tp", "tp2"]
+
+
+def test_run_once_evaluate_none_returns_false(tmp_path, monkeypatch):
+    _patch_notify(monkeypatch)
+    monkeypatch.setattr(alerts_mod, "evaluate", lambda s, tf, lv, since: None)
+    assert run_once("BTC/USDT", "15m", LEVELS, str(tmp_path / "s.json")) is False
+
+
+# ── evaluate : glue données→scan (fetchers monkeypatchés, hors-ligne) ──────────
+def test_evaluate_formats_cest_and_excludes_forming_bar(monkeypatch):
+    from screener import data as data_mod
+    # 20 barres plates puis TP1 touché à l'avant-dernière ; la DERNIÈRE est en formation
+    idx = pd.date_range("2026-06-22 10:00", periods=22, freq="15min", tz="UTC")
+    rows = [[64000, 64020, 63980, 64000, 1000]] * 20 \
+        + [[64000, 64850, 63990, 64820, 1200]] \
+        + [[64820, 64830, 64800, 64810, 100]]          # en formation → doit être exclue
+    ohlcv = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
+
+    monkeypatch.setattr(data_mod, "get_exchange", lambda name: object())
+    monkeypatch.setattr(data_mod, "fetch_ohlcv",
+                        lambda ex, s, tf, limit, use_cache: ohlcv.copy())
+    monkeypatch.setattr(data_mod, "fetch_open_interest",
+                        lambda s, tf, limit, source: None)
+
+    out = alerts_mod.evaluate("BTC/USDT", "15m", LEVELS, since_ts=idx[0])
+    assert out is not None
+    last_ts, typ, msg = out
+    assert last_ts == idx[-2]                          # dernière barre CLÔTURÉE
+    assert typ == "TP1"
+    # la barre TP1 (15:00 UTC) doit être horodatée 17h00 CEST dans le message
+    assert "17h00 CEST" in msg and "BTC/USDT" in msg
+
+
+def test_evaluate_no_trigger_returns_ts_only(monkeypatch):
+    from screener import data as data_mod
+    idx = pd.date_range("2026-06-22 10:00", periods=22, freq="15min", tz="UTC")
+    ohlcv = pd.DataFrame([[64000, 64020, 63980, 64000, 1000]] * 22,
+                         columns=["open", "high", "low", "close", "volume"], index=idx)
+    monkeypatch.setattr(data_mod, "get_exchange", lambda name: object())
+    monkeypatch.setattr(data_mod, "fetch_ohlcv",
+                        lambda ex, s, tf, limit, use_cache: ohlcv.copy())
+    monkeypatch.setattr(data_mod, "fetch_open_interest",
+                        lambda s, tf, limit, source: None)
+    out = alerts_mod.evaluate("BTC/USDT", "15m", LEVELS, since_ts=idx[0])
+    assert out == (idx[-2], None, None)
+
+
+# ── _notify : repli stdout sans secrets Telegram ───────────────────────────────
+def test_notify_stdout_without_secrets(monkeypatch, capsys):
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    alerts_mod._notify("hello")
+    assert "hello" in capsys.readouterr().out
+
+
+def test_notify_telegram_with_secrets(monkeypatch):
+    calls = []
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
+    monkeypatch.setattr(alerts_mod, "send_telegram",
+                        lambda token, chat, text: calls.append((token, chat, text)) or True)
+    alerts_mod._notify("ping")
+    assert calls == [("tok", "42", "ping")]
+
+
+# ── main : parsing CLI (mode cron --once implicite) ────────────────────────────
+def test_main_once_passes_levels(tmp_path, monkeypatch, capsys):
+    seen = {}
+
+    def fake_run_once(symbol, timeframe, levels, state_path):
+        seen.update(symbol=symbol, timeframe=timeframe, levels=levels)
+        return True
+
+    monkeypatch.setattr(alerts_mod, "run_once", fake_run_once)
+    alerts_mod.main(["--symbol", "BTC/USDT", "--timeframe", "15m",
+                     "--tp1", "64800", "--tp2", "65500", "--stop", "63184",
+                     "--resist", "64500", "--profit-floor", "63800",
+                     "--state", str(tmp_path / "s.json")])
+    assert seen["levels"] == LEVELS
+    assert "alerte envoyée" in capsys.readouterr().out
