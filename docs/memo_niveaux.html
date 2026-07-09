@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mémo — Niveaux de résistance en position longue</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --card:#ffffff; --ink:#1a1a1a; --muted:#5c5c5c; --line:#e3e2dd;
+    --demand:#1f8f4e;   /* vert  = demande / force        */
+    --supply:#c0392b;   /* rouge = offre / résistance     */
+    --trap:#d98218;     /* orange= piège / faux signal    */
+    --range:#2c72c0;    /* bleu  = bornes / support / repli*/
+    --pivot:#7d4fc0;    /* violet= spring / pivot / Phase C*/
+    --demand-bg:#e8f5ee; --supply-bg:#fbecea; --trap-bg:#fbf1e3; --range-bg:#e9f1fb; --pivot-bg:#f1ebfa;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16181c; --card:#1e2127; --ink:#e9e9ea; --muted:#9aa0a8; --line:#2c3038;
+      --demand:#4cc47f; --supply:#e8695c; --trap:#e0a24e; --range:#5a9bea; --pivot:#a98be0;
+      --demand-bg:#173025; --supply-bg:#331e1b; --trap-bg:#332617; --range-bg:#182a3f; --pivot-bg:#241a36;
+    }
+  }
+  :root[data-theme="dark"]{
+      --bg:#16181c; --card:#1e2127; --ink:#e9e9ea; --muted:#9aa0a8; --line:#2c3038;
+      --demand:#4cc47f; --supply:#e8695c; --trap:#e0a24e; --range:#5a9bea; --pivot:#a98be0;
+      --demand-bg:#173025; --supply-bg:#331e1b; --trap-bg:#332617; --range-bg:#182a3f; --pivot-bg:#241a36;
+  }
+  :root[data-theme="light"]{
+    --bg:#f7f7f5; --card:#ffffff; --ink:#1a1a1a; --muted:#5c5c5c; --line:#e3e2dd;
+    --demand:#1f8f4e; --supply:#c0392b; --trap:#d98218; --range:#2c72c0; --pivot:#7d4fc0;
+    --demand-bg:#e8f5ee; --supply-bg:#fbecea; --trap-bg:#fbf1e3; --range-bg:#e9f1fb; --pivot-bg:#f1ebfa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:960px;margin:0 auto;padding:34px 22px 90px}
+  header.masthead{border-bottom:2px solid var(--supply);padding-bottom:18px;margin-bottom:8px}
+  h1{font-size:1.85rem;line-height:1.2;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:.98rem;margin:0}
+  .tag{display:inline-block;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--supply);border:1px solid var(--supply);border-radius:999px;padding:2px 10px;margin-bottom:12px}
+  h2{font-size:1.32rem;margin:44px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+  h2 .n{color:var(--supply);font-variant-numeric:tabular-nums;margin-right:.4em}
+  h3{font-size:1.06rem;margin:26px 0 6px}
+  p{margin:.6em 0}
+  .lead{font-size:1.05rem;color:var(--ink)}
+  ul,ol{margin:.5em 0 .5em;padding-left:1.3em}
+  li{margin:.32em 0}
+  code,.mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.86em;
+    background:var(--range-bg);color:var(--ink);padding:1px 5px;border-radius:4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0;
+    box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .callout{border-left:4px solid var(--range);background:var(--range-bg);border-radius:0 10px 10px 0;
+    padding:12px 16px;margin:16px 0}
+  .callout.key{border-color:var(--supply);background:var(--supply-bg)}
+  .callout.win{border-color:var(--demand);background:var(--demand-bg)}
+  .callout.warn{border-color:var(--trap);background:var(--trap-bg)}
+  .callout .h{font-weight:700;display:block;margin-bottom:2px}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;margin:8px 0}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:var(--range-bg);font-weight:700;font-size:.82rem;letter-spacing:.01em}
+  tbody tr:nth-child(even){background:rgba(128,128,128,.045)}
+  .badge{display:inline-block;font-size:.74rem;font-weight:700;padding:1px 8px;border-radius:6px;white-space:nowrap}
+  .b-supply{color:var(--supply);background:var(--supply-bg);border:1px solid var(--supply)}
+  .b-demand{color:var(--demand);background:var(--demand-bg);border:1px solid var(--demand)}
+  .b-trap{color:var(--trap);background:var(--trap-bg);border:1px solid var(--trap)}
+  .b-range{color:var(--range);background:var(--range-bg);border:1px solid var(--range)}
+  .b-pivot{color:var(--pivot);background:var(--pivot-bg);border:1px solid var(--pivot)}
+  .rank{font-weight:800;color:var(--supply);font-size:1.02rem}
+  .dot{font-weight:700}
+  .dot.s{color:var(--supply)} .dot.d{color:var(--demand)} .dot.t{color:var(--trap)}
+  .dot.r{color:var(--range)} .dot.p{color:var(--pivot)}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.84rem;color:var(--muted);margin:10px 0 0}
+  .legend span b{color:var(--ink)}
+  ol.checklist{counter-reset:step;list-style:none;padding-left:0}
+  ol.checklist>li{position:relative;padding:10px 14px 10px 46px;margin:8px 0;background:var(--card);
+    border:1px solid var(--line);border-radius:10px}
+  ol.checklist>li::before{counter-increment:step;content:counter(step);position:absolute;left:12px;top:10px;
+    width:24px;height:24px;border-radius:50%;background:var(--supply);color:#fff;font-weight:700;font-size:.82rem;
+    display:flex;align-items:center;justify-content:center}
+  .foot{margin-top:50px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:.86rem}
+  .tocwrap{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 20px;margin:20px 0}
+  .tocwrap ol{columns:2;column-gap:28px;margin:.3em 0}
+  @media(max-width:620px){.tocwrap ol{columns:1}}
+  a{color:var(--range)}
+  .small{font-size:.85rem;color:var(--muted)}
+  strong.k{color:var(--supply)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <span class="tag">Mémo — v1 · document vivant</span>
+  <h1>Identifier &amp; hiérarchiser les niveaux de résistance en position longue</h1>
+  <p class="sub">Méthodologie réutilisable — cadre Wyckoff top-down, hiérarchie de lecture <strong>volume → OI → tierces</strong>, OI en coin, absorption/CVD. À enrichir au fil des cas.</p>
+</header>
+
+<div class="legend">
+  <span class="dot d">● demande / force</span>
+  <span class="dot s">● offre / résistance</span>
+  <span class="dot t">● piège / faux signal</span>
+  <span class="dot r">● borne / support / repli</span>
+  <span class="dot p">● spring / pivot / Phase C</span>
+  <span class="small">(même code couleur que les marqueurs de graphe)</span>
+</div>
+
+<div class="tocwrap">
+<ol>
+  <li><a href="#principe">Le principe directeur</a></li>
+  <li><a href="#context">Le contexte décide tout (top-down)</a></li>
+  <li><a href="#taxo">Taxonomie des 5 candidats</a></li>
+  <li><a href="#axes">Les 7 axes de notation</a></li>
+  <li><a href="#hierarchie">La hiérarchie par défaut</a></li>
+  <li><a href="#recul">Prendre du recul : ce qui manque</a></li>
+  <li><a href="#flux">Le verdict par le flux (au contact)</a></li>
+  <li><a href="#checklist">Checklist opérationnelle</a></li>
+  <li><a href="#gestion">« Je suis long » : gérer par altitude</a></li>
+</ol>
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="principe"><span class="n">1.</span>Le principe directeur</h2>
+
+<p class="lead">Une résistance n'est pas une ligne : c'est une <strong>zone où l'on s'attend à ce que l'offre dépasse la demande</strong> — où des vendeurs deviennent motivés et des acheteurs s'épuisent. Toute la question « laquelle prioriser ? » revient à une seule : <em>où l'offre est-elle la plus abondante, la plus motivée, et la mieux démontrée ?</em></p>
+
+<div class="callout key">
+  <span class="h">La règle des deux couches</span>
+  Ne jamais confondre <strong>la structure</strong> (ce qui fait d'un prix un niveau <em>a priori</em>) et <strong>le flux</strong> (ce qui confirme, au contact, que le niveau agit <em>vraiment</em> comme résistance).
+  <ul style="margin-top:6px">
+    <li><span class="badge b-range">Couche 1 — structure</span> classe les candidats <em>avant</em> que le prix n'arrive : elle sert à <strong>pré-planifier</strong> (où alléger, où placer le stop, où viser).</li>
+    <li><span class="badge b-supply">Couche 2 — flux</span> tranche <em>au contact</em> (volume → OI → CVD/tierces) : le niveau <strong>tient</strong> (offre confirmée) ou <strong>cède</strong> (vraie demande). C'est le verdict, et il <strong>prime</strong> sur le rang a priori.</li>
+  </ul>
+</div>
+
+<p>Conséquence méthodologique : <strong>on ne classe pas les <em>types</em> de niveaux dans une échelle figée</strong> (« mitigation block &gt; POC &gt; historique »). On <strong>note chaque candidat sur des axes indépendants</strong>, la confluence additionne, le contexte peut tout inverser, et le flux au contact rend le verdict final. C'est transparent et ajustable — jamais une boîte noire.</p>
+
+<!-- ===================================================================== -->
+<h2 id="context"><span class="n">2.</span>Le contexte décide tout (top-down)</h2>
+
+<p>Avant de comparer les niveaux, poser le cadre macro — sinon on compare des objets qui n'ont pas le même sens. <strong>La même résistance se comporte à l'opposé selon la tendance dominante :</strong></p>
+
+<div class="scroll">
+<table>
+<thead><tr><th style="width:26%">Cadre macro (HTF)</th><th>Nature des résistances</th><th>Ce que ça implique pour un long</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="badge b-demand">Uptrend / markup</span><br><span class="small">accumulation confirmée, prix qui fait des plus-hauts</span></td>
+  <td>Des <strong>ralentisseurs</strong>. L'offre y est <em>absorbée</em> puis franchie (jump across the creek → SOS → back-up LPS au-dessus). Un POC ou un ancien sommet au-dessus est une <strong>cible</strong>, pas un mur.</td>
+  <td>On <strong>tient / renforce</strong> à travers la résistance <em>si</em> le flux confirme la demande à la cassure. Alléger seulement sur épuisement net.</td>
+</tr>
+<tr>
+  <td><span class="badge b-supply">Downtrend / range = redistribution</span><br><span class="small">défaut : une plage dans un downtrend est une redistribution jusqu'à preuve du contraire</span></td>
+  <td>Des <strong>murs / zones de retournement</strong>. L'offre y gagne le plus souvent. Un rebond dans un ancien niveau, un mitigation block, le haut de plage (zone UTAD) = <em>demande piégée</em>.</td>
+  <td>La résistance est l'endroit où l'on <strong>allège / sort / resserre le stop</strong> : on est long <em>dans</em> une offre démontrée. Le rebond est un LPSY en puissance.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="h">Le contexte peut ré-ordonner toute la hiérarchie</span>
+  En redistribution, les événements Wyckoff d'offre (<span class="badge b-supply">SOW</span>, <span class="badge b-trap">UTAD</span>, LPSY) <strong>dominent</strong> — ils <em>définissent</em> le retournement. En markup, ces mêmes lignes ne sont que des étapes vers la cible. <strong>Ne jamais présumer l'accumulation : il faut la gagner.</strong> Un aller-retour inattendu du prix = signal de réévaluation du cadre.
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="taxo"><span class="n">3.</span>Taxonomie des 5 candidats</h2>
+
+<p>Pour chaque type : <strong>quelle offre s'y trouve et pourquoi</strong> (c'est ce qui fait sa force), sa fraîcheur, et comment le lire. Une résistance forte = là où des participants <em>sous l'eau sont contraints de vendre</em> ou là où l'offre a déjà été <em>démontrée</em>.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th style="width:16%">Candidat</th><th style="width:30%">Quelle offre / pourquoi ça résiste</th><th>Force &amp; fraîcheur · comment le lire</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="badge b-supply">SOW</span><br><span class="small">Sign of Weakness</span></td>
+  <td>Ce n'est pas une ligne mais un <strong>événement de caractère</strong> : une descente à spread large + volume en hausse qui <em>casse le support</em> de la plage (« through the ice »). Il <strong>démontre</strong> que l'offre a pris le contrôle.</td>
+  <td><span class="badge b-supply">Très fort — offre prouvée</span> Reclasse <strong>toute la zone au-dessus en offre</strong>. La vraie résistance qu'il crée est le <strong>LPSY</strong> (rebond faible post-SOW, lower high qui ne reprend pas la borne) et <strong>l'ancien support devenu plafond</strong> (« retour à l'ice »). Théorie : CVD↓ franc <em>en phase</em> avec le prix = offre agressive réelle.</td>
+</tr>
+<tr>
+  <td><span class="badge b-trap">Mitigation block</span><br><span class="small">SMC — cousin du LPSY / origine du markdown</span></td>
+  <td>La <strong>dernière bougie haussière avant l'impulsion baissière</strong> qui a cassé la structure. Y sont piégés les longs (et le « smart money » qui doit <em>mitiger</em> = solder / renforcer son short). Retour = offre.</td>
+  <td><span class="badge b-trap">Fort mais anticipatif</span> Zone, pas ligne ; <strong>frais tant qu'inconsommé</strong> (invalidé si le prix clôture au travers). Puissant quand il <em>coïncide</em> avec un ancien support cassé et/ou un FVG. À confirmer par la réaction — offre <em>présumée</em>, pas encore prouvée.</td>
+</tr>
+<tr>
+  <td><span class="badge b-range">POC / HVN</span><br><span class="small">Volume Profile</span></td>
+  <td>Le prix le plus échangé = <strong>acceptation / « fair value »</strong>. Beaucoup de positions y ont été ouvertes → des traders à <em>breakeven</em> y vendent pour sortir à plat. Aimant puis friction.</td>
+  <td><span class="badge b-range">Moyen — localise l'offre piégée</span> Le <strong>POC</strong> est plutôt un <em>aimant / zone de stagnation</em> ; pour un <strong>rejet net</strong>, le <strong>VAH</strong> (haut de la value area) et les bords de <strong>LVN</strong> sont plus tranchants. Un <strong>naked / virgin POC</strong> (jamais retouché) est un aimant fort. <strong>À ancrer</strong> (session / composite / depuis un swing) — un POC non ancré ne veut rien dire. Confirmer par le flux.</td>
+</tr>
+<tr>
+  <td><span class="badge b-supply">Résistance historique</span><br><span class="small">niveau ayant déjà rejeté</span></td>
+  <td>Des décisions réelles s'y sont déjà prises → orders + psychologie (niveau <em>surveillé</em>). Empiriquement démontré.</td>
+  <td><span class="badge b-trap">Fort mais décroissant</span> <strong>À double tranchant :</strong> chaque test <em>consomme</em> l'offre au repos. Un niveau testé 3–4× est souvent <strong>plus faible</strong> (candidat à la cassure), pas plus fort. Le plus fiable : un rejet <em>franc et récent</em> non retesté. Les niveaux lointains perdent en pertinence (rotation des participants). Ronds psychologiques / ancien ATH = « historique » au sens surveillé.</td>
+</tr>
+<tr>
+  <td><span class="badge b-range">Bas d'un canal de distribution</span><br><span class="small">voir précision ci-dessous</span></td>
+  <td>Bord d'un canal baissier (markdown). L'offre structurelle du canal + la <strong>polarité</strong> (un support cassé du canal devient plafond par en dessous).</td>
+  <td><span class="badge b-range">Dépend du sens visé</span> Dérivé/dynamique → <strong>faible seul</strong>, précieux en <em>confluence</em> et pour le <em>timing</em> (où le rebond est étiré). Voir l'encadré : la résistance d'un canal baissier est d'abord sa <strong>ligne du haut (supply line)</strong> et le <strong>dessous d'une ligne de support cassée</strong>.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout">
+  <span class="h">Précision de vocabulaire — « bas d'un canal de distribution »</span>
+  Le terme est ambigu ; deux lectures, les deux utiles pour un long :
+  <ul style="margin-top:6px">
+    <li><strong>Canal baissier de markdown</strong> (le prix descend dans un canal) : la résistance est la <strong>ligne du haut</strong> (supply line / ligne de survente-surachat de Wyckoff). Le « bas » du canal en est le <em>support</em> — mais dès qu'il est <strong>cassé</strong>, son <em>dessous</em> devient résistance (polarité) : c'est là que meurt le premier rebond (un LPSY).</li>
+    <li><strong>Canal haussier qui est en fait une distribution</strong> (rising wedge / rallye en surachat) : la résistance est la <strong>supply line</strong> du canal ; un contact en <em>over-bought</em> est l'endroit théorique de la prise de profit / distribution.</li>
+  </ul>
+  Dans les deux cas, retenir : un <strong>bord de canal est une résistance <em>dérivée</em></strong> (elle dépend du tracé) — on ne s'y fie que confirmée par le flux et/ou en confluence avec une offre <em>structurelle</em> (POC, ancien niveau, mitigation block).
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="axes"><span class="n">4.</span>Les 7 axes de notation</h2>
+
+<p>Plutôt qu'un classement figé, <strong>noter chaque candidat</strong> sur ces axes orthogonaux (transparent, ajustable — l'esprit de <code>score.py</code> : poids × force × récence). La somme pondérée donne la priorité <em>a priori</em> ; le contexte (axe 4) et le flux (axe 7) peuvent renverser le rang.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th style="width:4%">#</th><th style="width:22%">Axe</th><th>Question &amp; ce qui note haut</th></tr></thead>
+<tbody>
+<tr><td class="rank">1</td><td><strong>Nature de l'offre</strong></td><td><em>Qui vend là, et est-il contraint ?</em> Le plus fort = <strong>participants sous l'eau forcés de vendre</strong> (longs piégés au POC/HVN, mitigation block, ancien support devenu plafond) ou <strong>offre institutionnelle démontrée</strong>. Le plus faible = prise de profit discrétionnaire, offre passive (ronds, ATH lointain).</td></tr>
+<tr><td class="rank">2</td><td><strong>Preuve vs. ligne statique</strong></td><td><em>L'offre est-elle démontrée ou présumée ?</em> Rang : <span class="badge b-supply">événement Wyckoff confirmé</span> (SOW/UTAD/LPSY — signature volume) &gt; <span class="badge b-trap">rejet historique prouvé</span> (mais consommable) &gt; <span class="badge b-range">zone anticipée</span> (mitigation block, POC non testé, ligne de canal).</td></tr>
+<tr><td class="rank">3</td><td><strong>Fraîcheur / consommation</strong></td><td><em>Combien de fois déjà testé ?</em> Fraîche (inconsommée) = plus forte au <strong>premier</strong> contact. Chaque retest mange les orders au repos. 1ᵉʳ retest = max ; 3–4ᵉ = affaibli (risque de cassure). <strong>Inverse l'intuition « prouvé = fort ».</strong></td></tr>
+<tr><td class="rank">4</td><td><strong>Contexte top-down</strong> <span class="badge b-supply">maître-filtre</span></td><td><em>Mur ou ralentisseur ?</em> En redistribution → mur (alléger). En markup → ralentisseur (tenir). <strong>Cet axe peut multiplier ou annuler tous les autres.</strong></td></tr>
+<tr><td class="rank">5</td><td><strong>Confluence</strong> <span class="badge b-demand">multiplicateur</span></td><td><em>Combien de méthodes pointent la même zone ?</em> POC + ancien swing high + supply line + mitigation block empilés dans un mouchoir = résistance bien plus forte que n'importe lequel seul. Un POC isolé sans rien autour = faible.</td></tr>
+<tr><td class="rank">6</td><td><strong>Échelle / fractalité</strong></td><td><em>À quelle TF ?</em> La résistance <strong>sur la TF de ton trade</strong> est ton plafond opératoire ; une résistance <strong>HTF (Daily)</strong> est le mur <em>dominant</em> (elle prime sur une ligne H1). Ne pas se faire sortir par une micro-résistance H1 d'une thèse H4 — mais respecter le plafond H4/D1.</td></tr>
+<tr><td class="rank">7</td><td><strong>Flux au contact</strong> <span class="badge b-supply">verdict</span></td><td><em>Que dit la tape quand le prix arrive ?</em> volume/spread → OI (coin) → CVD/absorption → tierces. <strong>Prime sur le rang a priori</strong> : une « faible » ligne de canal qui produit une absorption + no-demand nette bat un « fort » niveau historique que le prix tranche sur CVD↑.</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="hierarchie"><span class="n">5.</span>La hiérarchie par défaut</h2>
+
+<p>En appliquant les axes, voici l'<strong>ordre par défaut</strong> (à ajuster par le contexte et le flux — ce n'est pas une échelle rigide) :</p>
+
+<div class="card">
+<p><span class="rank">1.</span> <span class="badge b-supply">Événements d'offre Wyckoff en cadre redistribution</span> — <strong>SOW → LPSY, zone UTAD / ST.</strong><br>
+<span class="small">Le plus haut : l'offre est <em>démontrée</em> (signature volume) <em>et</em> définit toute la structure. Le LPSY est la zone de sortie/short manuel par excellence.</span></p>
+
+<p><span class="rank">2.</span> <span class="badge b-trap">Support cassé devenu résistance (polarité) + origine du markdown</span> — quand l'ancien support et le <strong>mitigation block / order block</strong> coïncident.<br>
+<span class="small">Longs piégés + impulsion démontrée ; frais au premier retest. La combinaison des deux est ce qui compte.</span></p>
+
+<p><span class="rank">3.</span> <span class="badge b-supply">Résistance historique prouvée — <em>si encore fraîche</em></span> (1–2 tests) et surveillée.<br>
+<span class="small">Forte mais décroît à chaque retest ; un niveau très battu est un candidat à la cassure, pas un mur.</span></p>
+
+<p><span class="rank">4.</span> <span class="badge b-range">POC / VAH / naked POC (Volume Profile)</span>.<br>
+<span class="small">Localise l'offre piégée / l'acceptation ; forte comme <em>zone</em>, à confirmer par la tape. VAH et bords de LVN plus tranchants que le POC pour un rejet.</span></p>
+
+<p><span class="rank">5.</span> <span class="badge b-range">Lignes dérivées</span> — supply line de canal, Fib, MAs, VWAP.<br>
+<span class="small">Faibles seules ; précieuses en <em>confluence</em> et pour le <em>timing</em> (où le rebond est étiré), pas comme murs autonomes.</span></p>
+</div>
+
+<div class="callout key">
+  <span class="h">Les 3 règles qui priment sur ce classement</span>
+  <ol style="margin:6px 0 0">
+    <li><strong>La confluence promeut</strong> : 2–3 candidats empilés &gt; un candidat « supérieur » isolé. On marque le <em>cluster</em>, pas la ligne.</li>
+    <li><strong>La fraîcheur promeut</strong> : une zone fraîche de rang 4 peut battre un niveau historique de rang 3 usé par 4 tests.</li>
+    <li><strong>Le contexte + le flux renversent</strong> : en markup tout ceci n'est que ralentisseurs à franchir ; et au contact, la tape (axe 7) a le dernier mot.</li>
+  </ol>
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="recul"><span class="n">6.</span>Prendre du recul : ce qui manque à la liste</h2>
+
+<p>Tes 5 candidats couvrent l'offre <em>structurelle</em>. En prenant du recul, il manque surtout la <strong>liquidité</strong>, les <strong>références dynamiques</strong>, et la <strong>gestion de ta propre position</strong>. Par ordre d'importance :</p>
+
+<h3><span class="dot t">◆</span> Les pools de liquidité au-dessus (le plus sous-estimé)</h3>
+<p>Au-dessus des swing highs évidents se logent des <strong>stops groupés</strong> (shorts, et stops des acheteurs de cassure). Le prix est souvent <em>aspiré</em> vers cette liquidité <strong>avant</strong> de se retourner : c'est le <strong>liquidity grab / stop-run</strong> — l'<strong>UTAD / upthrust</strong> de Wyckoff. Conséquence pour un long :</p>
+<ul>
+  <li>La <strong>vraie résistance est souvent <em>juste au-dessus</em></strong> de la ligne évidente, là où la liquidité se fait balayer puis le prix rejette.</li>
+  <li>Ne pas se faire secouer par la <em>mèche</em> qui perce le niveau ; ce qui compte est l'<strong>échec à <em>tenir</em> au-dessus</strong> (clôture qui revient sous le high balayé = vrai retournement).</li>
+  <li>Ça réconcilie « liquidité » SMC et « upthrust/UTAD » Wyckoff : <strong>même objet, deux vocabulaires.</strong></li>
+</ul>
+
+<h3><span class="dot r">◆</span> Les références dynamiques &amp; dérivées</h3>
+<ul>
+  <li><strong>VWAP ancré</strong> (depuis un sommet significatif) &amp; ses bandes : benchmark institutionnel de mean-reversion, souvent défendu.</li>
+  <li><strong>MAs surveillées</strong> (50/200 en Daily/H4) : résistance dynamique auto-réalisatrice sur un rebond de downtrend (« rejet de la 200 »).</li>
+  <li><strong>Fib du leg baissier</strong> (0,5 / 0,618 / 0,786) : où meurt typiquement un rebond contre-tendance. <strong>Faible seul, fort en confluence</strong> avec un mitigation block / POC / structure.</li>
+</ul>
+
+<h3><span class="dot s">◆</span> Polarité, vides &amp; POC vierges</h3>
+<ul>
+  <li><strong>Ancien support = nouvelle résistance</strong> : la résistance « historique » la plus fiable. Le premier rebond vers un plancher de plage cassé (« back-up to the ice », LPSY) est une zone de sortie/short de premier ordre.</li>
+  <li><strong>FVG / imbalance (SMC)</strong> &amp; gaps non comblés : prix inefficient laissé par une impulsion → aimant puis rejet. Confluence naturelle avec le mitigation block.</li>
+  <li><strong>Naked / virgin POC</strong> : un POC d'une balance antérieure jamais retouché — aimant fort.</li>
+</ul>
+
+<h3><span class="dot p">◆</span> La cible de la structure elle-même (measured move)</h3>
+<p>Si ton long joue une accumulation, le <strong>compte / l'objectif</strong> (projection de la hauteur de plage, count P&amp;F Wyckoff) dit <em>où le mouvement est censé finir</em> — cette projection est une résistance/zone de sortie <strong>indépendamment des lignes de graphe</strong>. Savoir où l'on va, c'est savoir où l'élan doit mourir.</p>
+
+<h3><span class="dot r">◆</span> Temps, session &amp; événements</h3>
+<p>Les déséquilibres offre/demande se concentrent autour des <strong>resets de funding</strong>, ouvertures de session, et <strong>news macro programmées</strong>. Liquidité fine le week-end (cf. actifs non-24/7 comme l'or). Un contact de résistance sur volume fin ne vaut pas un contact en pleine session.</p>
+
+<h3><span class="dot s">◆</span> L'absorption comme juge de paix</h3>
+<p>Entre candidats proches, l'edge du projet : <code>absorption</code> / <code>no_demand</code> (effort vs. résultat) dit si le niveau est <strong>activement défendu</strong> (offre qui absorbe) vs. simplement statique. C'est la confirmation la plus fine — l'arbitre final quand deux zones se disputent le rang.</p>
+
+<h3><span class="dot d">◆</span> L'invalidation (aussi importante que le niveau)</h3>
+<p>Une résistance n'est utile qu'assortie de <strong>ce qui la nie</strong> : <strong>reclaim + acceptation au-dessus</strong> (clôture qui tient, idéalement OI/CVD confirmant une vraie demande = SOS/LPS au-dessus) = résistance <em>void</em>, on retourne le biais. Toujours coupler « résistance » et « condition de cassure = tenir/renforcer ». Sans ça, on subit la cassure au lieu de la trader.</p>
+
+<!-- ===================================================================== -->
+<h2 id="flux"><span class="n">7.</span>Le verdict par le flux (au contact)</h2>
+
+<p>Aucun niveau n'<em>est</em> une résistance tant que la tape ne l'a pas confirmé <strong>quand le prix y arrive</strong>. Lecture dans l'ordre imposé — <strong>volume → OI → CVD/absorption → tierces</strong> — pour trancher : le niveau <span class="badge b-supply">tient</span> ou <span class="badge b-demand">cède</span>.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th style="width:16%">Couche</th><th>Le niveau <strong>TIENT</strong> (offre confirmée → alléger/sortir)</th><th>Le niveau <strong>CÈDE</strong> (vraie demande → tenir/renforcer)</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>Volume / spread</strong><br><span class="small">force primaire</span></td>
+  <td>Arrivée en <strong>no-demand</strong> (spread étroit, volume sec) ; ou climax haussier / upthrust : gros volume qui <em>cale</em>, clôture faible (CLV bas), longue mèche haute.</td>
+  <td>Poussée à <strong>spread large + volume en expansion</strong> qui <em>traverse</em> et clôture haut dans la barre (jump across the creek).</td>
+</tr>
+<tr>
+  <td><strong>OI (coin)</strong><br><span class="small">jamais en USD</span></td>
+  <td><strong>prix↑ + OI↑</strong> à la résistance dans un downtrend = <em>nouveaux longs piégés</em> (deviennent le carburant du markdown). <strong>prix↑ + OI↓</strong> = short covering = rallye <em>sans carburant</em>, susceptible d'échouer au mur.</td>
+  <td>Comportement d'OI cohérent avec une <strong>vraie demande</strong> qui s'installe et <em>tient</em> après la cassure (pas un simple covering qui retombe). Lire le <em>signe</em> en coin, pondéré par sa cohérence multi-barres.</td>
+</tr>
+<tr>
+  <td><strong>CVD / absorption</strong><br><span class="small">flux agressif (proxy spot)</span></td>
+  <td>Prix qui monte dans la résistance à <strong>CVD plat/négatif</strong> = hausse passive/absorbée → <strong>l'offre absorbe</strong> (distribution). Ou gros achats agressifs <em>sans</em> progression = absorption = mur confirmé (<code>absorption &gt; 0</code>, delta_z&gt;0 = offre absorbe).</td>
+  <td>Cassure portée par <strong>CVD↑ franc</strong> (demande agressive réelle). Un franchissement sans CVD↑ = covering = <strong>faux SOS</strong>, méfiance.</td>
+</tr>
+<tr>
+  <td><strong>Tierces</strong><br><span class="small">seulement si OI ambigu</span></td>
+  <td>Foule <strong>déjà très longue + funding positif</strong> qui pousse dans la résistance = <em>fragile</em> (carburant à flush). Lecture <strong>froide</strong> : si les tierces affaiblissent la thèse de cassure, le relater comme risque.</td>
+  <td>Funding contenu, shorts qui se font liquider en <em>squeeze ordonné</em>, crowd pas déjà all-in long = cassure mieux carburée. Ne jamais tordre les tierces pour forcer le récit.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="h">Cas « ambigu »</span>
+  Prix qui cale + OI↑ = longs <em>ou</em> shorts qui ouvrent (impossible à trancher sur prix+OI seuls). Croiser <strong>ratio L/S, funding, liquidations</strong>, et lire le <strong>sens commun</strong> (une phrase), pas des bullets séparés. Si rien ne tranche : <strong>ne rien décider — laisser une barre de plus résoudre.</strong>
+</div>
+
+<!-- ===================================================================== -->
+<h2 id="checklist"><span class="n">8.</span>Checklist opérationnelle (réutilisable)</h2>
+
+<ol class="checklist">
+  <li><strong>Cadre d'abord (top-down).</strong> Trend HTF + position dans la plage → les résistances sont-elles des <em>murs</em> (downtrend/redistribution) ou des <em>ralentisseurs</em> (markup) ? Fixer l'attente par défaut.</li>
+  <li><strong>Cartographier &amp; clusteriser.</strong> Superposer toutes les méthodes (structure, POC/VAH, polarité, canal, Fib, VWAP, liquidité au-dessus). Marquer les <strong>zones serrées où ≥ 2 se croisent</strong>. Ce cluster, à la TF de ton trade, est ta résistance opératoire.</li>
+  <li><strong>Noter par les 7 axes.</strong> Nature de l'offre, preuve vs. statique, fraîcheur (combien de tests), échelle. En tirer un rang <em>a priori</em>.</li>
+  <li><strong>Repérer la liquidité au-dessus.</strong> Anticiper une possible mèche/UTAD à travers le high évident — ne pas confondre le <em>balayage</em> avec la <em>cassure</em>.</li>
+  <li><strong>Au contact, lire la tape dans l'ordre</strong> volume/spread → OI(coin) → CVD/absorption → tierces. Verdict : <em>tient</em> / <em>cède</em> / <em>ambigu</em>.</li>
+  <li><strong>Agir par altitude</strong> (cf. §9) : alléger/sortir/resserrer sur un mur confirmé ; tenir/renforcer sur une cassure tenue (LPS au-dessus) ; ne rien faire de décisif sur l'ambigu.</li>
+  <li><strong>Pré-définir l'invalidation.</strong> Le reclaim + acceptation qui annule la résistance et retourne le biais. Toujours écrire le niveau <em>et</em> sa condition de cassure.</li>
+</ol>
+
+<!-- ===================================================================== -->
+<h2 id="gestion"><span class="n">9.</span>« Je suis long » : gérer par altitude</h2>
+
+<p>« Identifier la résistance » quand on est long, c'est surtout <strong>décider la gestion du trade</strong>. La résistance qui compte pour <em>toi</em> est la <strong>plus proche crédible avant ta cible</strong> — c'est là que se joue le R:R — à l'échelle de ton horizon de détention.</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th style="width:22%">Verdict au contact</th><th>Action sur un long</th></tr></thead>
+<tbody>
+<tr><td><span class="badge b-supply">Mur confirmé</span><br><span class="small">no-demand / absorption d'offre / OI↑ piégé / CVD plat</span></td>
+  <td><strong>Alléger</strong> (prise de profit partielle), <strong>remonter le stop</strong> sous le dernier repli valide, ou <strong>sortir</strong> si c'est la cible. En redistribution : traiter le rebond comme un <strong>LPSY</strong> — sortie prioritaire.</td></tr>
+<tr><td><span class="badge b-demand">Cassure tenue</span><br><span class="small">spread large + CVD↑ franc + OI cohérent, clôture qui tient au-dessus</span></td>
+  <td><strong>Tenir</strong> ; éventuellement <strong>renforcer sur le back-up (LPS)</strong> au-dessus de l'ancien plafond. Ne pas prendre profit dans la force pure sans signe d'épuisement.</td></tr>
+<tr><td><span class="badge b-trap">Balayage de liquidité / upthrust</span><br><span class="small">mèche au-dessus puis clôture qui revient sous</span></td>
+  <td><strong>Danger</strong> : ne pas ajouter dans la mèche. Un retour + tenue <em>sous</em> le high balayé = signal de <strong>sortie</strong> (piège haussier confirmé).</td></tr>
+<tr><td><span class="badge b-range">Ambigu</span><br><span class="small">tierces qui ne tranchent pas, OI indécis</span></td>
+  <td><strong>Ne rien décider de structurel.</strong> Au plus, alléger un poil par prudence et laisser <strong>une barre de plus</strong> lever l'ambiguïté. Ne pas forcer une lecture.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout win">
+  <span class="h">Le réflexe à graver</span>
+  <strong>La structure te dit <em>où</em> regarder ; le flux te dit <em>quoi faire</em>.</strong> On pré-planifie sur les niveaux (couche 1), on exécute sur la tape (couche 2). Et tout niveau cité se justifie entre parenthèses par <em>ce qui</em> en fait un niveau clé (quel événement Wyckoff, quelle borne, quel comportement volume/OI) — jamais un chiffre nu.
+</div>
+
+<div class="foot">
+  <p><strong>Mémo « niveaux » — v1.</strong> Document vivant : à enrichir cas par cas (exemples annotés BTC/ETH, calibrage des poids d'axes, seuils d'absorption au contact d'une résistance, captures avec le code couleur graphe↔texte). Cohérent avec <code>CLAUDE.md</code> : classification top-down, Wyckoff fractal, hiérarchie volume → OI → tierces, OI en coin, CVD/absorption, niveaux toujours justifiés.</p>
+  <p class="small">Aide à la décision discrétionnaire — jamais d'exécution automatique. Prochaines pistes : intégrer un détecteur de « cluster de confluence » et une lecture d'absorption dédiée au <em>contact d'une résistance</em> (miroir du spring au plancher).</p>
+</div>
+
+</div>
+</body>
+</html>
