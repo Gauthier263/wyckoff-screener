@@ -50,6 +50,66 @@ def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd
     return out
 
 
+def add_absorption(df: pd.DataFrame, delta, vol_window: int = 20,
+                   move_atr: float = 1.0, weak_eff: float = 0.5,
+                   win: int = 3) -> pd.DataFrame:
+    """Effort (CVD) vs résultat (prix) : **absorption** et **no-demand / no-supply**.
+
+    Deux lectures opposées de la loi effort-vs-résultat, à partir du flux d'ordres agressifs.
+    `df` doit déjà porter `clv` et `atr` (via :func:`add_features`) ; `delta` est le flux
+    agressif net par barre (taker_buy − taker_sell, en coin), aligné sur l'index de `df`
+    (cf. :func:`screener.data.fetch_taker_delta`).
+
+    Colonnes ajoutées :
+      - ``delta``      : flux agressif net par barre (coin).
+      - ``delta_z``    : delta / écart-type glissant — **EFFORT** en σ (signe = côté agressif).
+      - ``ret_atr``    : (close − open) / atr — **RÉSULTAT** directionnel, en ATR.
+      - ``absorption`` : ``−delta_z · (2·clv − 1)`` — version **per-barre** (in-barre). Le **signe**
+        discrimine : **> 0 = flux rejeté = absorption** (``delta_z < 0`` vente rejetée → demande
+        absorbe, haussier ; ``delta_z > 0`` achat rejeté → offre absorbe, baissier) ;
+        **< 0 = mouvement honnête confirmé** (effort ET clôture alignés : un SOS/SOW franc sort
+        nettement négatif) ; **≈ 0 = flux faible** ou clôture neutre (AR/ST).
+      - ``absorption_w`` : **même formule sur une fenêtre de ``win`` barres** (défaut 3) — flux net
+        cumulé vs position de la clôture dans le range des ``win`` dernières barres.
+        **COMPLÉMENTAIRE du per-barre, pas un remplaçant** (backtest BTC) : il est bien plus
+        **stable d'une TF à l'autre** et capte les reclaims étalés sur plusieurs barres (absorption
+        de DEMANDE aux creux) ; MAIS comme c'est une mesure *nette multi-barres*, il **masque** un
+        rejet d'une seule bougie noyé dans une tendance opposée (typiquement l'absorption d'OFFRE
+        au sommet d'un rallye, où le contexte haussier domine la fenêtre). Lire les DEUX : le
+        per-barre pour « cette bougie est-elle un rejet ? », ``absorption_w`` pour le contexte
+        multi-barres robuste à la TF. Un désaccord (per-barre > 0, ``absorption_w`` < 0) = rejet
+        LOCAL dans un mouvement de fond.
+      - ``no_demand``  : prix MONTE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (hausse
+        sans demande agressive = faiblesse / distribution).
+      - ``no_supply``  : prix BAISSE ≥ ``move_atr`` ATR avec ``|delta_z| ≤ weak_eff`` (baisse
+        sans offre agressive = force / accumulation).
+    """
+    out = df.copy()
+    d = delta if isinstance(delta, pd.Series) else pd.Series(delta, index=out.index)
+    d = d.reindex(out.index).astype(float)
+    out["delta"] = d
+
+    sd = d.rolling(vol_window, min_periods=max(3, vol_window // 4)).std()
+    out["delta_z"] = d / sd.replace(0, np.nan)
+    out["ret_atr"] = (out["close"] - out["open"]) / out["atr"].replace(0, np.nan)
+
+    clv_s = 2.0 * out["clv"] - 1.0                 # clôture dans le range, [-1, +1]
+    out["absorption"] = -out["delta_z"] * clv_s
+
+    # ── version fenêtrée (option A) : même formule sur `win` barres ──────────
+    dsum = d.rolling(win, min_periods=1).sum()                       # flux net cumulé
+    dsum_z = dsum / dsum.rolling(vol_window, min_periods=max(3, vol_window // 4)).std().replace(0, np.nan)
+    hi_w = out["high"].rolling(win, min_periods=1).max()
+    lo_w = out["low"].rolling(win, min_periods=1).min()
+    clv_w = ((out["close"] - lo_w) / (hi_w - lo_w).replace(0, np.nan)).clip(0, 1)
+    out["absorption_w"] = -dsum_z * (2.0 * clv_w - 1.0)
+
+    weak = out["delta_z"].abs() <= weak_eff        # NaN → False (pas de faux flag)
+    out["no_demand"] = (out["ret_atr"] >= move_atr) & weak
+    out["no_supply"] = (out["ret_atr"] <= -move_atr) & weak
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Pivots / swings
 # --------------------------------------------------------------------------- #
