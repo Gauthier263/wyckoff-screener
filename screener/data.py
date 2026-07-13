@@ -23,6 +23,13 @@ def get_exchange(name: str = "binance"):
         # géo-bloqués) qui n'apportent rien ici.
         opts["options"] = {"fetchMarkets": ["spot"]}
     ex = klass(opts)
+    # ccxt met la session requests en trust_env=False : elle ignore alors HTTPS_PROXY /
+    # REQUESTS_CA_BUNDLE. On réactive trust_env pour que le screener fonctionne derrière un
+    # proxy d'entreprise / une CA d'inspection TLS (jamais de désactivation de la vérif).
+    try:
+        ex.session.trust_env = True
+    except Exception:
+        pass
     if name == "binance":
         # Route les endpoints publics vers le miroir officiel data-only de Binance :
         # mêmes données et mêmes volumes, sans clé API, et non géo-restreint —
