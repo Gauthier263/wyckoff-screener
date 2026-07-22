@@ -1,242 +1,586 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mémo — Les tests du Composite Operator</title>
+<title>Mémo — Les TESTS du Composite Operator</title>
 <style>
-  :root{--acc:#1b6b1b;--dis:#a11;--amb:#8a6d00;--ink:#1c2530;--mut:#5c6672;--blue:#22518f}
-  *{box-sizing:border-box}
-  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;color:var(--ink);background:#fff;line-height:1.6}
-  .wrap{max-width:1060px;margin:0 auto;padding:26px}
-  h1{font-size:1.6em;margin:0 0 4px}
-  h2{font-size:1.3em;margin:36px 0 10px;padding-bottom:6px;border-bottom:2px solid #eee}
+  :root{--acc:#1b6b1b;--dis:#a11;--ink:#222;--mut:#666;--hl:#6a3d00;--blu:#2456a6}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;color:var(--ink);background:#fff;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px}
+  h1{font-size:1.5em;margin:0 0 4px}
+  h2{font-size:1.25em;margin:30px 0 10px;padding-bottom:5px;border-bottom:2px solid #eee}
   h3{font-size:1.08em;margin:20px 0 8px}
-  .sub{color:var(--mut);margin:0 0 14px;font-size:.93em}
+  h4{margin:14px 0 6px;font-size:.98em}
+  .sub{color:var(--mut);margin:0 0 14px;font-size:.9em}
   .muted{color:var(--mut);font-size:.9em}
-  p{margin:8px 0}
-  ul{margin:8px 0}
-  code{background:#f2f2f2;border-radius:4px;padding:0 4px;font-size:.9em}
-  table{border-collapse:collapse;width:100%;margin:10px 0 14px;font-size:.86em}
-  th,td{border:1px solid #ddd;padding:8px 10px;vertical-align:top;text-align:left}
+  table{border-collapse:collapse;width:100%;margin:8px 0 14px;font-size:.86em}
+  th,td{border:1px solid #ddd;padding:7px 9px;vertical-align:top;text-align:left}
   th{background:#f4f4f4;font-weight:600}
   td.k{white-space:nowrap;font-weight:600}
+  td.ok{color:var(--acc)} td.ko{color:var(--dis)} td.n{color:var(--hl)}
   tr:nth-child(even) td{background:#fcfcfc}
   .toc{background:#f7f9fc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 18px;margin:14px 0;font-size:.9em}
-  .toc a{color:var(--blue);text-decoration:none}.toc a:hover{text-decoration:underline}
-  .toc ol{margin:6px 0 0;padding-left:22px}
-  .lead{background:#fbfcfe;border:1px solid #e6ebf2;border-radius:8px;padding:14px 18px;margin:12px 0}
-  .box{border:1px solid #e3e3e3;border-radius:9px;padding:14px 16px;margin:12px 0;background:#fff}
-  .ok{border-left:4px solid var(--acc);background:#f2faf3}
-  .ko{border-left:4px solid var(--dis);background:#fdf3f3}
-  .tag{font-size:.72em;font-weight:600;border-radius:9px;padding:1px 8px;margin-left:3px;border:1px solid #ccc;color:#555;background:#f6f6f6;white-space:nowrap}
-  td.up{color:var(--acc);font-weight:600}td.dn{color:var(--dis);font-weight:600}
-  .fiche{border:1px solid #e3e3e3;border-radius:9px;padding:16px 18px;margin:14px 0;background:#fdfdfd;border-left:4px solid var(--blue)}
-  .fiche h3{margin-top:0}
-  .fiche .role{color:var(--mut);font-size:.85em;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
-  .fiche .sig{margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;font-style:italic;color:#444}
-  @media print{.box,.fiche{page-break-inside:avoid}h2{page-break-before:always}.toc{display:none}}
-</style></head>
-<body><div class="wrap">
+  .toc ol{margin:6px 0 0;padding-left:20px}
+  .toc a{color:var(--blu);text-decoration:none}
+  .card{border:1px solid #e3e3e3;border-radius:8px;padding:14px 16px;margin:12px 0;background:#fff}
+  .card.key{border-left:4px solid var(--acc);background:#f7fbf7}
+  .card.warn{border-left:4px solid var(--dis);background:#fff9f9}
+  .card.note{border-left:4px solid var(--blu);background:#f7f9fc}
+  .card.author{border-left:4px solid var(--hl);background:#fffdf8}
+  code{background:#f4f4f4;padding:1px 5px;border-radius:4px;font-size:.9em}
+  .tag{font-size:.72em;color:var(--mut);border:1px solid #ddd;border-radius:10px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+  ul,ol{margin:6px 0} li{margin:3px 0}
+  @media print{.card{page-break-inside:avoid}h2{page-break-before:always}.toc{display:none}}
+</style></head><body><div class="wrap">
 
-<h1>Mémo — Les tests du Composite Operator</h1>
-<p class="sub">Pourquoi l'opérateur composite teste, ce qui fait un test valide, la distinction
-LPS vs BUEC, les trois types de spring, la règle de Tom Williams, la matrice de réaction du CO, et
-les fiches des quatre auteurs de référence.</p>
+<h1>Mémo — Les TESTS du Composite Operator</h1>
+<p class="sub">Comment le CO vérifie qu'une campagne est prête : pourquoi il teste, conditions de validité,
+typologie complète (dont LPS vs Back-Up to the Edge of the Creek, les 3 springs, la règle de Tom Williams),
+matrice réaction du CO ↔ manifestations du prix, et fiches doctrinales par auteur.
+Seuils chiffrés = ceux du screener (<code>test_vol ≤ ×0.85</code>, <code>narrow ≤ 0.7 ATR</code>,
+<code>climax ≥ ×2.0</code>, <code>sos ≥ ×1.3</code>, <code>wide ≥ 1.3 ATR</code>, <code>reclaim_clv 0.5</code>).</p>
 
-<div class="toc"><b>Sommaire</b>
+<nav class="toc"><b>Sommaire</b>
 <ol>
-<li><a href="#s1">Pourquoi le Composite Operator teste</a></li>
-<li><a href="#s2">Anatomie d'un test — valide vs échoué</a></li>
-<li><a href="#s3">LPS vs BUEC · les 3 springs · la règle de Tom Williams</a></li>
-<li><a href="#s4">Matrice de réaction du CO (manifestation prix + stratégie)</a></li>
-<li><a href="#s5">Fiches auteurs — Wyckoff · Evans · Pruden · Williams</a></li>
-</ol></div>
+<li><a href="#campagne">Pourquoi le CO teste — l'économie profonde du test</a></li>
+<li><a href="#anatomie">Anatomie d'un test — conditions de validité</a></li>
+<li><a href="#typologie">Typologie des tests : LPS vs BUEC · les 3 springs · la règle de Williams</a></li>
+<li><a href="#matrice">Matrice : situation → lecture → réaction du CO → manifestations du prix</a></li>
+<li><a href="#pierre">Les tests, pierre angulaire d'une campagne ?</a></li>
+<li><a href="#ponderation">Pondérer les tests réussis ?</a></li>
+<li><a href="#exemples">Exemples récents (XAU, BTC)</a></li>
+<li><a href="#auteurs">Fiches auteurs : Wyckoff · Evans · Pruden · Williams</a></li>
+</ol></nav>
 
-<!-- ===================== 1 ===================== -->
-<h2 id="s1">1 · Pourquoi le Composite Operator teste</h2>
-<div class="lead">
-<p><b>Le Composite Operator (CO)</b> — l'« Homme Composite » de Wyckoff, l'agrégat des mains fortes /
-institutions — <b>ne bouge pas le prix sur une espérance : il agit sur confirmation</b>. Le test est
-son outil de vérification.</p>
-<p><b>Le but.</b> Avant de lancer un markup (ou un markdown), le CO doit s'assurer que <b>la force
-adverse est épuisée</b>. Il a passé la Phase B à <b>absorber l'offre</b> (accumulation) ; un test en
-Phase C <b>vérifie que cette absorption a marché</b> — qu'enfoncer le prix ne fait <b>plus</b> sortir
-de vendeurs.</p>
-<p><b>Le mécanisme.</b> Il <b>sonde un niveau</b> (typiquement le bas de la plage / le spring) et
-<b>regarde le volume</b>. <b>Volume faible</b> sur la sonde = les vendeurs sont partis (<i>no-supply</i>)
-= la cause est complète = <b>voie libre pour marquer</b>. <b>Volume élevé</b> = l'offre subsiste =
-pas prêt (retour en absorption).</p>
-<p><b>La logique économique.</b> Marquer le prix <i>à travers</i> de l'offre latente coûte cher (le CO
-achèterait sa propre résistance). <b>Tester, c'est de la gestion du risque pour l'opérateur</b> : il
-confirme que le chemin est dégagé avant d'engager son capital.</p>
-<p><b>Le tell pour nous.</b> Un test <b>montre la main du CO</b>. Un test réussi à volume sec près
-d'un spring/support est l'un des <b>signaux long les plus probants</b>, parce qu'on se greffe sur la
-<i>propre confirmation de l'opérateur</i>. (Fractal : les tests existent à toutes les échelles.)</p>
-</div>
+<!-- ============================================================ -->
+<section id="campagne">
+<h2>1 · Pourquoi le CO teste — l'économie profonde du test</h2>
 
-<!-- ===================== 2 ===================== -->
-<h2 id="s2">2 · Anatomie d'un test — valide vs échoué</h2>
-<p>Un test <b>sonde un niveau</b> : le low d'un spring, un support, un ancien climax, ou (en Phase D,
-par le haut) la <b>résistance cassée</b> (le creek devenu support). Ce qui compte n'est pas le niveau
-mais <b>le volume de la réponse</b>.</p>
+<p>Une campagne d'accumulation a trois temps : <b>construire la cause</b> (absorber le flottant au plus bas
+prix, dans la panique puis dans l'ennui), <b>vérifier</b>, puis <b>récolter l'effet</b> (le markup).
+Le test est le temps de vérification. Cinq raisons distinctes — et cumulatives — font que le CO ne peut
+pas s'en passer :</p>
 
-<div class="box ok">
-<h3 style="margin-top:0">Test VALIDE (no-supply)</h3>
+<h3>1.1 — Le coût : le markup est la phase la plus chère de la campagne</h3>
+<p>Pendant l'accumulation, le CO est <b>faiseur de prix passif</b> : il achète ce qu'on lui vend, aux prix
+qu'il a lui-même déprimés. Pendant le markup, il devient <b>preneur de prix</b> : pour faire monter, il doit
+lever les offres au-dessus du marché — chaque tranche d'offre résiduelle rencontrée en montant est achetée
+<i>plus cher</i> que pendant la plage. Marquer les prix à la hausse alors qu'il reste du flottant, c'est offrir
+une porte de sortie à prix améliorés aux derniers détenteurs faibles — l'inverse exact de la campagne. Pire :
+si l'offre résiduelle est trop lourde, le markup <b>échoue</b>, le prix retombe dans la plage, le CO porte un
+inventaire acheté trop haut, et la campagne doit être <i>replacée plus bas</i> — double coût. Le test coûte
+quelques barres de patience ; l'absence de test peut coûter la campagne.</p>
+
+<h3>1.2 — L'asymétrie d'information : le CO connaît SA position, pas celle des autres</h3>
+<p>C'est le point le plus mal compris. Le CO sait exactement combien il a absorbé — mais il ne sait <b>pas</b>
+combien d'offre reste chez les autres : les longs piégés plus haut qui attendent un rebond pour sortir
+(<i>overhead supply</i>), les shorts en gain qui peuvent presser, les autres opérateurs. Le carnet ne le lui dit
+pas — les intentions ne sont pas affichées. <b>Le test est son seul instrument de mesure du monde extérieur</b> :
+en ramenant (ou laissant revenir) le prix sur la zone sensible, il force les vendeurs résiduels à se
+manifester… ou à révéler leur absence.</p>
+
+<h3>1.3 — La fiabilité : l'information négative ne se simule pas</h3>
+<p>Un test pose une seule question — <i>« reste-t-il des vendeurs ici ? »</i> — et la meilleure réponse
+possible est <b>l'absence de volume</b>. Un volume présent est toujours ambigu (vraie vente ? covering ?
+bruit ?). Un volume <b>absent</b> ne se truque pas : si personne ne vend quand le prix retouche la zone de
+l'ancienne panique, c'est que l'offre y est objectivement épuisée. C'est la loi effort-vs-résultat retournée :
+<i>pas d'effort vendeur + prix qui tient = plus rien à vendre</i>. Le test à volume sec est une information
+<b>à faible bruit</b> — la denrée la plus rare des marchés.</p>
+
+<h3>1.4 — Le springboard : le test décide du « quand »</h3>
+<p>Wyckoff appelait <i>« on the springboard »</i> l'état d'un titre dont la préparation est complète — prêt à
+quitter sa zone d'accumulation. Le passage sur le springboard n'est pas une intuition : c'est un <b>verdict de
+tests</b>. Tant que les retours sur la zone basse sortent volumiques, le titre n'est PAS sur le springboard
+(il reste de l'offre à absorber). Le jour où le retour sort sec et tenu, il l'est. Le test transforme la
+question « quand lancer le markup ? » — indécidable a priori — en une lecture factuelle.</p>
+
+<h3>1.5 — L'héritage opérationnel : les pools testaient réellement</h3>
+<p>Ce n'est pas une métaphore. Dans les années 1910–1930, les opérateurs et pools que Wyckoff décrivait (et
+pour lesquels il avait travaillé) <b>testaient physiquement</b> le marché avec des ordres exploratoires : vendre
+quelques milliers de titres pour voir si le prix casse ou si des acheteurs les absorbent ; retirer tous les
+bids pour voir si le titre tombe de lui-même (il n'y a plus de vendeurs si rien ne tombe) ; acheter
+bruyamment pour mesurer l'élasticité de l'offre au-dessus. Le « test » wyckoffien est la trace sur la bande
+(le tape) de ces sondages réels. Aujourd'hui les acteurs et outils ont changé, la logique — sonder à moindre
+coût avant d'engager le gros du capital — est inchangée : c'est de la <b>reconnaissance avant l'offensive</b>.</p>
+
+<div class="card key"><b>Synthèse §1.</b> Le CO teste parce que (1) le markup est cher et irréversible,
+(2) il ne connaît pas l'offre résiduelle des autres, (3) seule l'absence de volume est une preuve fiable,
+(4) le test seul dit <i>quand</i> le titre est sur le springboard, (5) c'est une pratique opérationnelle
+héritée de sondages réels. Miroir en distribution : remplacer « offre » par « demande » — le CO distributeur
+teste s'il reste des acheteurs (no demand) avant de lancer le markdown.</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="anatomie">
+<h2>2 · Anatomie d'un test — les conditions de validité</h2>
+
+<p>Structurellement : un <b>retour vers une zone où de l'offre s'est manifestée</b> (low d'un climax, d'un
+spring, d'un shakeout, borne cassée) pour mesurer ce qu'il en reste. Cinq conditions, TOUTES nécessaires :</p>
+
+<table>
+<thead><tr><th>#</th><th>Condition</th><th>Seuil chiffré (screener)</th><th>Ce que ça prouve</th></tr></thead>
+<tbody>
+<tr><td class="k">1</td><td><b>Volume SEC</b> — sous la moyenne ET inférieur au volume du passage précédent sur la zone</td><td><code>vol_ratio ≤ ×0.85</code></td><td>plus de vendeurs actifs sur la zone</td></tr>
+<tr><td class="k">2</td><td><b>Spread ÉTROIT</b></td><td><code>spread_atr ≤ 0.7</code></td><td>aucune pression : ni panique ni poursuite</td></tr>
+<tr><td class="k">3</td><td><b>Borne tenue</b> — creux du test AU-DESSUS du low testé (higher low)</td><td>low(test) &gt; low(spring/SC)</td><td>la demande défend plus haut qu'avant</td></tr>
+<tr><td class="k">4</td><td><b>Clôture qui répond</b> — mi-range ou mieux</td><td><code>clv ≥ ~0.5</code></td><td>les acheteurs reprennent la barre</td></tr>
+<tr><td class="k">5</td><td><b>Contexte</b> — le test suit un événement qui a RETIRÉ de l'offre (climax, spring, shakeout, SOS)</td><td>position dans la séquence</td><td>on teste <i>quelque chose</i> ; un test sans cause ne teste rien</td></tr>
+</tbody>
+</table>
+
+<div class="card warn"><b>La condition 5 est celle que tout le monde oublie.</b> Une bougie sèche à spread
+étroit au milieu de nulle part n'est PAS un test — juste une bougie calme. Le test n'a de valeur
+qu'<b>adossé à une cause</b> : il vérifie le résultat d'une opération précédente du CO. Séquence d'abord,
+test ensuite (règle top-down).</div>
+
+<p><b>En crypto, deux confirmations supplémentaires</b> (indisponibles sur l'or) : <b>OI plat/↓</b> sur le
+test (personne ne s'engage contre la zone) et <b>absorption ≈ 0</b> (aucune agression — le calme). Un test
+avec OI qui MONTE n'est pas un test : quelqu'un s'engage, la question n'est pas réglée.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="typologie">
+<h2>3 · Typologie des tests</h2>
+
+<h3>3.1 — Vue d'ensemble (accumulation)</h3>
+<table>
+<thead><tr><th>Test</th><th>Phase</th><th>Ce qu'il teste</th><th>Signature valide</th></tr></thead>
+<tbody>
+<tr><td class="k">ST (Secondary Test)</td><td>A→B</td><td>la zone du SC : la panique est-elle épuisée ?</td><td>vol &lt; climax, spread rétréci, creux ≥ SC</td></tr>
+<tr><td class="k">Tests de Phase B (STs répétés)</td><td>B</td><td>l'offre résiduelle à chaque retour vers la borne basse</td><td>volume des creux qui DÉCROÎT test après test</td></tr>
+<tr><td class="k">SPRING (lui-même un test)</td><td>C</td><td>test ULTIME : stop-run sous le plancher pour forcer la dernière offre à se montrer</td><td>pénétration + rejet — cf. les 3 types §3.3</td></tr>
+<tr><td class="k">TEST du spring</td><td>C</td><td>le low du spring : la secousse a-t-elle tout délogé ?</td><td>volume ENCORE plus sec que le spring + creux plus haut + clôture ferme</td></tr>
+<tr><td class="k">LPS successifs</td><td>D</td><td>la demande à chaque repli du canal naissant — cf. §3.2</td><td>replis secs, higher lows en escalier</td></tr>
+<tr><td class="k">BUEC (Back-Up to the Edge of the Creek)</td><td>D→E</td><td>la borne FRANCHIE : les vendeurs reviennent-ils dessus ? — cf. §3.2</td><td>retour sec SUR l'ancienne résistance, qui tient</td></tr>
+<tr><td class="k">No-supply bar (micro-test VSA)</td><td>toutes</td><td>version 1-bougie : baisse à spread étroit, volume &lt; aux 2 barres précédentes</td><td>confirmée par la réponse haussière qui suit</td></tr>
+</tbody>
+</table>
+<p class="muted">Miroir distribution : ST du BC, UT (test de la demande en Phase B), UTAD + son test,
+LPSY (test du support cassé = <i>no demand rally</i> sous la glace).</p>
+
+<!-- ---------------------------------------------------------- -->
+<h3>3.2 — LPS successifs (Phase D) vs Back-Up to the Edge of the Creek : la différence</h3>
+
+<p>Les deux sont des tests de demande, les deux font des higher lows, et doctrinalement le BUEC <b>est</b> une
+forme particulière de LPS (Evans). Mais les confondre fait rater l'essentiel : ils ne testent <b>pas la même
+chose</b>, pas <b>au même endroit</b>, pas <b>au même moment de la campagne</b>.</p>
+
+<table>
+<thead><tr><th></th><th>LPS successifs (Phase D, « dans le canal »)</th><th>BUEC — Back-Up to the Edge of the Creek</th></tr></thead>
+<tbody>
+<tr><td class="k">Moment</td><td><b>AVANT la cassure</b> de la borne haute : entre le spring/test (Phase C) et le JAC. C'est la montée <i>à l'intérieur</i> de la plage.</td><td><b>APRÈS la cassure</b> (le JAC/SOS majeur) : le prix est déjà sorti de la plage et revient dessus. Transition Phase D → E.</td></tr>
+<tr><td class="k">Localisation</td><td>À l'intérieur de la structure : sur les anciens niveaux mineurs de la plage (petites résistances internes devenues supports, mid-range, sommet du spring). Chaque repli du canal naissant en forme un.</td><td>UN endroit précis : <b>le bord du creek</b> — l'ancienne résistance majeure de la plage (la borne franchie par le SOS), testée par au-dessus.</td></tr>
+<tr><td class="k">Ce qui est testé</td><td>La <b>demande</b> : à chaque repli, les acheteurs reviennent-ils plus haut que la fois d'avant ? Le CO jauge si la demande publique commence à prendre le relais — et si LUI peut cesser de porter seul le marché.</td><td>Le <b>changement de polarité de la borne</b> : l'ancienne offre (tous ceux qui vendaient à ce niveau pendant des semaines) a-t-elle vraiment disparu ? La résistance est-elle devenue support ?</td></tr>
+<tr><td class="k">Pluriel / singulier</td><td><b>Plusieurs</b> par structure — LPS 1, LPS 2… en escalier. Chacun est le « dernier point de soutien » <i>du moment</i>, jusqu'au suivant plus haut.</td><td>Typiquement <b>un seul</b> (parfois deux) : c'est LE test de sortie. S'il y en a beaucoup, c'est que la sortie ne tient pas — mauvais signe.</td></tr>
+<tr><td class="k">Volume attendu</td><td>Replis secs (≤×0.85), poussées entre les replis de plus en plus volumiques (la demande s'affirme).</td><td>Retour SEC impérativement — le moindre volume vendeur fort sur le bord du creek remet la cassure en cause (possible upthrust).</td></tr>
+<tr><td class="k">Invalidation</td><td>Un LPS qui casse le low du LPS précédent = l'escalier casse → retour en Phase B (voire C).</td><td>Retour DANS la plage (clôture sous la borne) = le JAC a échoué → c'était un upthrust de la borne, pas un SOS.</td></tr>
+<tr><td class="k">Fonction pour le CO</td><td>Jauge de maturité : « la demande extérieure porte-t-elle ? puis-je franchir ? » Les LPS successifs sont ses <b>paliers de décision</b> avant d'engager le franchissement.</td><td>Contrôle de sortie : « la sortie est-elle définitive ? » C'est le <b>dernier point de vérification avant la Phase E</b>, où il laissera courir le markup.</td></tr>
+</tbody>
+</table>
+
+<div class="card note"><b>Image d'Evans pour bien les séparer.</b> Le boy-scout (le prix) longe le creek
+(la zone d'offre sinueuse au-dessus de la plage). Ses <b>allers-retours d'approche</b> — il s'approche du
+bord, recule, reprend de l'élan un peu plus haut — ce sont les <b>LPS successifs</b> : il jauge la largeur
+et prend son élan. Puis il <b>saute</b> (JAC, sur volume — l'élan). Une fois de l'autre côté, il <b>revient
+au bord</b> vérifier que la berge tient sous son poids et reprendre son souffle : c'est le <b>back-up to the
+edge of the creek</b>. S'approcher du bord N fois (LPS) et revenir au bord une fois le saut fait (BUEC) sont
+deux gestes différents — avant/après le saut.</div>
+
+<!-- ---------------------------------------------------------- -->
+<h3>3.3 — Les 3 types de spring, en détail</h3>
+<p class="muted">Typologie SMI/Pruden. Attention : la numérotation varie selon les sources — se fier au
+COMPORTEMENT (pénétration × volume), pas au numéro. L'axe : plus la pénétration est <i>profonde et
+volumique</i>, plus il restait d'offre — et plus la vérification exigée est lourde.</p>
+
+<div class="card">
+<h4>Spring de type 3 — l'effleurement sec <span class="tag">le plus haussier · pas de test requis</span></h4>
 <ul>
-<li><b>Volume faible</b> — inférieur aux deux barres précédentes ; seuil screener <code>test ≤ ×0.85</code>,
-le plus sec est le mieux (idéal ×0.5–0.7).</li>
-<li><b>Spread étroit</b>, <b>clôture hors des plus-bas</b> (moitié haute de la barre).</li>
-<li>Idéalement un <b>higher low</b>, et <b>confirmé par une barre suivante haussière</b> (la réponse).</li>
-<li>Lecture : l'offre est absente → la demande a le champ libre → <b>markup imminent</b>.</li>
-</ul>
-</div>
+<li><b>Pénétration</b> : minime — le prix passe à peine sous le plancher (undercut de quelques ticks/fractions d'ATR), souvent en mèche.</li>
+<li><b>Volume</b> : SEC (≤ moyenne). Le stop-run ne déclenche presque rien : ni cascade de stops, ni vendeurs frais.</li>
+<li><b>Ce que ça révèle</b> : il n'y avait <b>déjà plus d'offre</b>. Le plancher était vide — la cassure n'a trouvé personne à déloger. C'est un test qui a réussi <i>en tant que spring</i> : il est son propre test.</li>
+<li><b>Réaction du CO</b> : feu vert immédiat — la préparation était déjà complète, le titre était sur le springboard sans qu'on le sache. Le markup peut partir sans étape intermédiaire.</li>
+<li><b>Manifestation typique</b> : reclaim dans la même barre ou la suivante, puis SOS rapide. Souvent le spring #3 est rétrospectivement la dernière bougie basse de la structure.</li>
+</ul></div>
 
-<div class="box ko">
-<h3 style="margin-top:0">Test ÉCHOUÉ (offre encore présente)</h3>
+<div class="card">
+<h4>Spring de type 2 — la secousse absorbée <span class="tag">le cas standard · test secondaire REQUIS</span></h4>
 <ul>
-<li><b>Volume élevé / en hausse</b> sur la sonde = <b>des vendeurs répondent</b> = l'offre n'est pas
-épuisée.</li>
-<li>Le prix <b>ne tient pas</b>, barres de baisse larges, clôtures basses.</li>
-<li>Lecture : la cause n'est <b>pas complète</b> → le CO <b>retourne absorber</b> (ré-accumulation)
-ou le cadre était faux. <b>Rester à l'écart.</b></li>
+<li><b>Pénétration</b> : modérée (quelques dixièmes d'ATR sous le plancher), quelques barres sous la borne possibles.</li>
+<li><b>Volume</b> : moyen à soutenu — de l'offre s'est bel et bien présentée (stops + vendeurs de la cassure), mais la clôture qui réintègre la plage prouve qu'elle a été <b>absorbée</b>.</li>
+<li><b>Ce que ça révèle</b> : il RESTAIT de l'offre — le CO vient de l'acheter d'un bloc. Mais « absorbée une fois » ne veut pas dire « épuisée » : d'autres vendeurs peuvent s'être réveillés.</li>
+<li><b>Réaction du CO</b> : il NE lance PAS le markup tout de suite. Il laisse/provoque un retour vers le low du spring — le fameux <b>test du spring</b> — qui doit sortir sur volume nettement inférieur avec un creux plus haut. C'est LE cas d'école du « test qui découle du spring ».</li>
+<li><b>Manifestation typique</b> : spring → rebond réflexe de quelques barres → retour calme vers le low (le test) → si sec : départ. La séquence complète prend typiquement 3 à 10 barres de la TF de la structure.</li>
+</ul></div>
+
+<div class="card">
+<h4>Spring de type 1 — le terminal shakeout <span class="tag">le plus violent · test(s) IMPÉRATIF(S)</span></h4>
+<ul>
+<li><b>Pénétration</b> : profonde — expansion de spread nette sous le plancher, parfois plusieurs ATR ; ressemble à une vraie cassure baissière.</li>
+<li><b>Volume</b> : FORT à climactique. Cascade de stops, capitulation des derniers détenteurs, shorts qui s'engagent sur la « cassure ».</li>
+<li><b>Ce que ça révèle</b> : une quantité massive d'offre vient de changer de mains d'un coup. Si le prix récupère vite et fort (reclaim), c'est le CO qui a tout ramassé — c'est le <b>terminal shakeout</b> : la dernière opération d'absorption de la campagne, brutale et définitive.</li>
+<li><b>Réaction du CO</b> : vérification OBLIGATOIRE, parfois multiple. Un transfert aussi gros laisse toujours des résidus (vendeurs tardifs, shorts piégés à gérer). Il exige un ou plusieurs tests secs avant d'engager le markup. Règle : plus le shakeout est gros, plus la vérification doit être propre.</li>
+<li><b>Manifestation typique</b> : V violent (flush + reclaim), puis un ou deux retours vers la zone du low à volume décroissant. Nuance : si la réponse post-shakeout est explosive (squeeze), le test peut prendre la forme différée d'un back-up sur la zone reconquise plutôt que d'un retour au low (cas BTC 01/07, cf. §7).</li>
+<li><b>Piège</b> : sans reclaim rapide, ce n'est pas un shakeout mais une vraie cassure. La différence se lit dans la clôture (réintègre ou non) et, en crypto, dans l'absorption (flux rejeté ?) et l'OI (shorts squeezés ?).</li>
+</ul></div>
+
+<!-- ---------------------------------------------------------- -->
+<h3>3.4 — La règle de Tom Williams, en détail</h3>
+
+<p><b>Énoncé court :</b> <i>un test sur volume FORT est un test raté — il devra être re-testé.</i>
+Développons, parce que la logique interne est ce qui la rend utilisable.</p>
+
+<h4>a) Le test selon Williams (VSA)</h4>
+<p>Pour Williams, le test est une opération <b>délibérée</b> du « smart money » : marquer rapidement le prix
+<b>à la baisse, dans une zone où de gros volumes de vente ont eu lieu</b> (l'ancienne panique), pour voir ce
+qui en sort. La barre de test idéale : <b>baisse, spread étroit, volume faible</b> (inférieur aux deux barres
+précédentes), <b>clôture mi-range ou haute</b>. Elle dit : on a ouvert la trappe, et rien n'est tombé.</p>
+
+<h4>b) Pourquoi le volume fort invalide le test</h4>
+<p>Si le retour dans la zone fait ressortir du volume, c'est que des vendeurs s'y trouvaient <b>encore</b> —
+peu importe que la clôture ait tenu (absorption). Le professionnel n'a pas obtenu sa réponse : il sait
+qu'il reste de l'offre, il ne sait pas <i>combien</i>. Or il ne lancera jamais un markup au-dessus d'une
+offre non mesurée (cf. §1.1). Conclusion opératoire : il <b>reviendra</b> — il re-marquera le prix dans la
+même zone, plus tard, jusqu'à obtenir un passage SEC. D'où les doubles et triples tests si fréquents :
+<b>chaque test volumique prend rendez-vous pour le suivant</b>.</p>
+
+<h4>c) Les trois conditions annexes de Williams</h4>
+<ul>
+<li><b>Le fond (background) prime</b> : un test n'a de sens que sur fond de force (climax d'arrêt, absorption,
+shakeout récents). Le même geste sur fond de distribution est un piège — un rallye de test dans un marché
+faible devient no-demand.</li>
+<li><b>La réponse valide le test</b> : un test sec n'est confirmé que si le marché <b>répond</b> à la hausse
+dans les barres qui suivent. Test sec sans réponse = pas de demande = signal neutre (cf. matrice, ligne 4).</li>
+<li><b>Le test en tendance</b> : Williams applique aussi le test comme signal de <i>continuation</i> — dans un
+markup établi, une petite baisse sèche dans une zone de volume antérieure = re-vérification réussie,
+la hausse peut reprendre. Le test n'est donc pas réservé aux planchers.</li>
 </ul>
-</div>
 
-<p><b>Ne pas confondre le spring et son test.</b> Le <b>spring</b> est le <i>shakeout</i> (le plongeon
-sous le support) ; le <b>test</b> est la <i>re-sonde à volume sec</i> qui confirme que le spring a
-tenu. Séquence type : <b>spring → rebond → test secondaire</b> (plus le spring a fait sortir d'offre,
-plus le test secondaire est nécessaire — cf. §3).</p>
+<div class="card note"><b>Traduction dans nos seuils.</b> Test validé (Williams) =
+<code>vol_ratio ≤ 0.85</code> ET vol &lt; vol des 2 barres précédentes ET <code>clv ≥ 0.5</code>,
+sur fond de climax/spring récent, suivi d'une réponse haussière ≤ 3 barres.
+Test raté (à re-tester) = mêmes conditions de position mais <code>vol_ratio ≥ ~1.5</code> :
+noter le niveau, attendre le retour suivant — c'est LUI qui décidera.</div>
+</section>
 
-<!-- ===================== 3 ===================== -->
-<h2 id="s3">3 · LPS vs BUEC · les 3 springs · la règle de Tom Williams</h2>
+<!-- ============================================================ -->
+<section id="matrice">
+<h2>4 · Matrice : situation → lecture → réaction du CO → manifestations du prix</h2>
 
-<h3>LPS vs BUEC — même fonction, la nuance du lieu</h3>
+<p class="muted">Cadre : accumulation présumée, retour du prix sur une zone testée (low du spring / SC / borne).
+Symétrique en distribution (inverser offre↔demande). La colonne « réaction du CO » décrit ses opérations
+concrètes ; la colonne « manifestations » décrit ce que ces opérations impriment sur le graphe — c'est par
+elles qu'on INFÈRE la réaction (on ne voit jamais le CO, on voit ses traces).</p>
+
 <table>
-<thead><tr><th>Terme</th><th>Ce qu'il nomme</th><th>Localisation</th><th>Empreinte</th></tr></thead>
+<thead><tr><th>Situation observée</th><th>Lecture</th><th>Réaction du CO (opérations concrètes)</th><th>Manifestations sur le prix (ce qu'on verra)</th></tr></thead>
 <tbody>
-<tr><td class="k">LPS<br><span class="muted">Last Point of Support</span></td>
-<td>La <b>fonction</b> : le dernier point de soutien avant le markup, où la demande revient en Phase D.</td>
-<td>N'importe quel <b>higher low</b> de Phase D (pas forcément à la borne).</td>
-<td>Volume sec, higher low, no-supply.</td></tr>
-<tr><td class="k">BUEC<br><span class="muted">Back-Up to the Edge of the Creek</span></td>
-<td>Le <b>lieu</b> : le back-up <b>à la résistance cassée</b> (le creek) après le JAC/SOS.</td>
-<td>Précisément <b>sur l'ancienne borne</b> devenue support (résistance→support).</td>
-<td>Volume sec, tient au-dessus du creek, no-supply.</td></tr>
-</tbody></table>
-<p class="muted">Doctrinalement <b>synonymes</b> (Evans) : les deux = test de support à volume sec, higher
-low, en Phase D, confirmant la demande. La nuance pédagogique : <b>BUEC nomme l'endroit</b> (au bord
-du ruisseau franchi), <b>LPS nomme le rôle</b> (dernier support avant markup). <b>Un BUEC est toujours
-un LPS ; un LPS n'est pas toujours pile au creek.</b></p>
+<tr>
+<td class="k">Test à VOLUME SEC + borne tenue + clôture ferme<br><span class="muted">vol ≤×0.85, spread ≤0.7 ATR, higher low</span></td>
+<td class="ok"><b>Offre épuisée.</b> La question est réglée.</td>
+<td><b>Il engage le markup.</b> Concrètement : il retire ses ordres de vente de camouflage (ceux qui plafonnaient le prix pendant l'absorption), remonte ses bids, et passe à l'achat AGRESSIF au marché — pour la première fois de la campagne il accepte de payer le prix. Il peut laisser 1–2 barres calmes de plus pour compléter sa ligne à bon prix avant de pousser.</td>
+<td>Dans les 1–3 barres : bougie(s) de demande à <b>spread croissant, clôtures hautes, volume qui REVIENT sur la hausse</b> (l'inverse du test : maintenant l'effort est acheteur et le résultat suit). Enchaînement de higher highs rapide, pas de retour sur le low du test. Le JAC/SOS suit vite — souvent la structure « décolle » en quelques barres.</td>
+</tr>
+<tr>
+<td class="k">Test à VOLUME FORT mais clôture qui TIENT<br><span class="muted">vol ≥×1.5–2, clv ≥0.5, borne tenue</span></td>
+<td class="n"><b>Offre encore présente, mais ABSORBÉE.</b> Quelqu'un vend encore — quelqu'un de plus gros achète tout.</td>
+<td><b>Il prolonge l'absorption et reprend rendez-vous.</b> Il continue d'acheter passivement (bids échelonnés sous le marché), ne poursuit PAS à la hausse (pousser maintenant = payer l'offre restante au prix fort). Plus tard, il RETIRERA son soutien pour laisser le prix revenir sur la zone — provoquant lui-même le re-test qui devra sortir sec (règle de Williams).</td>
+<td>Rallye <b>mou</b> après le test (pas de follow-through : spreads étroits, volume qui sèche en montant), le prix plafonne à mi-plage, puis <b>retour vers la zone</b> dans les barres/jours suivants. Visuellement : doubles/triples creux au même niveau avec <b>volume décroissant à chaque passage</b> — le gradient d'assèchement EST la signature de la campagne qui mûrit.</td>
+</tr>
+<tr>
+<td class="k">Test à VOLUME FORT + clôture FAIBLE / borne cassée<br><span class="muted">vol fort, clv ≤0.3, pas de reclaim</span></td>
+<td class="ko"><b>Offre dominante.</b> Le test a échoué : plus de vendeurs que le CO ne veut en absorber ici.</td>
+<td><b>Il se retire.</b> Il annule ses bids (plus de filet), cesse d'absorber, et peut même ALLÉGER une partie de son inventaire dans les rebonds pour ne pas porter à perte — quitte à revendre ce qu'il vient d'acheter. Puis il laisse le marché chercher un niveau plus bas où l'offre s'épuisera d'elle-même, et REPLACE la campagne là (nouveau climax, nouvelle plage).</td>
+<td><b>La cassure tient</b> : clôtures sous la zone, pas de reclaim. Les rebonds de retour sont faibles et calent SOUS l'ancien plancher (structure de LPSY — l'ancien support devenu résistance). Expansion baissière (spreads larges vers le bas), nouveaux plus-bas. Plus tard, ailleurs plus bas : un nouveau climax d'arrêt — le début de la campagne replacée.</td>
+</tr>
+<tr>
+<td class="k">Test SEC… mais AUCUNE réponse ensuite<br><span class="muted">no-supply suivi de no-demand</span></td>
+<td class="n"><b>Offre épuisée MAIS demande absente.</b> Le marché est vide des deux côtés.</td>
+<td><b>Il attend — ou il anime.</b> Sans demande publique à qui revendre plus haut, le markup ne paie pas (il monterait seul, contre personne). Option 1 : laisser mûrir (le temps et l'ennui font sortir les derniers impatients). Option 2 : ANIMER le titre — achats voyants sur volume léger, marquer des plus-hauts visibles, faire parler le titre — pour attirer l'attention du public et créer la demande qui manque.</td>
+<td>La plage <b>s'éternise</b> : volatilité qui se contracte, spreads qui rétrécissent des deux côtés, volume global en baisse — l'apathie. Ponctuellement : des poussées soudaines à faible volume qui font un plus-haut marginal puis retombent sans suite (l'animation). Le réveil viendra d'un coup — surveiller le premier vrai volume directionnel après la léthargie.</td>
+</tr>
+<tr>
+<td class="k">PAS de test du tout (V-bottom)</td>
+<td class="n"><b>Vérification incomplète.</b> Le CO n'a pas pu confirmer — ou un événement exogène a forcé le mouvement.</td>
+<td><b>Il teste plus tard, autrement.</b> Sur le premier repli venu, il retire délibérément ses bids et LAISSE le prix retomber vers la borne franchie — sans la défendre — précisément pour observer qui vend dans ce vide. Le back-up devient le test différé. S'il sort sec, il redéploie ses achats ; sinon il sait que la sortie était prématurée.</td>
+<td>Verticalité initiale, puis un <b>premier pullback</b> vers la borne/zone de départ qui semble « sans soutien » (personne ne le retient — c'est voulu). C'est LE moment d'observation : s'il sort sec + tient la borne = BUEC validé, la tendance reprend ; s'il retombe DANS la plage sur volume, la sortie a échoué et tout est à refaire.</td>
+</tr>
+<tr>
+<td class="k">Tests secs réussis… puis UPTHRUST de la borne haute</td>
+<td class="ko"><b>Contradiction — le cadre est peut-être faux.</b> Un marché réellement accumulé ne se fait pas rejeter du plafond en no-demand.</td>
+<td>Deux CO possibles, deux réactions : <b>si accumulateur</b>, il DÉFEND le retour dans la plage — il rachète la baisse immédiatement pour que le rejet ne dégénère pas (l'upthrust n'était qu'un stop-run de la borne haute). <b>Si distributeur</b> (on s'est trompé de cadre), l'upthrust était SON test de la demande : il vend massivement dans tout ce qui rebondit ensuite.</td>
+<td>Le tri se fait dans les barres POST-rejet : <b>cas accumulation</b> — stabilisation rapide au-dessus des anciens lows, higher low reformé à volume sec, la structure repart. <b>Cas distribution</b> — enchaînement de lower highs, volume qui ressort sur chaque BAISSE (l'offre travaille), les LPS anciens cassent un à un. Tenir les deux étiquettes tant que ce tri n'a pas eu lieu.</td>
+</tr>
+</tbody>
+</table>
+</section>
 
-<h3>Les trois springs — classés par la quantité d'offre révélée</h3>
+<!-- ============================================================ -->
+<section id="pierre">
+<h2>5 · Les tests sont-ils la pierre angulaire d'une campagne ? — avis</h2>
+
+<p><b>Oui — mais de la DÉCISION, pas de la CONSTRUCTION.</b></p>
+<ul>
+<li><b>Le moteur de la campagne, c'est l'absorption</b> (climax + Phase B) : c'est là que le CO construit sa
+position. Un test ne crée pas de cause — il la <i>mesure</i>.</li>
+<li><b>Mais chaque transition de phase est gardée par un test</b> : ST (la panique est finie ?) → tests de
+Phase B (l'absorption progresse ?) → spring + test (la dernière offre est délogée ?) → LPS successifs
+(la demande porte ?) → BUEC (la sortie tient ?). <b>Une campagne est une séquence de portes, et chaque porte
+est un test.</b> Sans tests, le CO vole à l'aveugle et le markup devient un pari.</li>
+<li><b>Pour l'analyste</b>, le test est l'événement le plus lisible de la méthode : signal à faible bruit
+(l'absence de volume ne se simule pas), localisation précise (la zone testée), timing (il précède
+immédiatement le mouvement qu'il autorise).</li>
+</ul>
+<div class="card key"><b>Formulation à retenir :</b> le climax fournit la matière première de la campagne,
+le test en est le contrôle-qualité, le markup en est la livraison. Livrer sans contrôle-qualité, ça existe —
+ça s'appelle un faux breakout.</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="ponderation">
+<h2>6 · Faut-il pondérer davantage les tests réussis ? — oui, comme confirmateurs</h2>
+<ol>
+<li><b>Le test réussi fait changer de statut l'événement testé.</b> Spring seul = « possible spring »
+(étiquette conditionnelle). Spring + test sec = « spring CONFIRMÉ ». Aucun événement de Phase C/D ne devrait
+passer de <i>possible</i> à <i>confirmé</i> sans son test.</li>
+<li><b>Hiérarchie de fiabilité : test sec validé &gt; SOS volumique.</b> Le SOS peut être du covering ;
+le test sec ne peut pas mentir sur l'absence d'offre. En crypto on répare le SOS avec OI/CVD ; sur l'or
+(pas de flux), le test sec est l'information n°1.</li>
+<li><b>La succession de tests est cumulative.</b> Des retours successifs à volume décroissant
+(×3 → ×1.5 → ×0.6) = la meilleure preuve de maturation d'une cause. C'est un gradient, pas un événement.</li>
+</ol>
+<p><b>Garde-fous</b> : (a) un test sans cause en amont a un poids nul ; (b) un test réussi prouve l'absence
+d'offre, pas la présence de demande — le poids fort va au couple test + réponse ; (c) le poids supérieur se
+traduit par « meilleure lecture, invalidation plus nette » — jamais par une confiance aveugle.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="exemples">
+<h2>7 · Exemples récents, reliés à la doctrine</h2>
 <table>
-<thead><tr><th>Type</th><th>Pénétration sous le support</th><th>Volume</th><th>Offre révélée</th><th>Réaction / test secondaire</th></tr></thead>
+<thead><tr><th>Cas</th><th>Ce qui s'est passé</th><th>Leçon</th></tr></thead>
 <tbody>
-<tr><td class="k">Spring #1<br><span class="muted">terminal shakeout</span></td>
-<td>Profonde</td><td class="dn">Élevé, spread large</td><td>Importante</td>
-<td>La demande doit <b>absorber fort</b> ; récupération plus lente → <b>test secondaire NÉCESSAIRE</b>. Le plus risqué.</td></tr>
-<tr><td class="k">Spring #2</td>
-<td>Modérée</td><td>Modéré</td><td>Présente mais gérable</td>
-<td>La demande l'emporte → <b>test secondaire recommandé</b> avant d'entrer.</td></tr>
-<tr><td class="k">Spring #3</td>
-<td>Mineure (marginale)</td><td class="up">Faible (no-supply)</td><td>Quasi nulle</td>
-<td>Reversal <b>rapide</b> dans la plage → test secondaire <b>optionnel</b>. <b>Le plus haussier</b> (demande au contrôle).</td></tr>
-</tbody></table>
-<p class="muted"><b>Sens de la numérotation :</b> #1 = le plus d'offre / le plus dangereux (il faut la
-prouver absorbée) ; #3 = le moins d'offre / le plus haussier. Plus le spring révèle d'offre, plus le
-<b>test secondaire à volume sec</b> devient indispensable pour valider.</p>
+<tr><td class="k">XAU H4 — test volumique re-testé plus bas</td>
+<td>SC1 3 972 (24/06, ×4.4) → ST le 25/06 sur volume ENCORE FORT (×3.2) → conformément à la règle de Williams,
+le marché est revenu : SC2/undercut 3 950 (30/06) → retest 3 965 (01/07) à ~×1.1, clv 0.67 → réponse ×3.2
+jusqu'à 4 117.</td>
+<td>Un test à gros volume n'est pas un échec — c'est un rendez-vous pris. La séquence « test volumique →
+re-test plus sec → réponse » est le déroulé canonique.</td></tr>
+<tr><td class="k">BTC H1 — terminal shakeout, test différé en back-up</td>
+<td>Spring/shakeout 57 800 (01/07 03:00) : flush sous 58 115 + reclaim violent (absorption_w +1.76, OI −4k).
+Pas de retour sec sur 57 800 (réponse trop explosive) — mais la consolidation 58 500–59 090 a joué le test
+différé : replis à ×0.4–0.8, higher low, vente absorbée à répétition.</td>
+<td>Quand la réponse au shakeout est immédiate, le test prend la forme différée du back-up sur la zone
+reconquise (cf. §3.3 type 1 et matrice ligne 5).</td></tr>
+<tr><td class="k">BTC H4 — tests de Phase B jamais secs</td>
+<td>ST1 58 608 et ST2 58 500 (26/06) sur volumes lourds (×2–4), clôtures fermes : offre présente mais absorbée,
+jamais de passage sec → aucun go — et le plancher a été re-pressé (SOW 30/06) avant le dénouement (shakeout 01/07).</td>
+<td>Tests volumiques répétés = campagne PROLONGÉE, pas terminée. Le go n'existe qu'au passage sec.</td></tr>
+</tbody>
+</table>
+</section>
 
-<h3>La règle de Tom Williams (VSA)</h3>
-<div class="box">
-<p><b>« Ce n'est pas le test, c'est la réponse au test. »</b> Un test valide = une sonde baissière sur
-<b>volume inférieur aux deux barres précédentes</b>, clôture hors des plus-bas (<i>no-supply</i>) ;
-il n'est <b>confirmé que par une barre haussière en réponse</b>. <b>Volume élevé sur un test = de
-l'offre = le test a échoué</b>, quelle que soit l'allure de la bougie.</p>
-<p class="muted">Corollaire Williams : on <b>teste après une baisse ou après un signe de force</b> pour
-confirmer <i>l'absence d'offre</i> avant d'engager. Un up-move qui n'a jamais été testé reste suspect
-(il peut cacher de l'offre non purgée).</p>
-</div>
+<!-- ============================================================ -->
+<section id="auteurs">
+<h2>8 · Fiches auteurs — la théorie de chacun sur les tests et la campagne</h2>
 
-<!-- ===================== 4 ===================== -->
-<h2 id="s4">4 · Matrice de réaction du Composite Operator</h2>
-<p class="sub">Pour chaque situation testée : ce que le CO cherche, ce qu'on observe, la
-<b>manifestation prix</b>, et la <b>stratégie</b> discrétionnaire correspondante.</p>
-<table>
-<thead><tr><th>Situation</th><th>Ce que le CO vérifie</th><th>Volume</th><th>Manifestation prix</th><th>Stratégie</th></tr></thead>
-<tbody>
-<tr><td class="k">Spring #3<br>(no-supply)</td><td>l'offre est-elle absente ?</td><td class="up">faible ≤ ×0.85</td>
-<td>dip mineur sous le support, reversal rapide, clôture haute</td>
-<td><b>Long agressif</b>, stop sous le low du spring.</td></tr>
-<tr><td class="k">Spring #1<br>(terminal shakeout)</td><td>l'ampleur de l'offre</td><td class="dn">élevé, spread large</td>
-<td>flush profond puis récupération lente</td>
-<td><b>Attendre le test secondaire</b> à volume sec avant d'entrer long.</td></tr>
-<tr><td class="k">Test secondaire réussi</td><td>reste-t-il de l'offre ?</td><td class="up">sec, higher low</td>
-<td>barre de test étroite puis <b>up-bar en réponse</b></td>
-<td><b>Long sur la réponse</b>, stop sous le test.</td></tr>
-<tr><td class="k">Test échoué</td><td>idem</td><td class="dn">élevé sur la sonde</td>
-<td>ne tient pas, wide down bar, clôture basse</td>
-<td><b>Rester à l'écart</b> ; ré-accumulation attendue.</td></tr>
-<tr><td class="k">LPS / BUEC<br>(Phase D)</td><td>la demande tient-elle le niveau cassé ?</td><td class="up">sec (no-supply)</td>
-<td>higher low au-dessus du creek (résistance→support)</td>
-<td><b>Long / ajout</b>, stop sous le LPS.</td></tr>
-<tr><td class="k">UTAD<br>(distribution)</td><td>la demande au-dessus est-elle absente ?</td><td class="dn">pas d'expansion à l'achat</td>
-<td>poke au-dessus de la plage puis rejet, clôture basse</td>
-<td><b>Short sur le rejet</b>, stop au-dessus du plus-haut.</td></tr>
-<tr><td class="k">LPSY<br>(distribution)</td><td>l'offre domine-t-elle le rebond ?</td><td class="dn">faible sur le rebond (no-demand)</td>
-<td>lower high faible sous la résistance</td>
-<td><b>Short</b>, stop au-dessus du LPSY.</td></tr>
-</tbody></table>
-<p class="muted">Lecture : le CO teste <b>toujours dans le sens où il veut aller</b> — en accumulation il
-sonde la <i>demande sous le support</i> (springs/LPS), en distribution il sonde l'<i>absence de demande
-au-dessus</i> (UTAD/LPSY). La stratégie se greffe sur le résultat du test, jamais avant.</p>
+<!-- ------------------- WYCKOFF ------------------- -->
+<div class="card author">
+<h3>Richard D. Wyckoff (1873–1934) — l'inventeur du cadre <span class="tag">sources : « Studies in Tape Reading » 1910 · le Cours 1931</span></h3>
 
-<!-- ===================== 5 ===================== -->
-<h2 id="s5">5 · Fiches auteurs</h2>
-<p class="sub">Les quatre références qui ont bâti et transmis la lecture des tests.</p>
+<h4>Qui il est, d'où parle-t-il</h4>
+<p>Wyckoff n'est pas un théoricien extérieur : coursier à Wall Street à 15 ans, puis broker, éditeur du
+<i>Magazine of Wall Street</i>, il a passé sa carrière à observer — et côtoyer — les grands opérateurs de son
+époque (Livermore, Keene, les pools). Son projet explicite : <b>rétro-ingénierer les campagnes des gros
+opérateurs</b> pour que l'individuel cesse d'en être la victime. Toute sa méthode découle d'une conviction :
+le marché est mû par des campagnes préparées, et la préparation <i>se voit</i> dans le couple prix-volume.</p>
 
-<div class="fiche">
-<p class="role">Le fondateur · 1873–1934</p>
-<h3>Richard D. Wyckoff</h3>
-<p>Trader et éditeur américain (<i>The Magazine of Wall Street</i>), il codifie sa méthode en observant
-les grands opérateurs de son temps (Livermore, Morgan…). Apports : <b>l'Homme Composite</b> (lire le
-marché comme un seul esprit professionnel), les <b>3 lois</b> (offre/demande, cause/effet, effort/
-résultat), le <b>cycle du prix</b> (accumulation → markup → distribution → markdown), et le comptage
-de la <b>cause</b> en point &amp; figure.</p>
-<p class="sig">« Étudie le marché comme s'il était piloté par un seul cerveau — l'Homme Composite. »</p>
-</div>
+<h4>Le Composite Operator et la campagne</h4>
+<p>Son outil conceptuel central : raisonner comme si TOUTES les opérations des mains fortes émanaient d'un
+seul homme — le <b>Composite Man</b>. Il faut, écrit-il en substance, étudier chaque graphique comme s'il était
+la trace des manœuvres d'un opérateur unique qui vous chasse. La campagne du CO a quatre actes (accumulation,
+markup, distribution, markdown) et Wyckoff insiste : l'opérateur <b>prépare</b> ses mouvements longtemps à
+l'avance — la préparation est la partie invisible de l'iceberg, le mouvement n'en est que la récolte.</p>
 
-<div class="fiche">
-<p class="role">Le pédagogue · milieu du XXᵉ siècle</p>
-<h3>Robert G. Evans</h3>
-<p>Principal transmetteur de la méthode (successeur à la tête du <i>Stock Market Institute</i>). Apports :
-les <b>métaphores qui rendent la méthode enseignable</b> — le <b>creek</b> (la résistance « ruisseau »)
-et le <b>jump across the creek</b> (JAC/SOS), la <b>glace</b> (l'<i>ice</i>, le support qu'on traverse),
-et le <b>back-up to the edge of the creek</b> (BUEC). C'est lui qui donne aux tests et aux back-ups leur
-vocabulaire imagé.</p>
-<p class="sig">Le ruisseau : on saute au-dessus (JAC), puis on revient poser le pied au bord (BUEC).</p>
-</div>
+<h4>Sa théorie du test : le sondage réel et le springboard</h4>
+<p>Chez Wyckoff, le test n'est pas d'abord un pattern graphique — c'est une <b>opération</b>. Il décrit les
+sondages réels des opérateurs : vendre un paquet pour voir si le marché l'encaisse ; retirer ses ordres pour
+voir si le titre tient seul ; acheter ostensiblement pour mesurer l'offre au-dessus. La lecture de bande
+(tape reading, son premier livre) est l'art de repérer ces sondages et leurs réponses. Le concept qui en
+découle : le <b>springboard</b> — le moment où la préparation est complète et où le titre est prêt à quitter
+sa zone. Un titre est « on the springboard » quand les sondages ne rencontrent plus de résistance : c'est un
+verdict de tests, pas une opinion.</p>
 
-<div class="fiche">
-<p class="role">L'académique · professeur (Golden Gate University), †2017</p>
-<h3>Henry O. « Hank » Pruden</h3>
-<p>Professeur et théoricien de la finance comportementale. Apports : la <b>codification des Phases A→E</b>
-(les schémas d'accumulation/distribution utilisés aujourd'hui), la <b>taxonomie des springs et des tests</b>,
-et <i>The Three Skills of Top Trading</i> (état mental, technique, gestion du risque). Il relie Wyckoff
-à la <b>psychologie des foules</b> et à la finance comportementale.</p>
-<p class="sig">Rendre les phases lisibles : chaque schéma dit où l'on en est dans le cycle.</p>
-</div>
+<h4>Les Neuf Tests d'Achat — le test comme checklist de campagne</h4>
+<p>Apport majeur et directement lié au sujet : Wyckoff a formalisé une liste de <b>Nine Buying Tests</b>
+(et son miroir, les Nine Selling Tests) — les conditions à vérifier avant d'engager du capital sur une
+accumulation présumée. Paraphrase de la liste canonique (enseignée par le cours et reprise par le SMI) :</p>
+<ol>
+<li>L'<b>objectif de baisse est atteint</b> (compte Point &amp; Figure du mouvement baissier précédent réalisé).</li>
+<li>Un <b>soutien préliminaire, un selling climax et un secondary test</b> se sont produits — la Phase A existe.</li>
+<li>L'<b>activité est haussière</b> : le volume augmente dans les rallyes et diminue dans les réactions.</li>
+<li>La <b>ligne de tendance baissière est cassée</b> (le stride du markdown est rompu).</li>
+<li>Des <b>plus-bas montants</b> se forment (higher lows).</li>
+<li>Des <b>plus-hauts montants</b> se forment (higher highs).</li>
+<li>Le titre est <b>plus fort que le marché</b> (force relative vs indice).</li>
+<li>Une <b>base horizontale s'est formée</b> — la cause est construite (compte P&amp;F suffisant).</li>
+<li>Le <b>potentiel de gain estimé vaut au moins trois fois le risque</b> (le stop) — le R:R structurel.</li>
+</ol>
+<p>À noter : c'est une checklist de <b>l'analyste</b> autant que du CO — Wyckoff l'utilisait pour décider si
+une campagne (celle d'un autre) était mûre pour qu'on s'y joigne. Les tests de prix (ST, springboard) y
+cohabitent avec des tests de structure (cause P&amp;F, force relative) : chez Wyckoff, « tester » c'est
+vérifier TOUTES les conditions, pas seulement le volume d'une bougie.</p>
 
-<div class="fiche">
-<p class="role">Le lecteur de volume · ex-trader de syndicat, créateur de la VSA</p>
-<h3>Tom Williams</h3>
-<p>Ancien trader professionnel d'un syndicat londonien devenu analyste. Apports : la <b>Volume Spread
-Analysis (VSA)</b> et l'ouvrage <i>Master the Markets</i> ; la lecture <b>barre par barre</b> du footprint
-des mains fortes via le triplet <b>volume × spread × clôture</b> — <b>no-demand, no-supply, upthrust,
-test</b> — et le logiciel TradeGuider. C'est lui qui formalise <b>ce qu'est un test valide</b> (volume
-sous les deux barres précédentes, clôture hors des bas) et la <b>règle « la réponse au test »</b>.</p>
-<p class="sig">« Le marché révèle son intention dans la relation volume–spread–clôture de chaque barre. »</p>
-</div>
+<h4>Ce qu'on lui doit sur notre sujet</h4>
+<ul>
+<li>Le cadre entier : campagne, CO, préparation → vérification → récolte.</li>
+<li>Le test comme <b>opération de sondage</b> (pas comme pattern), et le springboard comme verdict.</li>
+<li>La checklist des Nine Tests : l'idée qu'une campagne s'ORIGINE sur un faisceau de conditions vérifiées,
+jamais sur un signal isolé.</li>
+</ul></div>
 
-<p class="muted" style="margin-top:26px;border-top:1px solid #eee;padding-top:10px">
-Mémo de référence — les tests du Composite Operator. À lire avec le mémo théorie (seuils vol×/spread/
-CLV des événements) et le mémo comportement à la résistance (les tests en distribution : UTAD, LPSY).</p>
+<!-- ------------------- EVANS ------------------- -->
+<div class="card author">
+<h3>Robert G. Evans (†1972) — le pédagogue des frontières <span class="tag">sources : conférences hebdomadaires du Stock Market Institute (SMI), années 1940–60</span></h3>
+
+<h4>Qui il est</h4>
+<p>Evans a repris et dirigé l'enseignement de la méthode après Wyckoff (le cours devenu SMI, Phoenix). Il n'a
+pas écrit de livre : son œuvre est un corpus d'<b>enregistrements et de conférences hebdomadaires</b> envoyés
+aux étudiants pendant des décennies. Sa contribution n'est pas d'avoir changé la méthode, mais de l'avoir
+rendue <b>mémorisable</b> — par des allégories devenues le vocabulaire standard du wyckoffien moderne. Or ses
+allégories portent presque toutes sur UNE chose : <b>le franchissement d'une frontière, et son test</b>.</p>
+
+<h4>L'histoire du Creek — et pourquoi elle est une théorie du test</h4>
+<p>Son allégorie la plus célèbre : un boy-scout (le prix) marche le long d'un <b>creek</b> (un ruisseau
+sinueux = la zone d'offre irrégulière qui borde le haut d'une plage d'accumulation — pas une ligne droite,
+une <i>rivière</i> de résistance qui serpente). Le scout s'en approche plusieurs fois, recule, cherche un
+endroit plus étroit, <b>prend de l'élan</b> — ces approches sont les rallyes internes de la plage et leurs
+replis (les futurs LPS). Puis il <b>saute</b> : le <i>Jump Across the Creek</i> (JAC) — le franchissement ne
+réussit que <b>avec de l'élan</b>, c'est-à-dire du volume. Et une fois de l'autre côté, il <b>revient au bord
+reprendre son souffle et vérifier que la berge tient</b> : le <i>Back-Up to the Edge of the Creek</i> (BUEC).
+Toute la théorie du test de sortie tient dans cette image : un franchissement non re-testé est un saut dont
+on n'a pas vérifié la réception.</p>
+
+<h4>L'histoire de la glace (Ice) — le miroir distribution</h4>
+<p>Pour la distribution, Evans propose le miroir : le prix patine sur un étang gelé — la <b>glace</b> (le
+support composite de la plage de distribution). La glace craque (SOW qui casse le support), le prix passe
+au travers, puis <b>remonte par en dessous toucher la glace</b> : ce rallye de retour qui vient buter sous
+l'ancien support est le test de la cassure — le LPSY. Si la glace tient (le rallye cale dessous, à volume
+sec = no demand), le markdown est validé. Structure identique au creek, inversée : <b>toute cassure, dans
+les deux sens, exige son retour de vérification</b>.</p>
+
+<h4>Terminal shakeout et springboard</h4>
+<p>Evans a aussi beaucoup développé le <b>terminal shakeout</b> (le spring de type 1 : la dernière secousse
+violente qui achève l'accumulation) et repris le springboard wyckoffien dans son enseignement — en insistant :
+après un shakeout, la vérification (test) n'est pas optionnelle, elle est la preuve que la secousse était
+terminale et non le début d'une vraie cassure.</p>
+
+<h4>Ce qu'on lui doit sur notre sujet</h4>
+<ul>
+<li>Le vocabulaire des frontières : <b>creek/JAC/BUEC</b> et <b>ice/LPSY</b> — c'est-à-dire la théorie
+imagée du test de cassure dans les deux sens.</li>
+<li>La distinction implicite que ce mémo formalise en §3.2 : les <b>approches du creek</b> (LPS successifs,
+avant le saut) vs le <b>retour au bord</b> (BUEC, après le saut).</li>
+<li>L'idée que le volume est <b>l'élan</b> : un franchissement sans élan (sans volume) retombe dans le creek.</li>
+</ul></div>
+
+<!-- ------------------- PRUDEN ------------------- -->
+<div class="card author">
+<h3>Henry (Hank) O. Pruden (1936–2017) — le systématiseur académique <span class="tag">source : « The Three Skills of Top Trading », Wiley 2007 · enseignement Golden Gate University</span></h3>
+
+<h4>Qui il est</h4>
+<p>Professeur de business à la Golden Gate University (San Francisco), animateur pendant des décennies du
+programme d'analyse technique qui y enseignait la méthode Wyckoff, figure de l'IFTA et de la TSAA. Pruden est
+le pont entre le corpus SMI (Wyckoff/Evans) et l'enseignement moderne : c'est par lui (et ses étudiants) que
+les <b>schémas de phases A–E</b> et la typologie fine des springs se sont standardisés.</p>
+
+<h4>Sa thèse : trois compétences, dont le pattern Wyckoff n'est qu'une</h4>
+<p><i>The Three Skills of Top Trading</i> soutient qu'un trader complet a besoin de trois compétences :
+(1) <b>l'analyse systémique</b> (construire un système, comprendre le cycle), (2) la <b>reconnaissance de
+patterns</b> — et pour lui LE système de patterns pertinent est la méthode Wyckoff, (3) la <b>discipline
+mentale</b> (psychologie de l'exécution). Le test wyckoffien vit dans la compétence 2, mais Pruden le relie
+à la 1 : il superpose au cycle de prix un <b>cycle de psychologie de foule</b> (accumulation = désespoir
+finissant, markup = espoir → avidité, distribution = euphorie finissante, markdown = peur) — le test étant
+le moment où le CO mesure <i>l'état émotionnel résiduel</i> de la foule : un test sec dit que le désespoir
+a fini de vendre.</p>
+
+<h4>Sa théorie des phases et la place exacte des tests</h4>
+<p>C'est chez Pruden (héritant du SMI) que la grille <b>A–B–C–D–E</b> devient l'outil standard : Phase A
+(arrêt : PS, SC, AR, ST), B (construction de la cause, tests répétés des deux bornes), C (<b>le test
+définitif</b> — spring ou son absence), D (la preuve : SOS/LPS successifs dans la plage), E (la sortie).
+Relire cette grille avec notre sujet : <b>C et D sont littéralement les phases de test</b> — C teste l'offre
+(spring), D teste la demande (LPS) puis la frontière (BUEC). Pruden formalise ce que ce mémo répète : la
+campagne est une séquence de portes.</p>
+
+<h4>La typologie des springs (n°1, 2, 3)</h4>
+<p>Pruden a popularisé la classification des springs par intensité (détaillée en §3.3) : le <b>#1</b>
+(pénétration profonde, gros volume — terminal shakeout, vérification impérative), le <b>#2</b> (modéré,
+offre absorbée — test secondaire requis), le <b>#3</b> (effleurement sec — pas de test requis, le plus
+haussier). Son apport conceptuel : <b>relier le type de spring à l'exigence de test</b> — plus le spring a
+révélé d'offre, plus la vérification doit être lourde. C'est la codification la plus directe du lien
+spring→test que demande ce mémo.</p>
+
+<h4>Ce qu'on lui doit sur notre sujet</h4>
+<ul>
+<li>La grille de phases A–E et la localisation canonique de chaque test dans la campagne.</li>
+<li>La typologie springs #1/#2/#3 <b>indexée sur l'exigence de vérification</b>.</li>
+<li>La lecture psychologique du test (mesurer l'émotion résiduelle de la foule) et l'insistance sur le
+trade du JAC/BUEC comme setup à plus haute probabilité de la méthode.</li>
+</ul></div>
+
+<!-- ------------------- WILLIAMS ------------------- -->
+<div class="card author">
+<h3>Tom Williams (1929–2016) — le test réduit à la bougie <span class="tag">source : « Master the Markets » (1993, rév. 2005) · fondateur du VSA</span></h3>
+
+<h4>Qui il est</h4>
+<p>Williams se présentait comme un ancien trader d'un syndicat professionnel à Londres dans les années
+1960–70 — un praticien du côté « smart money », pas un académique. De retour à la vie civile, il a formalisé
+le <b>Volume Spread Analysis (VSA)</b> : une relecture bougie-par-bougie de la logique wyckoffienne
+(effort vs résultat), qui deviendra le logiciel TradeGuider. Son livre <i>Master the Markets</i> est le
+manifeste. Sa perspective sur notre sujet est unique : il décrit le test <b>de l'intérieur</b> — comme une
+opération qu'il dit avoir pratiquée.</p>
+
+<h4>Sa théorie générale : le fond (background) et les deux vérités du volume</h4>
+<p>Le VSA repose sur deux principes. (1) <b>La force apparaît sur les barres de baisse, la faiblesse sur les
+barres de hausse</b> — le smart money achète dans les baisses (climax, shakeouts, tests) et vend dans les
+hausses (upthrusts, no demand) : il faut donc lire chaque bougie contre son sens apparent. (2) <b>Le fond
+prime</b> : aucune bougie ne se lit seule ; un même signal vaut selon la « toile de fond » de force
+(accumulation récente) ou de faiblesse (distribution récente) dans laquelle il apparaît. Ces deux principes
+encadrent sa théorie du test.</p>
+
+<h4>Sa théorie du test — la plus opérationnelle des quatre auteurs</h4>
+<p>Pour Williams, le test est LE geste professionnel par excellence : avant de monter un marché, les
+professionnels <b>le marquent rapidement à la baisse, dans une zone où de gros volumes de VENTE ont eu lieu
+récemment</b>, pour vérifier que cette offre est bien éteinte. La barre de test parfaite : <b>baisse, spread
+étroit, volume inférieur aux deux barres précédentes, clôture mi-range ou haute</b>. Sa lecture psychologique :
+on a rouvert la porte de la peur, et personne ne s'est enfui — les vendeurs n'existent plus. Il en fait un
+signal aussi bien de retournement (post-climax/shakeout) que de <b>continuation</b> (test réussi en cours de
+markup = la hausse peut reprendre), et le distingue du simple <i>no supply</i> passif : le test est un
+mouvement <b>provoqué</b> vers une zone précise, le no supply est une bougie sèche quelconque.</p>
+
+<h4>Sa règle : test à volume fort = re-test obligatoire</h4>
+<p>Détaillée en §3.4 : si le retour dans la zone fait ressortir du volume, le professionnel n'a pas sa
+réponse — il sait qu'il reste de l'offre, pas combien. Il ne lancera pas le markup au-dessus d'une offre non
+mesurée : il <b>reviendra tester</b>, et le marché restera lourd/rangé jusqu'au passage sec. Corollaires chez
+Williams : un test réussi doit recevoir une <b>réponse</b> haussière rapide pour être validé ; et un « test »
+sur fond de faiblesse est un piège (c'est le contexte qui décide du sens du geste).</p>
+
+<h4>Ce qu'on lui doit sur notre sujet — et sa limite</h4>
+<ul>
+<li>La <b>définition opérationnelle</b> du test à l'échelle de la bougie (nos seuils <code>test_vol</code>,
+<code>narrow_spread_atr</code> en sont la traduction directe).</li>
+<li>La <b>règle du re-test</b> — l'outil pratique n°1 pour ne pas entrer trop tôt.</li>
+<li>Le test comme signal de <b>continuation</b>, pas seulement de plancher.</li>
+<li><b>Limite</b> : le VSA, pris seul, devient un catalogue d'étiquettes de bougies hors structure. Williams
+le dit lui-même (le fond prime), mais la pratique VSA l'oublie souvent : sans la grille de campagne
+Wyckoff/Pruden (phases, cause, bornes), un « test » VSA n'est qu'une bougie sèche — cf. condition 5, §2.</li>
+</ul></div>
+
+<p class="muted" style="margin-top:18px;border-top:1px solid #eee;padding-top:10px">
+Note d'honnêteté : la doctrine classique (les quatre auteurs) est prix + volume. Les extensions OI / CVD /
+absorption citées dans ce mémo sont nos overlays modernes — cohérents avec la logique du CO, mais absents
+des textes d'origine. Les fiches paraphrasent l'enseignement des auteurs ; aucune citation verbatim.</p>
+<p class="muted" style="margin-top:10px">À lire avec les deux mémos frères : le <b>mémo théorie
+Wyckoff</b> (seuils vol×/spread/CLV, OI, CVD, absorption de chaque événement) et le <b>mémo comportement
+à la résistance</b> (les tests côté distribution : UTAD, LPSY, upthrust). Ce mémo-ci est le volet
+« campagne &amp; vérification » de la même méthode.</p>
+</section>
 
 </div></body></html>
