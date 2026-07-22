@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mémo — Upthrust : accumulation vs distribution (UTAD)</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --fg:#1c1c1a; --muted:#5b5b55; --line:#d9d8d2;
+    --card:#ffffff; --accent:#2f6f4f; --accent2:#8a3b3b; --warn:#8a6d1f;
+    --thead:#efeee9; --zebra:#faf9f6; --code:#eceae4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#16171a; --fg:#e7e7e3; --muted:#a2a29a; --line:#33343a;
+      --card:#1e2024; --accent:#6cc79a; --accent2:#e08a8a; --warn:#d8b45a;
+      --thead:#23252b; --zebra:#1a1c20; --code:#26282e;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f7f7f5; --fg:#1c1c1a; --muted:#5b5b55; --line:#d9d8d2;
+    --card:#ffffff; --accent:#2f6f4f; --accent2:#8a3b3b; --warn:#8a6d1f;
+    --thead:#efeee9; --zebra:#faf9f6; --code:#eceae4;
+  }
+  :root[data-theme="dark"]{
+    --bg:#16171a; --fg:#e7e7e3; --muted:#a2a29a; --line:#33343a;
+    --card:#1e2024; --accent:#6cc79a; --accent2:#e08a8a; --warn:#d8b45a;
+    --thead:#23252b; --zebra:#1a1c20; --code:#26282e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px;}
+  h1{font-size:26px;line-height:1.2;margin:0 0 4px}
+  h2{font-size:20px;margin:38px 0 6px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:16px;margin:22px 0 6px;color:var(--fg)}
+  p{margin:8px 0}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .lead{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:8px;padding:14px 16px;margin:16px 0}
+  .lead.dist{border-left-color:var(--accent2)}
+  .lead.warn{border-left-color:var(--warn)}
+  code,.k{background:var(--code);padding:1px 6px;border-radius:5px;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .accu{color:var(--accent);font-weight:600}
+  .dist{color:var(--accent2);font-weight:600}
+  .warnw{color:var(--warn);font-weight:600}
+  .scroll{overflow-x:auto;margin:12px 0;border:1px solid var(--line);border-radius:8px}
+  table{border-collapse:collapse;width:100%;min-width:640px;background:var(--card);font-size:14px}
+  th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+  thead th{background:var(--thead);position:sticky;top:0;font-size:12.5px;
+    text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  tbody tr:nth-child(even){background:var(--zebra)}
+  td:first-child{font-weight:600;white-space:nowrap}
+  .col3 td:first-child{white-space:normal}
+  ul{margin:8px 0 8px 0;padding-left:20px}
+  li{margin:4px 0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;
+    padding:2px 8px;border-radius:999px;border:1px solid var(--line);text-transform:uppercase}
+  .tag.a{color:var(--accent);border-color:var(--accent)}
+  .tag.d{color:var(--accent2);border-color:var(--accent2)}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+  .step b{color:var(--accent2)}
+  .foot{color:var(--muted);font-size:13px;margin-top:40px;border-top:1px solid var(--line);padding-top:14px}
+  .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Upthrust en accumulation vs. upthrust de distribution (UTAD)</h1>
+  <p class="sub">Mémo de discrimination — mêmes bougies, sens opposé. Lecture top-down, ordre VSA <b>volume → OI (coin) → métriques tierces</b>.</p>
+
+  <div class="lead">
+    <b>Principe directeur.</b> Un upthrust est un perçage de la <span class="k">résistance</span> (borne haute de la plage) qui échoue et re-clôture dans la plage.
+    La <b>bougie ne dit rien à elle seule</b> : c'est le <b>cadre</b> (trend HTF, position dans le schéma, ce qui suit) qui décide.
+    Défaut de prudence : <span class="dist">une plage dans un downtrend = redistribution</span> jusqu'à preuve du contraire — l'accumulation se <i>gagne</i>, elle ne se présume pas.
+    On tient donc <b>les deux scénarios en parallèle</b> et on étiquette <b>conditionnellement</b> jusqu'à la cassure de plage confirmée.
+  </div>
+
+  <h2>0. Vocabulaire — ne pas confondre trois choses</h2>
+  <div class="scroll">
+  <table class="col3">
+    <thead><tr><th>Terme</th><th>Où</th><th>Rôle</th></tr></thead>
+    <tbody>
+      <tr><td>UT « mineur »</td><td>Phase B (accu ou distrib)</td><td>Test d'offre ordinaire au sein de la plage, sans prétention terminale. Fréquent, peu décisif.</td></tr>
+      <tr><td>Upthrust d'accumulation</td><td>Phase C d'accumulation</td><td>Dernier test avant markup : perce la résistance, l'offre est <b>absorbée</b>, le prix repart en haut. Miroir haussier du spring.</td></tr>
+      <tr><td>UTAD (Upthrust After Distribution)</td><td>Phase C de distribution</td><td>Perçage-piège terminal : attire la demande, la <b>distribue</b>, puis le prix casse le support → markdown.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="sub">Ils partagent la même forme. Tout le mémo sert à séparer les deux du milieu (les seuls qui « comptent » pour le déclenchement).</p>
+
+  <h2>1. AVANT l'upthrust — les précurseurs (mise en place)</h2>
+  <p>Ce qui, <i>en amont</i>, fait pencher la lecture. Aucun n'est décisif seul : on cherche la <b>convergence</b>.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Paramètre</th><th>Penche <span class="accu">accumulation</span></th><th>Penche <span class="dist">distribution (UTAD)</span></th></tr></thead>
+    <tbody>
+      <tr><td>Trend HTF (D1/H4)</td><td>Downtrend <b>épuisé</b> / base longue ; ou plage après impulsion haussière saine</td><td>Downtrend intact, ou plage <b>sous</b> une résistance macro / après markup essoufflé</td></tr>
+      <tr><td>Position de la plage</td><td>Bas de cycle, après capitulation ; support de plage tenu plusieurs fois</td><td>Haut de cycle, sous offre supérieure ; plage qui « traîne » sans nouveaux plus-hauts</td></tr>
+      <tr><td>Événement de Phase C déjà vu</td><td><b>Spring</b> valide en bas (rejet du plus-bas + volume qui sèche ensuite)</td><td>Pas de spring ; plutôt <b>SOW</b> antérieur, AR mou, tests de support de plus en plus faibles</td></tr>
+      <tr><td>Structure interne de la plage</td><td>Plus-bas <b>montants</b> (higher lows) ; le prix « appuie » sur la résistance</td><td>Plus-hauts <b>descendants</b> (lower highs) ; rebonds de plus en plus courts</td></tr>
+      <tr><td>Approche de la résistance — <b>volume</b></td><td>Poussées vers le haut <b>soutenues</b>, replis à volume sec (no supply)</td><td>Poussées à volume <b>décroissant</b> (demande qui s'essouffle en montant) ; « no demand » bars</td></tr>
+      <tr><td>Approche — <b>spread / clôtures</b></td><td>Clôtures dans le haut des barres, spread qui s'ouvre à la hausse</td><td>Clôtures molles malgré le prix qui monte ; effort &gt; résultat</td></tr>
+      <tr><td><b>OI (coin)</b> pendant la construction</td><td>OI qui <b>baisse</b> sur les replis (débouclage) ; hausses de prix sur short covering</td><td>OI qui <b>monte</b> pendant que le prix cale sous la résistance = longs prématurés qui s'empilent (bagage à flusher)</td></tr>
+      <tr><td>Funding</td><td>Neutre / négatif (personne n'ose être long) — carburant de squeeze haussier</td><td>Positif et <b>qui s'échauffe</b> — foule longue qui paie, cible d'un rejet</td></tr>
+      <tr><td>Ratio long/short</td><td>Bas / retail short ou absent</td><td>Élevé / retail massivement long (euphorie prématurée)</td></tr>
+      <tr><td>Liquidations récentes</td><td>Longs faibles déjà purgés (long_liq passées) → peu de bagage restant</td><td>Pas encore de purge — la foule longue est intacte, « à faire »</td></tr>
+      <tr><td>Volatilité / temps</td><td>Coil serré, ressort comprimé, plage mûre</td><td>Étalement mou, tentatives répétées qui échouent en haut</td></tr>
+      <tr><td>Contexte marché (crypto beta)</td><td>BTC/majeurs solides ou en base — l'alt suit une force réelle</td><td>Upthrust qui ne fait que <b>suivre un spike BTC</b> sans force propre = suspect</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="lead warn">
+    <b>Piège de symétrie.</b> « OI↑ + foule longue + niveau évident » alimente <i>les deux</i> scénarios : accumulation (offre absorbée <b>ensuite</b>) comme UTAD (support cassé <b>ensuite</b>).
+    Les précurseurs <b>orientent la probabilité</b>, ils ne tranchent pas. Le juge de paix est toujours <b>la réaction</b> (section 2) et <b>la suite</b> (section 3).
+  </div>
+
+  <h2>2. APRÈS l'upthrust — la réaction (le vrai juge)</h2>
+  <p>Une fois le perçage fait, on lit la <b>qualité du rejet</b> et le <b>suivi</b>. C'est ici que se décide l'étiquette.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Signal</th><th><span class="accu">Upthrust d'accumulation</span> (offre absorbée)</th><th><span class="dist">UTAD</span> (distribution)</th></tr></thead>
+    <tbody>
+      <tr><td>Volume <b>sur</b> le perçage</td><td>Faible / moyen — peu de vendeurs répondent (offre épuisée). Ou fort mais <b>absorbé</b> (prix ne cède pas)</td><td>Fort avec <b>résultat baissier</b> : le prix est refoulé nettement = offre massive servie</td></tr>
+      <tr><td>Spread & clôture (CLV) de la barre</td><td>Rejet contenu, clôture qui reste haute / revient vite au-dessus de la résistance</td><td>Spread large, clôture dans le <b>bas</b> de la barre, loin sous la résistance</td></tr>
+      <tr><td>Vitesse du retour dans la plage</td><td>Lente / partielle ; le prix « refuse » de retomber</td><td>Rapide et franche — réintégration immédiate = piège qui se referme</td></tr>
+      <tr><td>Le <b>retest</b> qui suit</td><td>Retest de la résistance <b>par le dessus</b> qui tient (résistance → support) à volume sec</td><td>Retest <b>par le dessous</b> (LPSY) qui échoue à reprendre pied ; rebonds mous</td></tr>
+      <tr><td>Suivi (follow-through)</td><td>Poussée qui repart, nouveaux plus-hauts, LPS propre → markup</td><td>Enchaîne un <b>SOW</b> : cassure du support de plage à volume/spread croissants</td></tr>
+      <tr><td><b>OI (coin)</b> au rejet</td><td>OI qui <b>baisse</b> au refoulement = shorts couverts / longs pas piégés ; ou OI stable pendant que le prix tient</td><td>OI qui <b>reste haut / monte</b> puis se déboucle à la baisse = longs piégés qui capitulent</td></tr>
+      <tr><td>Liquidations au rejet</td><td>short_liq (les shorts du perçage se font squeezer) ; long_liq quasi nulles</td><td><b>long_liq</b> en cascade sur la descente = flush des longs piégés</td></tr>
+      <tr><td>Funding après</td><td>Se détend / repart neutre ; le prix monte sans excès de longs</td><td>Reste positif au début (longs qui espèrent) puis bascule ; prix baisse quand même</td></tr>
+      <tr><td>Effort vs résultat (bilan)</td><td>Effort haussier <b>récompensé</b> (peu d'effort, prix tient/monte)</td><td>Effort haussier <b>stérile</b> puis effort baissier <b>productif</b></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="lead">
+    <b>Règle de déclenchement.</b> Une cassure de la résistance n'est un <span class="accu">SOS</span> qu'<b>après tenue + back-up (LPS)</b> au-dessus. Tant que ce n'est pas validé, le perçage reste une <i>tentative</i> — donc un <b>upthrust potentiel</b>. On n'achète jamais le perçage brut ; on attend le LPS.
+  </div>
+
+  <h2>3. Cas UTAD — ce qui arrive après, jusqu'au markdown</h2>
+  <p>Après un vrai UTAD, le prix ne s'effondre pas forcément d'un bloc : il déroule une séquence de distribution avec des <b>rebonds réactifs (LPSY)</b> qui peuvent être profonds. Voici la carte des cibles et le seuil qui confirme la phase D.</p>
+
+  <h3>Séquence type (Phase C → D → markdown)</h3>
+  <div class="step"><b>1. UTAD</b> — perçage-piège de la résistance (Phase C). Rejet + réintégration.</div>
+  <div class="step"><b>2. SOW (Sign of Weakness)</b> — première cassure <i>vers le bas</i> à travers la plage, spread large + volume en hausse, clôture basse. La demande ne défend plus.</div>
+  <div class="step"><b>3. Retour à « l'ice » / support de plage</b> — le prix chute vers la borne basse (support = plancher de la plage / niveau de l'AR). C'est la ligne de rupture décisive.</div>
+  <div class="step"><b>4. LPSY (Last Point of SupplY)</b> — rebond(s) réactif(s) faibles : c'est le « <b>deep pullback</b> ». Peut remonter loin (voir cibles ci-dessous) mais <b>échoue</b> à reprendre la plage avec de la demande.</div>
+  <div class="step"><b>5. Phase D — markdown</b> — cassure nette sous l'ice, LPSY successifs de plus en plus bas, chaque rebond plus mou. Le marché est passé sous contrôle de l'offre.</div>
+
+  <h3>Jusqu'où le prix peut-il redescendre — et remonter — sans invalider la distribution ?</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Mouvement</th><th>Amplitude typique</th><th>Ce qui reste cohérent avec la distribution</th></tr></thead>
+    <tbody>
+      <tr><td>Chute post-UTAD (SOW)</td><td>De la résistance jusqu'au <b>support de plage / ice</b> (souvent tout le corps de la plage d'un coup)</td><td>Volume &amp; spread <b>croissants</b> à la baisse, clôtures basses. Normal et attendu.</td></tr>
+      <tr><td>Rebond réactif « ordinaire » (LPSY haut)</td><td>Retrace <b>0.5 – 0.62</b> de la jambe SOW ; cale au milieu de la plage ou sous la résistance</td><td>Rebond à <b>volume décroissant</b>, spread qui se resserre = no demand. Confirme la faiblesse.</td></tr>
+      <tr><td><b>Deep pullback</b> (LPSY profond)</td><td>Retrace <b>0.62 – 0.79</b>, voire retest de la résistance / marginalement au-dessus de l'ice par le haut</td><td>Toléré <b>tant que</b> : rebond sans volume d'expansion, rejet net au contact de l'offre, OI qui ne construit pas de vraie demande. Le prix <b>re-rentre dans le canal</b> mais <b>n'y tient pas</b>.</td></tr>
+      <tr><td>Deep pullback extrême</td><td>Re-teste quasi le sommet de la plage / le niveau UTAD (rare)</td><td>À la limite du raisonnable : n'est plus « distribution propre » que si le retour se fait en <b>bougies molles</b> et casse à nouveau immédiatement. Sinon → zone d'invalidation (voir encadré).</td></tr>
+      <tr><td>Objectif markdown (Phase D+)</td><td>Projection par la <b>cause</b> (largeur de la plage / comptage P&amp;F) reportée sous le support</td><td>Chaque LPSY sous l'ice plafonne plus bas ; lower highs + lower lows installés.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="lead dist">
+    <b>Le canal.</b> Un deep pullback qui <b>re-pénètre le canal/la plage</b> ne casse PAS la thèse de distribution en soi : la redistribution respire, les LPSY peuvent revisiter l'intérieur de la plage. Ce qui compte est <b>comment</b> il y rentre : à volume sec, rejeté sous l'offre = LPSY (distribution intacte). À volume d'expansion, tenu, avec OI qui soutient une vraie demande = signal d'<b>invalidation</b>.
+  </div>
+
+  <h3>Quand peut-on conclure « on est bien en phase D d'un markdown » ?</h3>
+  <p>Faisceau de confirmation (idéalement plusieurs ensemble) :</p>
+  <ul>
+    <li><b>Ice cassée</b> sur spread large + volume en expansion, clôture près des plus-bas — pas une simple mèche.</li>
+    <li>Le <b>retour à l'ice par le dessous est rejeté</b> (LPSY) à volume faible / no demand — le support devenu résistance tient.</li>
+    <li>Séquence <b>lower highs + lower lows</b> établie sous la plage (au moins deux jambes).</li>
+    <li><b>OI (coin)</b> qui monte sur les jambes baissières (positions short qui se construisent / longs qui se débouclent), et qui ne construit rien à la hausse sur les rebonds.</li>
+    <li>Rebonds à <b>volume décroissant</b> systématiquement refoulés ; <b>long_liq</b> récurrentes sur les décrochages.</li>
+    <li>Le prix a parcouru ~<b>une largeur de plage</b> sous le support (measured move atteint ou en cours) sans jamais reprendre pied dedans.</li>
+    <li>Funding qui peut devenir négatif <b>alors que le prix continue de baisser</b> = les shorts contrôlent, pas de squeeze.</li>
+  </ul>
+
+  <div class="lead warn">
+    <b>Zone d'invalidation (retour possible vers l'accumulation / bear trap).</b> On abandonne la thèse de distribution si un « deep pullback » :
+    (1) <b>reprend et tient</b> au-dessus de l'ice/résistance sur volume d'<b>expansion</b> ; (2) enchaîne un <b>LPS</b> propre au-dessus (support qui tient) ; (3) avec <b>OI</b> et tierces qui valident une vraie demande (short covering + funding qui ne s'emballe pas).
+    Dans ce cas l'« UTAD » était en réalité un <b>upthrust d'accumulation</b> (ou le spring d'une structure supérieure). D'où la règle : <b>re-questionner le cadre dès que le prix fait l'inattendu</b>.
+  </div>
+
+  <h2>4. Table de décision — le faisceau, pas le signal unique</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Dimension</th><th>Vote <span class="accu">accu</span></th><th>Vote <span class="dist">distrib</span></th></tr></thead>
+    <tbody>
+      <tr><td>Cadre HTF + lieu</td><td>Bas de cycle, spring vu</td><td>Downtrend / haut de cycle, pas de spring</td></tr>
+      <tr><td>Structure interne</td><td>Higher lows</td><td>Lower highs</td></tr>
+      <tr><td>Volume à l'approche</td><td>Soutenu / no supply aux replis</td><td>Décroissant / no demand aux poussées</td></tr>
+      <tr><td>Volume au perçage</td><td>Faible ou absorbé</td><td>Fort avec refoulement net</td></tr>
+      <tr><td>Clôture de l'upthrust</td><td>Haute, tient au-dessus</td><td>Basse, réintègre vite</td></tr>
+      <tr><td>Retest</td><td>Par le dessus, tient</td><td>Par le dessous (LPSY), échoue</td></tr>
+      <tr><td>OI coin au rejet</td><td>Baisse (shorts couverts)</td><td>Débouclage baissier (longs piégés)</td></tr>
+      <tr><td>Liquidations</td><td>short_liq</td><td>long_liq en cascade</td></tr>
+      <tr><td>Suivi</td><td>SOS + LPS → markup</td><td>SOW + cassure ice → markdown</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="sub">On ne compte pas les votes bêtement : on <b>pondère par le cadre</b> (top-down) et par la <b>cohérence temporelle</b> (une dérive suivie sur plusieurs barres pèse plus qu'une barre isolée). La <b>confluence local↔macro</b> donne le signal le plus fort.</p>
+
+  <h2>5. Angles morts — ce qu'on oublie souvent</h2>
+  <ul>
+    <li><b>Déclarer la TF et la structure</b> avant d'étiqueter. Wyckoff est fractal : un upthrust H1 peut n'être qu'un test de Phase B sur H4. La même bougie peut être un événement local <i>et</i> autre chose en macro — les deux vrais.</li>
+    <li><b>La « cause » (largeur de plage / P&amp;F)</b> : elle mesure le potentiel du mouvement qui suit l'upthrust. Une grande plage = grande cause = mouvement plus ample dans le sens résolu.</li>
+    <li><b>Le rôle de l'AR</b> (réaction/rallye automatique) pour <b>définir les bornes</b> : sans borne propre, pas d'upthrust identifiable.</li>
+    <li><b>Absorption réelle = order flow.</b> On l'approxime avec volume + OI + tierces, mais c'est un proxy. Ne pas surinterpréter une seule barre.</li>
+    <li><b>Corrélation BTC / régime de marché.</b> Un upthrust d'alt qui ne fait que suivre un spike BTC n'a pas de « force propre » — à pondérer.</li>
+    <li><b>Tests multiples.</b> Il peut y avoir plusieurs upthrusts/tests secondaires avant résolution ; le premier n'est pas forcément le bon.</li>
+    <li><b>Rien n'est certain (bull/bear trap).</b> On raisonne en probabilités et on garde une invalidation chiffrée. L'accumulation se gagne.</li>
+    <li><b>Gestion du risque &gt; prédiction.</b> Le vrai edge n'est pas de deviner l'upthrust mais d'attendre la <b>confirmation (LPS ou LPSY)</b> et de placer un stop qui rend l'erreur peu coûteuse.</li>
+  </ul>
+
+  <p class="foot">
+    Mémo d'apprentissage — heuristiques transparentes et ajustables, jamais de boîte noire. Lecture toujours top-down, ordre VSA volume → OI (coin) → métriques tierces. À référer à chaque analyse d'upthrust pour décider accu vs. distribution.
+  </p>
+
+</div>
+</body>
+</html>
