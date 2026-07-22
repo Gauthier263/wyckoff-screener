@@ -1,0 +1,242 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mémo — Les tests du Composite Operator</title>
+<style>
+  :root{--acc:#1b6b1b;--dis:#a11;--amb:#8a6d00;--ink:#1c2530;--mut:#5c6672;--blue:#22518f}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;color:var(--ink);background:#fff;line-height:1.6}
+  .wrap{max-width:1060px;margin:0 auto;padding:26px}
+  h1{font-size:1.6em;margin:0 0 4px}
+  h2{font-size:1.3em;margin:36px 0 10px;padding-bottom:6px;border-bottom:2px solid #eee}
+  h3{font-size:1.08em;margin:20px 0 8px}
+  .sub{color:var(--mut);margin:0 0 14px;font-size:.93em}
+  .muted{color:var(--mut);font-size:.9em}
+  p{margin:8px 0}
+  ul{margin:8px 0}
+  code{background:#f2f2f2;border-radius:4px;padding:0 4px;font-size:.9em}
+  table{border-collapse:collapse;width:100%;margin:10px 0 14px;font-size:.86em}
+  th,td{border:1px solid #ddd;padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:#f4f4f4;font-weight:600}
+  td.k{white-space:nowrap;font-weight:600}
+  tr:nth-child(even) td{background:#fcfcfc}
+  .toc{background:#f7f9fc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 18px;margin:14px 0;font-size:.9em}
+  .toc a{color:var(--blue);text-decoration:none}.toc a:hover{text-decoration:underline}
+  .toc ol{margin:6px 0 0;padding-left:22px}
+  .lead{background:#fbfcfe;border:1px solid #e6ebf2;border-radius:8px;padding:14px 18px;margin:12px 0}
+  .box{border:1px solid #e3e3e3;border-radius:9px;padding:14px 16px;margin:12px 0;background:#fff}
+  .ok{border-left:4px solid var(--acc);background:#f2faf3}
+  .ko{border-left:4px solid var(--dis);background:#fdf3f3}
+  .tag{font-size:.72em;font-weight:600;border-radius:9px;padding:1px 8px;margin-left:3px;border:1px solid #ccc;color:#555;background:#f6f6f6;white-space:nowrap}
+  td.up{color:var(--acc);font-weight:600}td.dn{color:var(--dis);font-weight:600}
+  .fiche{border:1px solid #e3e3e3;border-radius:9px;padding:16px 18px;margin:14px 0;background:#fdfdfd;border-left:4px solid var(--blue)}
+  .fiche h3{margin-top:0}
+  .fiche .role{color:var(--mut);font-size:.85em;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .fiche .sig{margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;font-style:italic;color:#444}
+  @media print{.box,.fiche{page-break-inside:avoid}h2{page-break-before:always}.toc{display:none}}
+</style></head>
+<body><div class="wrap">
+
+<h1>Mémo — Les tests du Composite Operator</h1>
+<p class="sub">Pourquoi l'opérateur composite teste, ce qui fait un test valide, la distinction
+LPS vs BUEC, les trois types de spring, la règle de Tom Williams, la matrice de réaction du CO, et
+les fiches des quatre auteurs de référence.</p>
+
+<div class="toc"><b>Sommaire</b>
+<ol>
+<li><a href="#s1">Pourquoi le Composite Operator teste</a></li>
+<li><a href="#s2">Anatomie d'un test — valide vs échoué</a></li>
+<li><a href="#s3">LPS vs BUEC · les 3 springs · la règle de Tom Williams</a></li>
+<li><a href="#s4">Matrice de réaction du CO (manifestation prix + stratégie)</a></li>
+<li><a href="#s5">Fiches auteurs — Wyckoff · Evans · Pruden · Williams</a></li>
+</ol></div>
+
+<!-- ===================== 1 ===================== -->
+<h2 id="s1">1 · Pourquoi le Composite Operator teste</h2>
+<div class="lead">
+<p><b>Le Composite Operator (CO)</b> — l'« Homme Composite » de Wyckoff, l'agrégat des mains fortes /
+institutions — <b>ne bouge pas le prix sur une espérance : il agit sur confirmation</b>. Le test est
+son outil de vérification.</p>
+<p><b>Le but.</b> Avant de lancer un markup (ou un markdown), le CO doit s'assurer que <b>la force
+adverse est épuisée</b>. Il a passé la Phase B à <b>absorber l'offre</b> (accumulation) ; un test en
+Phase C <b>vérifie que cette absorption a marché</b> — qu'enfoncer le prix ne fait <b>plus</b> sortir
+de vendeurs.</p>
+<p><b>Le mécanisme.</b> Il <b>sonde un niveau</b> (typiquement le bas de la plage / le spring) et
+<b>regarde le volume</b>. <b>Volume faible</b> sur la sonde = les vendeurs sont partis (<i>no-supply</i>)
+= la cause est complète = <b>voie libre pour marquer</b>. <b>Volume élevé</b> = l'offre subsiste =
+pas prêt (retour en absorption).</p>
+<p><b>La logique économique.</b> Marquer le prix <i>à travers</i> de l'offre latente coûte cher (le CO
+achèterait sa propre résistance). <b>Tester, c'est de la gestion du risque pour l'opérateur</b> : il
+confirme que le chemin est dégagé avant d'engager son capital.</p>
+<p><b>Le tell pour nous.</b> Un test <b>montre la main du CO</b>. Un test réussi à volume sec près
+d'un spring/support est l'un des <b>signaux long les plus probants</b>, parce qu'on se greffe sur la
+<i>propre confirmation de l'opérateur</i>. (Fractal : les tests existent à toutes les échelles.)</p>
+</div>
+
+<!-- ===================== 2 ===================== -->
+<h2 id="s2">2 · Anatomie d'un test — valide vs échoué</h2>
+<p>Un test <b>sonde un niveau</b> : le low d'un spring, un support, un ancien climax, ou (en Phase D,
+par le haut) la <b>résistance cassée</b> (le creek devenu support). Ce qui compte n'est pas le niveau
+mais <b>le volume de la réponse</b>.</p>
+
+<div class="box ok">
+<h3 style="margin-top:0">Test VALIDE (no-supply)</h3>
+<ul>
+<li><b>Volume faible</b> — inférieur aux deux barres précédentes ; seuil screener <code>test ≤ ×0.85</code>,
+le plus sec est le mieux (idéal ×0.5–0.7).</li>
+<li><b>Spread étroit</b>, <b>clôture hors des plus-bas</b> (moitié haute de la barre).</li>
+<li>Idéalement un <b>higher low</b>, et <b>confirmé par une barre suivante haussière</b> (la réponse).</li>
+<li>Lecture : l'offre est absente → la demande a le champ libre → <b>markup imminent</b>.</li>
+</ul>
+</div>
+
+<div class="box ko">
+<h3 style="margin-top:0">Test ÉCHOUÉ (offre encore présente)</h3>
+<ul>
+<li><b>Volume élevé / en hausse</b> sur la sonde = <b>des vendeurs répondent</b> = l'offre n'est pas
+épuisée.</li>
+<li>Le prix <b>ne tient pas</b>, barres de baisse larges, clôtures basses.</li>
+<li>Lecture : la cause n'est <b>pas complète</b> → le CO <b>retourne absorber</b> (ré-accumulation)
+ou le cadre était faux. <b>Rester à l'écart.</b></li>
+</ul>
+</div>
+
+<p><b>Ne pas confondre le spring et son test.</b> Le <b>spring</b> est le <i>shakeout</i> (le plongeon
+sous le support) ; le <b>test</b> est la <i>re-sonde à volume sec</i> qui confirme que le spring a
+tenu. Séquence type : <b>spring → rebond → test secondaire</b> (plus le spring a fait sortir d'offre,
+plus le test secondaire est nécessaire — cf. §3).</p>
+
+<!-- ===================== 3 ===================== -->
+<h2 id="s3">3 · LPS vs BUEC · les 3 springs · la règle de Tom Williams</h2>
+
+<h3>LPS vs BUEC — même fonction, la nuance du lieu</h3>
+<table>
+<thead><tr><th>Terme</th><th>Ce qu'il nomme</th><th>Localisation</th><th>Empreinte</th></tr></thead>
+<tbody>
+<tr><td class="k">LPS<br><span class="muted">Last Point of Support</span></td>
+<td>La <b>fonction</b> : le dernier point de soutien avant le markup, où la demande revient en Phase D.</td>
+<td>N'importe quel <b>higher low</b> de Phase D (pas forcément à la borne).</td>
+<td>Volume sec, higher low, no-supply.</td></tr>
+<tr><td class="k">BUEC<br><span class="muted">Back-Up to the Edge of the Creek</span></td>
+<td>Le <b>lieu</b> : le back-up <b>à la résistance cassée</b> (le creek) après le JAC/SOS.</td>
+<td>Précisément <b>sur l'ancienne borne</b> devenue support (résistance→support).</td>
+<td>Volume sec, tient au-dessus du creek, no-supply.</td></tr>
+</tbody></table>
+<p class="muted">Doctrinalement <b>synonymes</b> (Evans) : les deux = test de support à volume sec, higher
+low, en Phase D, confirmant la demande. La nuance pédagogique : <b>BUEC nomme l'endroit</b> (au bord
+du ruisseau franchi), <b>LPS nomme le rôle</b> (dernier support avant markup). <b>Un BUEC est toujours
+un LPS ; un LPS n'est pas toujours pile au creek.</b></p>
+
+<h3>Les trois springs — classés par la quantité d'offre révélée</h3>
+<table>
+<thead><tr><th>Type</th><th>Pénétration sous le support</th><th>Volume</th><th>Offre révélée</th><th>Réaction / test secondaire</th></tr></thead>
+<tbody>
+<tr><td class="k">Spring #1<br><span class="muted">terminal shakeout</span></td>
+<td>Profonde</td><td class="dn">Élevé, spread large</td><td>Importante</td>
+<td>La demande doit <b>absorber fort</b> ; récupération plus lente → <b>test secondaire NÉCESSAIRE</b>. Le plus risqué.</td></tr>
+<tr><td class="k">Spring #2</td>
+<td>Modérée</td><td>Modéré</td><td>Présente mais gérable</td>
+<td>La demande l'emporte → <b>test secondaire recommandé</b> avant d'entrer.</td></tr>
+<tr><td class="k">Spring #3</td>
+<td>Mineure (marginale)</td><td class="up">Faible (no-supply)</td><td>Quasi nulle</td>
+<td>Reversal <b>rapide</b> dans la plage → test secondaire <b>optionnel</b>. <b>Le plus haussier</b> (demande au contrôle).</td></tr>
+</tbody></table>
+<p class="muted"><b>Sens de la numérotation :</b> #1 = le plus d'offre / le plus dangereux (il faut la
+prouver absorbée) ; #3 = le moins d'offre / le plus haussier. Plus le spring révèle d'offre, plus le
+<b>test secondaire à volume sec</b> devient indispensable pour valider.</p>
+
+<h3>La règle de Tom Williams (VSA)</h3>
+<div class="box">
+<p><b>« Ce n'est pas le test, c'est la réponse au test. »</b> Un test valide = une sonde baissière sur
+<b>volume inférieur aux deux barres précédentes</b>, clôture hors des plus-bas (<i>no-supply</i>) ;
+il n'est <b>confirmé que par une barre haussière en réponse</b>. <b>Volume élevé sur un test = de
+l'offre = le test a échoué</b>, quelle que soit l'allure de la bougie.</p>
+<p class="muted">Corollaire Williams : on <b>teste après une baisse ou après un signe de force</b> pour
+confirmer <i>l'absence d'offre</i> avant d'engager. Un up-move qui n'a jamais été testé reste suspect
+(il peut cacher de l'offre non purgée).</p>
+</div>
+
+<!-- ===================== 4 ===================== -->
+<h2 id="s4">4 · Matrice de réaction du Composite Operator</h2>
+<p class="sub">Pour chaque situation testée : ce que le CO cherche, ce qu'on observe, la
+<b>manifestation prix</b>, et la <b>stratégie</b> discrétionnaire correspondante.</p>
+<table>
+<thead><tr><th>Situation</th><th>Ce que le CO vérifie</th><th>Volume</th><th>Manifestation prix</th><th>Stratégie</th></tr></thead>
+<tbody>
+<tr><td class="k">Spring #3<br>(no-supply)</td><td>l'offre est-elle absente ?</td><td class="up">faible ≤ ×0.85</td>
+<td>dip mineur sous le support, reversal rapide, clôture haute</td>
+<td><b>Long agressif</b>, stop sous le low du spring.</td></tr>
+<tr><td class="k">Spring #1<br>(terminal shakeout)</td><td>l'ampleur de l'offre</td><td class="dn">élevé, spread large</td>
+<td>flush profond puis récupération lente</td>
+<td><b>Attendre le test secondaire</b> à volume sec avant d'entrer long.</td></tr>
+<tr><td class="k">Test secondaire réussi</td><td>reste-t-il de l'offre ?</td><td class="up">sec, higher low</td>
+<td>barre de test étroite puis <b>up-bar en réponse</b></td>
+<td><b>Long sur la réponse</b>, stop sous le test.</td></tr>
+<tr><td class="k">Test échoué</td><td>idem</td><td class="dn">élevé sur la sonde</td>
+<td>ne tient pas, wide down bar, clôture basse</td>
+<td><b>Rester à l'écart</b> ; ré-accumulation attendue.</td></tr>
+<tr><td class="k">LPS / BUEC<br>(Phase D)</td><td>la demande tient-elle le niveau cassé ?</td><td class="up">sec (no-supply)</td>
+<td>higher low au-dessus du creek (résistance→support)</td>
+<td><b>Long / ajout</b>, stop sous le LPS.</td></tr>
+<tr><td class="k">UTAD<br>(distribution)</td><td>la demande au-dessus est-elle absente ?</td><td class="dn">pas d'expansion à l'achat</td>
+<td>poke au-dessus de la plage puis rejet, clôture basse</td>
+<td><b>Short sur le rejet</b>, stop au-dessus du plus-haut.</td></tr>
+<tr><td class="k">LPSY<br>(distribution)</td><td>l'offre domine-t-elle le rebond ?</td><td class="dn">faible sur le rebond (no-demand)</td>
+<td>lower high faible sous la résistance</td>
+<td><b>Short</b>, stop au-dessus du LPSY.</td></tr>
+</tbody></table>
+<p class="muted">Lecture : le CO teste <b>toujours dans le sens où il veut aller</b> — en accumulation il
+sonde la <i>demande sous le support</i> (springs/LPS), en distribution il sonde l'<i>absence de demande
+au-dessus</i> (UTAD/LPSY). La stratégie se greffe sur le résultat du test, jamais avant.</p>
+
+<!-- ===================== 5 ===================== -->
+<h2 id="s5">5 · Fiches auteurs</h2>
+<p class="sub">Les quatre références qui ont bâti et transmis la lecture des tests.</p>
+
+<div class="fiche">
+<p class="role">Le fondateur · 1873–1934</p>
+<h3>Richard D. Wyckoff</h3>
+<p>Trader et éditeur américain (<i>The Magazine of Wall Street</i>), il codifie sa méthode en observant
+les grands opérateurs de son temps (Livermore, Morgan…). Apports : <b>l'Homme Composite</b> (lire le
+marché comme un seul esprit professionnel), les <b>3 lois</b> (offre/demande, cause/effet, effort/
+résultat), le <b>cycle du prix</b> (accumulation → markup → distribution → markdown), et le comptage
+de la <b>cause</b> en point &amp; figure.</p>
+<p class="sig">« Étudie le marché comme s'il était piloté par un seul cerveau — l'Homme Composite. »</p>
+</div>
+
+<div class="fiche">
+<p class="role">Le pédagogue · milieu du XXᵉ siècle</p>
+<h3>Robert G. Evans</h3>
+<p>Principal transmetteur de la méthode (successeur à la tête du <i>Stock Market Institute</i>). Apports :
+les <b>métaphores qui rendent la méthode enseignable</b> — le <b>creek</b> (la résistance « ruisseau »)
+et le <b>jump across the creek</b> (JAC/SOS), la <b>glace</b> (l'<i>ice</i>, le support qu'on traverse),
+et le <b>back-up to the edge of the creek</b> (BUEC). C'est lui qui donne aux tests et aux back-ups leur
+vocabulaire imagé.</p>
+<p class="sig">Le ruisseau : on saute au-dessus (JAC), puis on revient poser le pied au bord (BUEC).</p>
+</div>
+
+<div class="fiche">
+<p class="role">L'académique · professeur (Golden Gate University), †2017</p>
+<h3>Henry O. « Hank » Pruden</h3>
+<p>Professeur et théoricien de la finance comportementale. Apports : la <b>codification des Phases A→E</b>
+(les schémas d'accumulation/distribution utilisés aujourd'hui), la <b>taxonomie des springs et des tests</b>,
+et <i>The Three Skills of Top Trading</i> (état mental, technique, gestion du risque). Il relie Wyckoff
+à la <b>psychologie des foules</b> et à la finance comportementale.</p>
+<p class="sig">Rendre les phases lisibles : chaque schéma dit où l'on en est dans le cycle.</p>
+</div>
+
+<div class="fiche">
+<p class="role">Le lecteur de volume · ex-trader de syndicat, créateur de la VSA</p>
+<h3>Tom Williams</h3>
+<p>Ancien trader professionnel d'un syndicat londonien devenu analyste. Apports : la <b>Volume Spread
+Analysis (VSA)</b> et l'ouvrage <i>Master the Markets</i> ; la lecture <b>barre par barre</b> du footprint
+des mains fortes via le triplet <b>volume × spread × clôture</b> — <b>no-demand, no-supply, upthrust,
+test</b> — et le logiciel TradeGuider. C'est lui qui formalise <b>ce qu'est un test valide</b> (volume
+sous les deux barres précédentes, clôture hors des bas) et la <b>règle « la réponse au test »</b>.</p>
+<p class="sig">« Le marché révèle son intention dans la relation volume–spread–clôture de chaque barre. »</p>
+</div>
+
+<p class="muted" style="margin-top:26px;border-top:1px solid #eee;padding-top:10px">
+Mémo de référence — les tests du Composite Operator. À lire avec le mémo théorie (seuils vol×/spread/
+CLV des événements) et le mémo comportement à la résistance (les tests en distribution : UTAD, LPSY).</p>
+
+</div></body></html>
