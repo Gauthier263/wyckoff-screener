@@ -91,6 +91,20 @@
   </div>
   <p class="sub">Ils partagent la même forme. Tout le mémo sert à séparer les deux du milieu (les seuls qui « comptent » pour le déclenchement).</p>
 
+  <div class="lead warn">
+    <b>Seuils chiffrés du screener (<code>Thresholds</code>, config.yaml).</b> Les descriptions qualitatives ci-dessous se lisent contre ces valeurs par défaut — ajustables, jamais en dur :
+    <div class="pill-row">
+      <span class="tag">climax_vol = ×2.0</span>
+      <span class="tag">sos_vol = ×1.3</span>
+      <span class="tag">test_vol = ×0.85</span>
+      <span class="tag">wide_spread_atr = 1.3 ATR</span>
+      <span class="tag">narrow_spread_atr = 0.7 ATR</span>
+      <span class="tag">pen_atr = 0.1 ATR</span>
+      <span class="tag">reclaim_clv = 0.5</span>
+    </div>
+    <span style="color:var(--muted);font-size:13px">vol× = volume / moyenne(20) · spread_atr = (high−low) / ATR(14) · CLV = position de clôture dans la barre (0 = bas, 1 = haut) · pen_atr = pénétration mini hors borne, en ATR.</span>
+  </div>
+
   <h2>1. AVANT l'upthrust — les précurseurs (mise en place)</h2>
   <p>Ce qui, <i>en amont</i>, fait pencher la lecture. Aucun n'est décisif seul : on cherche la <b>convergence</b>.</p>
   <div class="scroll">
@@ -121,17 +135,17 @@
   <p>Une fois le perçage fait, on lit la <b>qualité du rejet</b> et le <b>suivi</b>. C'est ici que se décide l'étiquette.</p>
   <div class="scroll">
   <table>
-    <thead><tr><th>Signal</th><th><span class="accu">Upthrust d'accumulation</span> (offre absorbée)</th><th><span class="dist">UTAD</span> (distribution)</th></tr></thead>
+    <thead><tr><th>Signal</th><th><span class="accu">Upthrust d'accumulation</span> (offre absorbée)</th><th><span class="dist">UTAD</span> (distribution)</th><th>Seuil chiffré (screener)</th></tr></thead>
     <tbody>
-      <tr><td>Volume <b>sur</b> le perçage</td><td>Faible / moyen — peu de vendeurs répondent (offre épuisée). Ou fort mais <b>absorbé</b> (prix ne cède pas)</td><td>Fort avec <b>résultat baissier</b> : le prix est refoulé nettement = offre massive servie</td></tr>
-      <tr><td>Spread & clôture (CLV) de la barre</td><td>Rejet contenu, clôture qui reste haute / revient vite au-dessus de la résistance</td><td>Spread large, clôture dans le <b>bas</b> de la barre, loin sous la résistance</td></tr>
-      <tr><td>Vitesse du retour dans la plage</td><td>Lente / partielle ; le prix « refuse » de retomber</td><td>Rapide et franche — réintégration immédiate = piège qui se referme</td></tr>
-      <tr><td>Le <b>retest</b> qui suit</td><td>Retest de la résistance <b>par le dessus</b> qui tient (résistance → support) à volume sec</td><td>Retest <b>par le dessous</b> (LPSY) qui échoue à reprendre pied ; rebonds mous</td></tr>
-      <tr><td>Suivi (follow-through)</td><td>Poussée qui repart, nouveaux plus-hauts, LPS propre → markup</td><td>Enchaîne un <b>SOW</b> : cassure du support de plage à volume/spread croissants</td></tr>
-      <tr><td><b>OI (coin)</b> au rejet</td><td>OI qui <b>baisse</b> au refoulement = shorts couverts / longs pas piégés ; ou OI stable pendant que le prix tient</td><td>OI qui <b>reste haut / monte</b> puis se déboucle à la baisse = longs piégés qui capitulent</td></tr>
-      <tr><td>Liquidations au rejet</td><td>short_liq (les shorts du perçage se font squeezer) ; long_liq quasi nulles</td><td><b>long_liq</b> en cascade sur la descente = flush des longs piégés</td></tr>
-      <tr><td>Funding après</td><td>Se détend / repart neutre ; le prix monte sans excès de longs</td><td>Reste positif au début (longs qui espèrent) puis bascule ; prix baisse quand même</td></tr>
-      <tr><td>Effort vs résultat (bilan)</td><td>Effort haussier <b>récompensé</b> (peu d'effort, prix tient/monte)</td><td>Effort haussier <b>stérile</b> puis effort baissier <b>productif</b></td></tr>
+      <tr><td>Volume <b>sur</b> le perçage</td><td>Faible / moyen — peu de vendeurs répondent (offre épuisée). Ou fort mais <b>absorbé</b> (prix ne cède pas)</td><td>Fort avec <b>résultat baissier</b> : le prix est refoulé nettement = offre massive servie</td><td class="num">climactique ≥ ×2.0 (<code>climax_vol</code>) vs sec ≤ ×0.85 (<code>test_vol</code>)</td></tr>
+      <tr><td>Spread & clôture (CLV) de la barre</td><td>Rejet contenu, clôture qui reste haute / revient vite au-dessus de la résistance</td><td>Spread large, clôture dans le <b>bas</b> de la barre, loin sous la résistance</td><td class="num">spread large ≥ 1.3 ATR (<code>wide_spread_atr</code>) · CLV accu ≥ 0.5 / UTAD ≤ 0.5 (<code>reclaim_clv</code>)</td></tr>
+      <tr><td>Vitesse du retour dans la plage</td><td>Lente / partielle ; le prix « refuse » de retomber</td><td>Rapide et franche — réintégration immédiate = piège qui se referme</td><td class="num">clôture <b>rentrée</b> dans la plage ; pénétration hors borne ≈ 0.1 ATR (<code>pen_atr</code>)</td></tr>
+      <tr><td>Le <b>retest</b> qui suit</td><td>Retest de la résistance <b>par le dessus</b> qui tient (résistance → support) à volume sec</td><td>Retest <b>par le dessous</b> (LPSY) qui échoue à reprendre pied ; rebonds mous</td><td class="num">volume sec ≤ ×0.85 (<code>test_vol</code>)</td></tr>
+      <tr><td>Suivi (follow-through)</td><td>Poussée qui repart, nouveaux plus-hauts, LPS propre → markup</td><td>Enchaîne un <b>SOW</b> : cassure du support de plage à volume/spread croissants</td><td class="num">SOS/SOW ≥ ×1.3 (<code>sos_vol</code>) + spread ≥ 1.3 ATR</td></tr>
+      <tr><td><b>OI (coin)</b> au rejet</td><td>OI qui <b>baisse</b> au refoulement = shorts couverts / longs pas piégés ; ou OI stable pendant que le prix tient</td><td>OI qui <b>reste haut / monte</b> puis se déboucle à la baisse = longs piégés qui capitulent</td><td class="num">pas de seuil de bruit — le <b>signe</b> en coin est fiable, on pèse les petits Δ par leur cohérence multi-barres</td></tr>
+      <tr><td>Liquidations au rejet</td><td>short_liq (les shorts du perçage se font squeezer) ; long_liq quasi nulles</td><td><b>long_liq</b> en cascade sur la descente = flush des longs piégés</td><td class="num">tierce (Coinalyze) — lecture directionnelle</td></tr>
+      <tr><td>Funding après</td><td>Se détend / repart neutre ; le prix monte sans excès de longs</td><td>Reste positif au début (longs qui espèrent) puis bascule ; prix baisse quand même</td><td class="num">tierce (Coinalyze) — signe & tendance</td></tr>
+      <tr><td>Effort vs résultat (bilan)</td><td>Effort haussier <b>récompensé</b> (peu d'effort, prix tient/monte)</td><td>Effort haussier <b>stérile</b> puis effort baissier <b>productif</b></td><td class="num">vol× élevé + faible Δprix = effort sans résultat</td></tr>
     </tbody>
   </table>
   </div>
@@ -150,15 +164,16 @@
   <div class="step"><b>5. Phase D — markdown</b> — cassure nette sous l'ice, LPSY successifs de plus en plus bas, chaque rebond plus mou. Le marché est passé sous contrôle de l'offre.</div>
 
   <h3>Jusqu'où le prix peut-il redescendre — et remonter — sans invalider la distribution ?</h3>
+  <p class="sub">Deux lectures en parallèle : la <b>cible en % (retracement fib de la jambe SOW)</b> pour situer l'ampleur, et la <b>cible en niveau Wyckoff</b> (le « pourquoi » du niveau) — c'est cette dernière qui décide, la fib ne fait que la cadrer.</p>
   <div class="scroll">
   <table>
-    <thead><tr><th>Mouvement</th><th>Amplitude typique</th><th>Ce qui reste cohérent avec la distribution</th></tr></thead>
+    <thead><tr><th>Mouvement</th><th>Cible en % (fib de la jambe SOW)</th><th>Cible en niveau Wyckoff (le pourquoi)</th><th>Cohérent avec la distribution si</th></tr></thead>
     <tbody>
-      <tr><td>Chute post-UTAD (SOW)</td><td>De la résistance jusqu'au <b>support de plage / ice</b> (souvent tout le corps de la plage d'un coup)</td><td>Volume &amp; spread <b>croissants</b> à la baisse, clôtures basses. Normal et attendu.</td></tr>
-      <tr><td>Rebond réactif « ordinaire » (LPSY haut)</td><td>Retrace <b>0.5 – 0.62</b> de la jambe SOW ; cale au milieu de la plage ou sous la résistance</td><td>Rebond à <b>volume décroissant</b>, spread qui se resserre = no demand. Confirme la faiblesse.</td></tr>
-      <tr><td><b>Deep pullback</b> (LPSY profond)</td><td>Retrace <b>0.62 – 0.79</b>, voire retest de la résistance / marginalement au-dessus de l'ice par le haut</td><td>Toléré <b>tant que</b> : rebond sans volume d'expansion, rejet net au contact de l'offre, OI qui ne construit pas de vraie demande. Le prix <b>re-rentre dans le canal</b> mais <b>n'y tient pas</b>.</td></tr>
-      <tr><td>Deep pullback extrême</td><td>Re-teste quasi le sommet de la plage / le niveau UTAD (rare)</td><td>À la limite du raisonnable : n'est plus « distribution propre » que si le retour se fait en <b>bougies molles</b> et casse à nouveau immédiatement. Sinon → zone d'invalidation (voir encadré).</td></tr>
-      <tr><td>Objectif markdown (Phase D+)</td><td>Projection par la <b>cause</b> (largeur de la plage / comptage P&amp;F) reportée sous le support</td><td>Chaque LPSY sous l'ice plafonne plus bas ; lower highs + lower lows installés.</td></tr>
+      <tr><td>Chute post-UTAD (SOW)</td><td>impulsive, pas un retrace</td><td>Du <b>plafond (résistance)</b> jusqu'à <b>l'ice</b> (plancher de plage = low de l'AR), souvent tout le corps de la plage d'un coup</td><td>Volume &amp; spread <b>croissants</b> à la baisse, clôtures basses. Normal et attendu.</td></tr>
+      <tr><td>Rebond réactif « ordinaire » (LPSY haut)</td><td><b>0.5 – 0.62</b></td><td>Cale au <b>milieu de plage</b> ou sous <b>l'ice devenue résistance</b> (le support cassé qui refuse par le dessous)</td><td>Rebond à <b>volume décroissant</b>, spread qui se resserre = no demand. Confirme la faiblesse.</td></tr>
+      <tr><td><b>Deep pullback</b> (LPSY profond)</td><td><b>0.62 – 0.79</b></td><td>Retest de la <b>résistance de plage</b> par l'intérieur / marginalement au-dessus de l'ice ; <b>re-rentre dans le canal</b> mais n'y tient pas</td><td>Toléré <b>tant que</b> : rebond sans volume d'expansion, rejet net au contact de l'offre, OI qui ne construit pas de vraie demande.</td></tr>
+      <tr><td>Deep pullback extrême</td><td><b>0.79 – 1.0</b> (quasi plein retrace)</td><td>Re-teste quasi le <b>sommet de plage / le niveau UTAD</b> (rare)</td><td>À la limite : « distribution propre » seulement si le retour est en <b>bougies molles</b> et re-casse aussitôt. Sinon → zone d'invalidation (encadré).</td></tr>
+      <tr><td>Objectif markdown (Phase D+)</td><td><b>1.0 – 1.62+</b> extension sous l'ice</td><td>Projection par la <b>cause</b> : largeur de plage (comptage P&amp;F) reportée <b>sous</b> le support</td><td>Chaque LPSY sous l'ice plafonne plus bas ; lower highs + lower lows installés.</td></tr>
     </tbody>
   </table>
   </div>
