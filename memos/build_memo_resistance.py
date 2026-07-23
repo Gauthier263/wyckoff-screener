@@ -13,6 +13,13 @@ def _b64(cid):
     with open(p, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
+# F2 porte 3 graphes (les 3 BUEC vérifiés) ; les autres cas un seul.
+def _charts_html(cid):
+    ids = {"f2": ["f2a", "f2b", "f2c"]}.get(cid, [cid])
+    return "".join(
+        f'<img class="realchart" src="data:image/png;base64,{_b64(i)}" '
+        f'alt="graphe annoté réel — {i}" loading="lazy">' for i in ids)
+
 CVDCOL = "#173a6b"
 VOLCOL = "#5b8fd0"
 
@@ -289,7 +296,7 @@ def card_html(c):
 <p class="impl"><b>Implication cours.</b> {impl}</p>
 <p class="wyk"><b>Lien Wyckoff.</b> {wyk}</p>
 <div class="ex"><span class="lbl">Exemple réel (données vérifiées)</span>{EX[cid]}
-<img class="realchart" src="data:image/png;base64,{_b64(cid)}" alt="graphe annoté réel — {cid}" loading="lazy"></div>
+{_charts_html(cid)}</div>
 </div>'''
 
 P1 = "".join(card_html(c) for c in CARDS if c[0].startswith("r"))

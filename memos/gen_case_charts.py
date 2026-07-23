@@ -60,10 +60,25 @@ def plot_case(cid, title, tf, center, before, after, resist, markers, note=""):
         for ax in (a1,a2,a3): ax.axvline(k, color="#888", ls=":", lw=0.9, alpha=.6, zorder=0)
     a1.set_ylabel("Prix (BTC/USDT)"); a1.set_title(title, fontsize=13, fontweight="bold")
     a1.grid(alpha=.15)
-    # --- volume ---
+    # --- volume (+ RVOL sur les cas BUEC) ---
     a2.bar(x, d.volume, width=0.6, color=VOL, zorder=2)
     a2.plot(x, d.vol_ma, color="#555", lw=1.1, ls="--", label="vol MA")
     a2.set_ylabel("Volume"); a2.legend(loc="upper left", fontsize=8); a2.grid(alpha=.15)
+    if cid in ("f2a", "f2b", "f2c"):          # RVOL = volume relatif (vol / vol MA)
+        mk_idx = set()
+        for _ts, _l, _u in markers:
+            _j = d.index[d["ts"] == pd.Timestamp(_ts, tz="UTC")].tolist()
+            if _j: mk_idx.add(_j[0])
+        _vmax = float(d.volume.max())
+        for k in range(len(d)):
+            _mk = k in mk_idx
+            a2.text(k, d.volume[k] + _vmax * 0.03, f"×{d.vol_ratio[k]:.2f}",
+                    ha="center", va="bottom", rotation=90,
+                    fontsize=8.4 if _mk else 6.3,
+                    color=("#a11" if _mk else "#777"),
+                    fontweight=("bold" if _mk else "normal"), zorder=4)
+        a2.set_ylim(0, _vmax * 1.45)
+        a2.set_ylabel("Volume · RVOL (×vol MA)")
     # --- CVD ---
     a3.plot(x, d.cvd, color=CVDC, lw=1.8, zorder=2)
     a3.set_ylabel("CVD (delta cumulé)"); a3.grid(alpha=.15)
@@ -101,9 +116,15 @@ CASES = [
  ("f1","F1 · En force (SOS) — BTC/USDT H1, 20/07 (cassure 65 108)","1h","2026-07-20 17:00",26,14,
    [(65108,"résist. 65 108")], [("2026-07-20 17:00","F1 SOS","up")],
    "Cassure large vol ×2.83, CLV 0.95, CVD franc (delta_z +1.29) → continuation vers 66 956."),
- ("f2","F2 · Retest/BUEC — BTC/USDT H4, 11→12/06 (cassure 62 858)","4h","2026-06-12 06:00",14,12,
+ ("f2a","F2 · Retest/BUEC ① — BTC/USDT H4, 11→12/06 (cassure 62 858)","4h","2026-06-12 06:00",14,12,
    [(62858,"résist. 62 858")], [("2026-06-11 18:00","cassure","up"),("2026-06-12 06:00","back-up (vol sec)","down")],
-   "Cassure de 62 858 puis back-up qui teste le niveau à volume sec (≤ ×0.80) et tient → continuation à 64 763."),
+   "Cassure de 62 858 (RVOL ×1.24) puis back-up qui teste le niveau à volume sec (RVOL ≤ ×0.80) et tient → continuation à 64 763."),
+ ("f2b","F2 · Retest/BUEC ② — BTC/USDT H1, 10/07 (cassure 63 500)","1h","2026-07-10 06:00",8,12,
+   [(63500,"résist. 63 500")], [("2026-07-10 03:00","cassure","up"),("2026-07-10 09:00","back-up (vol sec)","down")],
+   "Cassure C63 750 (RVOL ×1.67, CVD franc) puis back-up sec (RVOL ×0.81) tenant > 63 500 → continuation à 64 693."),
+ ("f2c","F2 · Retest/BUEC ③ — BTC/USDT H1, 02/07 (cassure 61 334)","1h","2026-07-02 16:00",12,11,
+   [(61334,"résist. 61 334")], [("2026-07-02 14:00","cassure","up"),("2026-07-02 19:00","back-up (vol sec)","down")],
+   "Cassure de 61 334 (C61 543, RVOL ×1.76) puis back-up sec (RVOL ×0.69) qui tient → continuation à 61 900."),
  ("f3","F3 · Sans demande — BTC/USDT H1, 12/07 16:00 (cassure ratée)","1h","2026-07-12 16:00",22,14,
    [(64100,"résist. 64 100")], [("2026-07-12 16:00","F3 No-demand","up")],
    "Poussée au-dessus de 64 100 sur vol ×0.39 (anémique) puis repli sous le niveau — cassure sans demande."),
