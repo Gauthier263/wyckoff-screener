@@ -124,13 +124,19 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - **OI en COIN, jamais en USD, pour lire les positions.** L'OI en USD = OI_coin × prix
   **conflate positions et prix** : une hausse de prix gonfle l'OI USD même quand les positions
   *baissent* → faux signal *précisément quand le prix bouge* (ex. cassure BTC 64 800 : OI USD
-  +0.81 % « demande » alors que l'OI coin faisait −0.36 % = **short covering**). Toujours lire
+  +0.81 % « demande » alors que l'OI coin faisait −0.36 % = **prise de profit des shorts**). Toujours lire
   la **direction** de l'OI en **coin** (`fetch_open_interest`/`_ohlc` défaut `usd=False`,
   Coinalyze `convert_to_usd=false`) — c'est ce qu'affiche TradingView (« Intérêt ouvert » en
   BTC). L'USD ne sert qu'à donner un ordre de grandeur de notional, jamais à lire un Δ.
   **En coin, le *signe* est fiable** → on prend en compte les **petits Δ** (pas de seuil de
   bruit) en les pesant par leur **cohérence** : une dérive suivie sur plusieurs barres (ex.
-  −0.05/−0.07/−0.12 % = short covering réel) compte, une barre isolée minuscule moins.
+  −0.05/−0.07/−0.12 % = prise de profit des shorts réelle) compte, une barre isolée minuscule moins.
+- **Vocabulaire OI : dire « prise de profit des shorts », jamais « short covering ».** Gauthier
+  préfère l'angle *intention/P&L* (les shorts en gain au support **encaissent**) au terme
+  mécanique anglais. Les deux décrivent le même geste : sous-jacent = **rachat pour clôturer
+  (buy to close) → OI↓**. Réserver la mention « rachat pour clôturer / OI↓ » aux passages qui
+  expliquent l'**effet sur l'OI ou le prix** ; sinon, terme par défaut = **« prise de profit
+  des shorts »**. (Symétrie côté longs : « prise de profit des longs » = vente pour clôturer.)
 - **OI ambigu → croiser systématiquement 3 métriques tierces.** Prix+OI seuls sont
   **ambigus quand le prix cale** (OI↑ à prix plat = longs *ou* shorts qui ouvrent — impossible
   à trancher). Dans **toute lecture d'OI**, dès que le prix stagne / qu'une hausse d'OI doit
