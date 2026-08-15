@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from screener.features import add_features
-from screener.window import detect_window_structure
+from screener.window import detect_micro_backup, detect_window_structure
 
 
 def _df(rows):
@@ -138,3 +138,52 @@ def test_no_structure_on_flat_drift():
     struct = detect_window_structure(_df(_drift(80, 100.0, seed=9)), lookback=30)
     assert struct.bias == "neutral"
     assert not struct.is_valid
+
+
+def test_micro_backup_after_reclaim():
+    """Après le SOS, série de micro back-ups au contact de l'ex-résistance (creek = high de
+    l'AR ≈ 103) : le prix y revient 3× en tenant au-dessus, à volume ET |ΔOI| en assèchement.
+    Le détecteur compte les tests, déduit le niveau de la structure, et valide la fin de Phase B."""
+    rows = _drift(40, 100.0, seed=1)
+    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]           # SC : climax, plancher 95.0
+    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]            # AR : creek à 103.0 (ex-résistance)
+    rows += _drift(4, 102.0, vol=600.0, seed=2)
+    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]              # ST : test sec près du plancher
+    rows += _drift(3, 97.5, vol=600.0, seed=3)
+    rows += [[98.0, 104.5, 97.8, 104.2, 2600.0]]           # SOS : JAC franchit la creek (103)
+    # 3 micro back-ups qui reviennent tester 103 par en-dessous et tiennent (close ≥ 103),
+    # volume décroissant (assèchement) :
+    rows += [[103.6, 103.8, 102.85, 103.20, 720.0]]        # test 1
+    rows += [[103.3, 103.5, 102.80, 103.10, 620.0]]        # test 2
+    rows += [[103.2, 103.3, 102.90, 103.05, 540.0]]        # test 3
+    df = _df(rows)
+
+    struct = detect_window_structure(df, lookback=20)
+    assert struct.bias == "accumulation" and struct.is_valid
+
+    # OI globalement en repli avec |ΔOI| qui se tarit sur les 3 back-ups
+    oi_vals = np.linspace(2000.0, 1080.0, len(df))
+    oi_vals[-6:] = [1100.0, 1090.0, 1082.0, 1076.0, 1072.0, 1070.0]  # Δ3 : 24 → 18 → 12
+    oi = pd.DataFrame({"oi": oi_vals}, index=df.index)
+
+    mb = detect_micro_backup(df, struct, oi=oi, lookback=30)
+    assert mb.is_valid
+    assert mb.n_tests == 3
+    assert abs(mb.level - 103.0) < 1e-6          # niveau = high de l'AR (creek)
+    assert mb.vol_drying                         # volume décroissant test après test
+    assert mb.oi_drying                          # |ΔOI| décroissant
+    # volume strictement en assèchement + chaque test porte théorie + justification
+    vrs = [e.vol_ratio for e in mb.events]
+    assert vrs == sorted(vrs, reverse=True)
+    for e in mb.events:
+        assert e.name == "MICRO_BACKUP"
+        assert e.theory and "vol" in e.why
+        assert e.price >= 103.0                  # clôture tient au-dessus du niveau repris
+
+
+def test_micro_backup_none_on_neutral():
+    """Structure neutre → pas de niveau à surveiller, aucun back-up."""
+    struct = detect_window_structure(_df(_drift(80, 100.0, seed=9)), lookback=30)
+    mb = detect_micro_backup(_df(_drift(80, 100.0, seed=9)), struct)
+    assert not mb.is_valid
+    assert mb.n_tests == 0

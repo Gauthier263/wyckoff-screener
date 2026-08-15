@@ -53,6 +53,12 @@ _THEORY_DESC: dict[tuple[str, str], str] = {
         "plafond puis rejet : piège les acheteurs avant le markdown. Phase C.",
     ("distribution", "LPSY"): "Last Point of Supply — pullback après le SOW : sommet plus "
         "bas sur volume sec, dernier rebond avant la baisse.",
+    ("accumulation", "MICRO_BACKUP"): "Micro back-up — au contact de l'ex-résistance reprise "
+        "(devenue support), série de retests serrés à volume/OI en assèchement : la Phase B "
+        "s'achève, l'offre ne réagit plus. Timing d'entrée fin avant le markup.",
+    ("distribution", "MICRO_BACKUP"): "Micro back-up — au contact de l'ex-support cassé "
+        "(devenu résistance), série de retests serrés à volume/OI en assèchement : la Phase B "
+        "s'achève, la demande ne réagit plus. Timing fin avant le markdown.",
 }
 
 
@@ -79,6 +85,10 @@ def _theory(bias: str, name: str, th: Thresholds) -> str:
         rep = (f"Repère : réaction à volume SEC (≤ ×{th.test_vol}) ; "
                f"{'creux plus HAUT tenant le support' if acc else 'sommet plus BAS tenant la résistance'} "
                f"(le bon côté de la borne cassée).")
+    elif name == "MICRO_BACKUP":
+        rep = (f"Repère : retests SERRÉS au CONTACT du niveau repris (≤ 1 ATR) à volume SEC "
+               f"(≤ ×{th.test_vol}) tenant du bon côté, avec vol× ET |ΔOI| en DÉCROISSANCE test "
+               f"après test (l'activité se tarit = fin de Phase B). ≥ 2 tests pour valider.")
     else:  # SOS / SOW
         rep = (f"Repère : volume SOUTENU (≥ ×{th.sos_vol}) + spread LARGE (≥ {th.wide_spread_atr} ATR) "
                f"+ clôture {close_dir} (clv {'≥ 0.6' if acc else '≤ 0.4'}) confirmant la direction.")
@@ -152,6 +162,11 @@ def _why(name: str, acc: bool, vr: float, sa: float, clv: float, th: Thresholds)
         cote = "creux plus haut tenant le support" if acc else "sommet plus bas tenant la résistance"
         return (f"vol ×{vr:.2f} (sec) + {cote} → dernier point d'appui avant la "
                 f"{'hausse (markup)' if acc else 'baisse (markdown)'}.")
+    if name == "MICRO_BACKUP":
+        cote = "ex-résistance reprise (support)" if acc else "ex-support cassé (résistance)"
+        tari = "l'offre" if acc else "la demande"
+        return (f"vol ×{vr:.2f} (sec, ≤ test {th.test_vol}) + clôture tenant le {cote} → "
+                f"retest sans réaction adverse : {tari} s'est tarie, le niveau ne repousse plus le prix.")
     return ""
 
 
@@ -166,7 +181,7 @@ def _mk(df, i, name, bias, th) -> WindowEvent:
         s = np.clip(0.3 + 0.2 * (vr - th.climax_vol) + 0.3 * (clv if acc else 1 - clv), 0, 1)
     elif name in ("SOS", "SOW"):
         s = np.clip(0.4 + 0.1 * (vr - th.sos_vol) + 0.3 * (clv if acc else 1 - clv), 0, 1)
-    elif name in ("ST", "LPS", "LPSY"):
+    elif name in ("ST", "LPS", "LPSY", "MICRO_BACKUP"):
         s = np.clip(0.5 * (1 - vr), 0, 1)
     elif name in ("SPRING", "UTAD"):
         s = np.clip(0.35 + 0.4 * (clv if acc else 1 - clv), 0, 1)
@@ -345,3 +360,121 @@ def detect_window_structure(
     if not cand:
         return WindowStructure("neutral", np.nan, np.nan)
     return max(cand, key=lambda c: c.score)
+
+
+# --------------------------------------------------------------------------- #
+# Micro back-up : timing de fin de Phase B au contact d'une ex-résistance reprise
+# --------------------------------------------------------------------------- #
+@dataclass
+class MicroBackup:
+    """Série de back-ups serrés au contact d'un niveau repris.
+
+    En accumulation : l'ex-résistance (borne haute de la plage) reprise devient support,
+    re-testée par en-dessous ; en distribution : l'ex-support (borne basse) cassé devient
+    résistance, re-testé par au-dessus. Matérialise la **fin de Phase B** : le prix revient
+    tester le niveau, le volume ET l'|ΔOI| s'assèchent test après test → readiness Phase C/D
+    (markup / markdown). Le niveau est déduit AUTOMATIQUEMENT de la `WindowStructure`.
+    """
+    bias: str
+    level: float
+    n_tests: int = 0
+    events: list[WindowEvent] = field(default_factory=list)
+    vol_drying: bool = False
+    oi_drying: bool = False
+
+    @property
+    def is_valid(self) -> bool:
+        # exploitable = au moins 2 tests qui tiennent, à volume en assèchement
+        return self.n_tests >= 2 and self.vol_drying
+
+
+def detect_micro_backup(
+    df: pd.DataFrame, structure: WindowStructure, th: Thresholds | None = None,
+    oi=None, lookback: int = 30,
+) -> MicroBackup:
+    """Détecte une séquence de micro back-ups au contact du niveau repris de `structure`.
+
+    Le niveau (ex-résistance/ex-support) est déduit AUTOMATIQUEMENT de la structure : borne
+    haute en accumulation (reprise → testée par en-dessous), borne basse en distribution
+    (cassée → testée par au-dessus). On ne scanne qu'APRÈS le signe directionnel (SOS/SOW)
+    s'il existe — c'est là que le back-up a un sens (Phase D) — sinon sur toute la fenêtre.
+    Un test valide : le prix revient AU CONTACT du niveau (≤ 1 ATR) sans le casser franchement
+    et CLÔTURE du bon côté (niveau tenu), à volume sec. L'assèchement est mesuré comme la
+    DÉCROISSANCE de vol_ratio et de |ΔOI| test après test (l'activité se tarit = Phase B révolue).
+    """
+    th = th or Thresholds()
+    if structure.bias not in ("accumulation", "distribution"):
+        return MicroBackup(structure.bias, np.nan)
+    acc = structure.bias == "accumulation"
+    # Niveau = la BORNE de la plage reprise/cassée, i.e. l'extrême de l'AR (la « creek » en
+    # accu / l'« ice » en dist) — pas le sommet du signe (SOS/SOW) qui, lui, la franchit.
+    # Repli sur la borne de la structure si l'AR n'a pas été isolé.
+    ar = next((e for e in structure.events if e.name == "AR"), None)
+    if ar is not None:
+        level = ar.bar_high if acc else ar.bar_low
+    else:
+        level = structure.high if acc else structure.low
+    if np.isnan(level):
+        return MicroBackup(structure.bias, float("nan"))
+
+    win = df.iloc[-lookback:]
+    n = len(win)
+    if n < 4:
+        return MicroBackup(structure.bias, float(level))
+
+    # OI réaligné sur l'index des barres (comme detect_window_structure)
+    oi_aligned = None
+    if oi is not None and len(oi):
+        s = oi["oi"] if isinstance(oi, pd.DataFrame) else oi
+        oi_aligned = s.reindex(df.index, method="nearest")
+
+    # Départ du scan : juste après le signe directionnel (SOS/SOW) de la structure — le
+    # back-up (Phase D) ne se lit qu'une fois le niveau franchi. Sans signe, toute la fenêtre.
+    want = "SOS" if acc else "SOW"
+    sign_ts = None
+    for e in structure.events:
+        if e.name == want:
+            sign_ts = e.ts
+    start = 0
+    if sign_ts is not None:
+        try:
+            gi = df.index.get_loc(sign_ts)
+            start = min(n, max(0, gi - (len(df) - n) + 1))  # position locale dans win
+        except KeyError:
+            start = 0
+
+    atr_ref = float(np.nanmedian(win["atr"].values))
+    if np.isnan(atr_ref) or atr_ref <= 0:
+        atr_ref = (float(win["high"].max()) - float(win["low"].min())) / max(n, 1)
+    tol = atr_ref          # contact = mèche à moins d'1 ATR du niveau
+    break_tol = 0.5 * atr_ref  # au-delà, ce n'est plus un back-up mais une cassure/spring
+
+    tests: list[WindowEvent] = []
+    for j in range(start, n):
+        b = win.iloc[j]
+        vr = float(b["vol_ratio"]) if not np.isnan(b["vol_ratio"]) else 1.0
+        if acc:
+            touch = float(b["low"]) <= level + tol
+            no_break = float(b["low"]) >= level - break_tol
+            holds = float(b["close"]) >= level
+        else:
+            touch = float(b["high"]) >= level - tol
+            no_break = float(b["high"]) <= level + break_tol
+            holds = float(b["close"]) <= level
+        if touch and no_break and holds and vr <= th.test_vol * 1.3:
+            gi = len(df) - n + j
+            ev = _mk(df, gi, "MICRO_BACKUP", structure.bias, th)
+            if oi_aligned is not None:
+                ev.oi_chg = _oi_pct(oi_aligned, gi, 3)
+            tests.append(ev)
+
+    mb = MicroBackup(structure.bias, float(level), n_tests=len(tests), events=tests)
+    if len(tests) >= 2:
+        vrs = [e.vol_ratio for e in tests]
+        # assèchement volume : globalement décroissant (dernier ≤ premier, monotone à 10 % près)
+        mb.vol_drying = vrs[-1] <= vrs[0] and all(
+            vrs[k + 1] <= vrs[k] * 1.1 for k in range(len(vrs) - 1)
+        )
+        ois = [abs(e.oi_chg) for e in tests if not np.isnan(e.oi_chg)]
+        mb.oi_drying = len(ois) >= 2 and ois[-1] <= ois[0]
+    return mb
