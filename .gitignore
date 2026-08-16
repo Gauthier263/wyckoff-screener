@@ -8,4 +8,5 @@ memo_theorie.png
 tableau_rappel_theorie.html
 .venv/
 *.parquet
+scratch/
 .claude/settings.local.json
