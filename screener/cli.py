@@ -19,7 +19,7 @@ from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
 from .mtf import MTFResult, combine_mtf
 from .score import SymbolResult, score_symbol
-from .window import detect_window_structure
+from .window import detect_supply_dryup, detect_window_structure
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -146,6 +146,55 @@ def run_window(cfg: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def run_dryup(cfg: dict) -> pd.DataFrame:
+    """Mode assèchement de l'offre : cherche une consolidation (coil) où l'offre se tarit
+    — tests réussis à volume décroissant, spring + test de Phase C, contraction — mesurée
+    en unités ATR/ratio (identique 15m/1h/4h). OI lu en **coin**. Une ligne par événement ;
+    graphique 3 panneaux optionnel."""
+    ex = data_mod.get_exchange(cfg["exchange"])
+    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    th = Thresholds(**cfg.get("thresholds", {}))
+    lookback = cfg.get("dryup", 40)
+    bias = cfg["bias"] if cfg["bias"] in ("accumulation", "distribution") else "accumulation"
+
+    from .theory_table import build_theory_html
+    memo = build_theory_html(th)
+    print(f"→ mémo théorie : {memo}", file=sys.stderr)
+
+    rows: list[dict] = []
+    for sym in universe:
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+            oi = None
+            if cfg.get("oi", True):
+                try:
+                    o = data_mod.fetch_oi_ohlc_coin(sym, cfg["timeframe"], cfg["limit"])
+                    oi = o["close"].rename("oi").to_frame() if o is not None and len(o) else None
+                except Exception:
+                    oi = None
+            dry = detect_supply_dryup(df, th=th, oi=oi, lookback=lookback, bias=bias)
+            if not dry.is_valid:
+                continue
+            for e in dry.events:
+                rows.append({
+                    "symbol": sym, "bias": dry.bias, "score": round(dry.score, 2),
+                    "support": round(dry.support, 2), "resistance": round(dry.resistance, 2),
+                    "event": e.name, "time": (e.ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh"),
+                    "vol_x": round(e.vol_ratio, 2), "spread_atr": round(e.spread_atr, 2),
+                    "clv": round(e.clv, 2), "oi_3h_%": "—" if pd.isna(e.oi_chg) else round(e.oi_chg, 2),
+                    "volume/spread → thèse": e.why,
+                })
+            if cfg.get("chart"):
+                from .plot import plot_supply_dryup
+                out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_dryup.png"
+                plot_supply_dryup(sym, cfg["timeframe"], dry, out, ex=ex, df=df)
+                print(f"→ graphique : {out}", file=sys.stderr)
+        except Exception as e:
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+    return pd.DataFrame(rows)
+
+
 def main() -> None:
     # Console Windows en cp1252 : on force l'UTF-8 pour les symboles (→, ×, …).
     for stream in (sys.stdout, sys.stderr):
@@ -173,6 +222,8 @@ def main() -> None:
     p.add_argument("--mtf", action="store_true", help="confluence multi-timeframe (HTF→LTF)")
     p.add_argument("--window", nargs="?", type=int, const=60, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
+    p.add_argument("--dryup", nargs="?", type=int, const=40, default=None,
+                   help="mode assèchement de l'offre (coil + tests + spring/Phase C, défaut 40 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
@@ -187,8 +238,12 @@ def main() -> None:
                oi_source=args.oi_source)
     if args.window is not None:
         cfg["window"] = args.window
+    if args.dryup is not None:
+        cfg["dryup"] = args.dryup
 
-    if args.window is not None:
+    if args.dryup is not None:
+        table = run_dryup(cfg)
+    elif args.window is not None:
         table = run_window(cfg)
     elif args.mtf:
         table = run_mtf(cfg)

@@ -31,6 +31,18 @@ def get_exchange(name: str = "binance"):
         ex.urls["api"]["public"] = os.environ.get(
             "BINANCE_PUBLIC_URL", "https://data-api.binance.vision/api/v3"
         )
+    # Derrière un proxy d'egress qui ré-signe le TLS (CA d'entreprise / bac à sable) :
+    # ccxt passe `verify=True` explicitement, ce qui IGNORE REQUESTS_CA_BUNDLE. On pointe
+    # donc `ex.verify` sur le bundle fourni par l'env, et on réactive `trust_env` (proxy).
+    ca = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+    if ca:
+        ex.verify = ca
+    try:
+        ex.session.trust_env = True
+        if ca:
+            ex.session.verify = ca
+    except Exception:
+        pass
     ex.load_markets()
     return ex
 
@@ -109,10 +121,14 @@ def _archive_days(now, days=4, start=None, end=None, cap=400) -> list:
 
 
 def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4,
-                             start=None, end=None) -> "pd.Series | None":
+                             start=None, end=None, coin: bool = False) -> "pd.Series | None":
     """OI Binance (perp USDⓂ) depuis l'archive `data.binance.vision` — fichiers *metrics*
-    quotidiens (`sum_open_interest_value`, USD, pas de 5 min). Même miroir non géo-bloqué
-    que le spot, donc accessible là où `fapi` renvoie 451. **Retard ~1 jour**.
+    quotidiens (5 min). Même miroir non géo-bloqué que le spot, donc accessible là où `fapi`
+    renvoie 451. **Retard ~1 jour**.
+
+    `coin=False` (défaut) → `sum_open_interest_value` (USD, pour l'agrégat multi-venues).
+    `coin=True` → `sum_open_interest` (**OI en coin/BTC**, la bonne mesure pour lire la
+    *direction* des positions, cf. CLAUDE.md — profondeur historique pour les vieux setups).
 
     `start`/`end` (timestamps) ciblent un **intervalle historique** (ex. mars) ; sinon les
     `days` derniers jours. Binance ne publie ces metrics qu'en *quotidien* (pas de fichier
@@ -158,7 +174,8 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4,
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
             df = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])))
-            return pd.Series(df["sum_open_interest_value"].astype(float).values,
+            col = "sum_open_interest" if coin else "sum_open_interest_value"
+            return pd.Series(df[col].astype(float).values,
                              index=pd.to_datetime(df["create_time"], utc=True))
         except Exception:
             return None
@@ -531,6 +548,46 @@ def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 30
         ohlc = agg.resample(freq).agg(["first", "max", "min", "last"]).dropna()
         ohlc.columns = ["open", "high", "low", "close"]
         return ohlc if len(ohlc) else None
+    except Exception:
+        return None
+
+
+def fetch_oi_ohlc_coin(symbol: str = "BTC/USDT", timeframe: str = "1h", limit: int = 300,
+                       start=None, end=None) -> "pd.DataFrame | None":
+    """Bougies OHLC d'Open Interest **en coin (BTC)** — la mesure fidèle pour lire la
+    *direction* des positions (l'USD conflate positions et prix, cf. CLAUDE.md).
+
+    Récent → **Coinalyze** (série fine coin resamplée = ce qu'affiche TradingView).
+    Au-delà de la profondeur Coinalyze / setup historique → repli sur l'**archive**
+    `data.binance.vision` en coin (`sum_open_interest`). Renvoie un DataFrame OHLC ou None.
+    """
+    def _ohlc(s):
+        if s is None or not len(s):
+            return None
+        freq = _TF_FREQ.get(timeframe, "1h")
+        o = s.resample(freq).agg(["first", "max", "min", "last"]).dropna()
+        o.columns = ["open", "high", "low", "close"]
+        return o if len(o) else None
+
+    # 1) Coinalyze coin (fine → resample)
+    try:
+        fine = {"5m": "1m", "15m": "1m", "30m": "5m", "1h": "5m",
+                "4h": "1h", "1d": "1h"}.get(timeframe, "5m")
+        fm = _TF_MIN.get(fine, 5); tm = _TF_MIN.get(timeframe, 60)
+        flim = min(2000, max(int(limit * tm / fm), 200))
+        s = fetch_coinalyze_oi(symbol, fine, flim, start, end, ohlc=False)  # usd=False → coin
+        o = _ohlc(s)
+        if o is not None:
+            return o
+    except Exception:
+        pass
+    # 2) Repli archive Binance en coin (profondeur historique)
+    try:
+        days = 4
+        if start is not None and end is not None:
+            days = max(2, int((pd.Timestamp(end) - pd.Timestamp(start)).total_seconds() // 86400) + 2)
+        s = fetch_binance_oi_archive(symbol, days=days, start=start, end=end, coin=True)
+        return _ohlc(s)
     except Exception:
         return None
 

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from . import data as data_mod
-from .window import WindowStructure
+from .window import SupplyDryup, WindowStructure
 
 # TF d'analyse -> TF de dessin des bougies (plus fine)
 FINER_TF = {"1d": "4h", "4h": "1h", "1h": "15m", "30m": "5m", "15m": "5m", "5m": "1m"}
@@ -243,6 +243,144 @@ def plot_window_structure(
                 compo += "  |  OKX + Binance"
         axo.annotate(compo, (0.5, 0.04), xycoords="axes fraction", ha="center",
                      fontsize=7, color="#666")
+
+    panels[-1].xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
+    fig.autofmt_xdate(rotation=30)
+    fig.savefig(out_path, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    return out_path
+
+
+def plot_supply_dryup(
+    symbol: str, analysis_tf: str, dry: SupplyDryup, out_path: str,
+    ex=None, df=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
+    min_bars: int = 84, oi_ohlc=None,
+) -> str:
+    """Rendu d'une détection `SupplyDryup` — **même TF que l'analyse**, trois panneaux :
+    cours / volume (moyenne + étiquettes nom·×vol·ΔOI) / Open Interest **en coin (BTC)**.
+
+    Bornes du coil tracées (support 🟦 / résistance 🟥). Marqueurs d'événements (SC/SPRING/
+    ST) sur l'extrême réel de la barre. Fenêtre ≥ `min_bars` bougies de contexte. Panneau OI
+    omis si indisponible. `df` (OHLCV brut, index UTC) fourni → pas de re-fetch."""
+    if df is None:
+        ex = ex or data_mod.get_exchange("binance")
+        df = data_mod.fetch_ohlcv(ex, symbol, analysis_tf, limit, use_cache=False)
+    df = df[["open", "high", "low", "close", "volume"]]
+    if not dry.events:
+        raise ValueError("SupplyDryup sans événement — rien à tracer.")
+
+    td = _TF_TD.get(analysis_tf, pd.Timedelta(hours=1))
+    ts = [e.ts for e in dry.events]
+    first, last = min(ts), df.index[-1]
+    start_utc = min(first - td * 4, df.index[max(0, len(df) - min_bars)])
+    sub_utc = df.loc[start_utc:last].copy()
+    if len(sub_utc) < 3:
+        sub_utc = df.iloc[-min_bars:].copy()
+    delta = pd.Timedelta(hours=tz_hours)
+    sub = sub_utc.copy()
+    sub.index = sub.index + delta
+
+    from .features import add_features
+    sub = add_features(sub)
+
+    # Open Interest en COIN, bougies même TF, même fenêtre (Coinalyze récent → archive hist.)
+    if oi_ohlc is None:
+        try:
+            oi_ohlc = data_mod.fetch_oi_ohlc_coin(
+                symbol, analysis_tf, start=sub_utc.index[0], end=sub_utc.index[-1])
+        except Exception:
+            oi_ohlc = None
+    has_oi = oi_ohlc is not None and len(oi_ohlc) > 0
+    if has_oi:
+        oi_ohlc = oi_ohlc.copy()
+        oi_ohlc.index = oi_ohlc.index + delta
+        oi_ohlc = oi_ohlc[(oi_ohlc.index >= sub.index[0]) & (oi_ohlc.index <= sub.index[-1])]
+        base = symbol.split("/")[0]
+        scale, unit = (1e3, f"k {base}") if float(oi_ohlc["close"].median()) > 1e3 else (1.0, base)
+        oi_ohlc = oi_ohlc / scale
+        has_oi = len(oi_ohlc) > 0
+
+    x = mdates.date2num(sub.index.to_pydatetime())
+    width = (x[1] - x[0]) * 0.7 if len(x) > 1 else 0.01
+    if has_oi:
+        fig, (axp, axv, axo) = plt.subplots(3, 1, figsize=(13.5, 9.2), sharex=True,
+                                            gridspec_kw={"height_ratios": [3, 1, 1.4], "hspace": 0.06})
+    else:
+        fig, (axp, axv) = plt.subplots(2, 1, figsize=(13.5, 7.5), sharex=True,
+                                       gridspec_kw={"height_ratios": [3, 1], "hspace": 0.06})
+        axo = None
+    panels = [axp, axv] + ([axo] if has_oi else [])
+    fig.patch.set_facecolor("white")
+    _candles(axp, sub, width)
+
+    acc = dry.bias == "accumulation"
+
+    def locate(e):
+        want = _wanted_extreme(e.name, acc)
+        return (mdates.date2num((e.ts + delta).to_pydatetime()),
+                e.bar_high if want == "high" else e.bar_low)
+
+    # Bornes du coil : support (bleu) / résistance (rouge), avec prix dans la gouttière.
+    for yv, col, lbl in ((dry.support, "#1f77b4", "support"), (dry.resistance, "#d62728", "résistance")):
+        axp.axhline(yv, color=col, ls="--", lw=0.7, alpha=0.85)
+        axp.annotate(_fmt_price(yv), xy=(0.0, yv), xycoords=axp.get_yaxis_transform(),
+                     xytext=(-4, 0), textcoords="offset points", va="center", ha="right",
+                     fontsize=8, weight="bold", color=col, clip_on=False)
+        axp.annotate(lbl, xy=(1.0, yv), xycoords=axp.get_yaxis_transform(),
+                     xytext=(4, 0), textcoords="offset points", va="center", ha="left",
+                     fontsize=8, color=col, clip_on=False)
+
+    yr = float(sub["high"].max() - sub["low"].min()) or 1.0
+    gap = yr * 0.06
+    for e in dry.events:
+        xe, price = locate(e)
+        col = _EVENT_COLOR.get(e.name, "#555")
+        up = _wanted_extreme(e.name, acc) == "high"
+        y = price + (gap if up else -gap)
+        for axx in panels:
+            axx.axvline(xe, color=col, ls=":", lw=0.7, alpha=0.35, zorder=0)
+        axp.annotate(e.name, (xe, y), textcoords="offset points", xytext=(0, 26 if up else -34),
+                     ha="center", fontsize=9.5, weight="bold", color=col,
+                     arrowprops=dict(arrowstyle="-", color=col, lw=0.8))
+
+    sig = " · ".join(f"{k}={v:.2f}" for k, v in dry.signals.items())
+    spr = f"spring={'oui' if dry.spring else 'non'}+test={'oui' if dry.spring_test else 'non'}"
+    axp.set_title(f"{symbol} — SUPPLY DRY-UP ({dry.bias})  |  score {dry.score:.2f} · {dry.n_tests} tests · {spr}"
+                  f"  |  {analysis_tf} ({tz_label})\n{sig}", fontsize=10.5, weight="bold")
+    axp.set_ylabel("Prix"); axp.grid(True, alpha=0.2)
+    plo, phi = float(sub["low"].min()), float(sub["high"].max())
+    axp.set_ylim(plo - (phi - plo) * 0.26, phi + (phi - plo) * 0.20)
+
+    # Volume + étiquettes nom · ×vol · ΔOI
+    bc = ["#ef5350" if c < o else "#26a69a" for o, c in zip(sub["open"], sub["close"])]
+    axv.bar(x, sub["volume"].values, width=width, color=bc, alpha=0.6)
+    axv.plot(x, sub["vol_ma"].values, color="#555", lw=0.8, label="vol MA")
+    vol_arr = sub["volume"].values
+    for e in dry.events:
+        xe, _ = locate(e)
+        col = _EVENT_COLOR.get(e.name, "#555")
+        i = int((abs(x - xe)).argmin())
+        oi_txt = "" if pd.isna(e.oi_chg) else f"\nΔOI {e.oi_chg:+.1f}%"
+        axv.annotate(f"{e.name}\n×{e.vol_ratio:.1f}{oi_txt}", (xe, float(vol_arr[i])),
+                     textcoords="offset points", xytext=(0, 8), ha="center", va="bottom",
+                     fontsize=7, weight="bold", color=col)
+    axv.set_ylim(0, float(sub["volume"].max()) * 1.5)
+    axv.set_ylabel("Volume"); axv.grid(True, alpha=0.2); axv.legend(fontsize=7, loc="upper left")
+
+    if has_oi:
+        xo = mdates.date2num(oi_ohlc.index.to_pydatetime())
+        ow = (xo[1] - xo[0]) * 0.7 if len(xo) > 1 else width
+        for xi, (_, r) in zip(xo, oi_ohlc.iterrows()):
+            c = "#26a69a" if r["close"] >= r["open"] else "#ef5350"
+            axo.vlines(xi, r["low"], r["high"], color=c, lw=0.8, zorder=1)
+            lo, hi = sorted((r["open"], r["close"]))
+            axo.add_patch(plt.Rectangle((xi - ow / 2, lo), ow, max(hi - lo, 1e-9),
+                                        facecolor=c, edgecolor=c, zorder=2))
+        olo, ohi = float(oi_ohlc["low"].min()), float(oi_ohlc["high"].max())
+        axo.set_ylim(olo - (ohi - olo) * 0.12, ohi + (ohi - olo) * 0.12)
+        axo.set_ylabel(f"OI ({unit})"); axo.grid(True, alpha=0.2)
+        axo.annotate("OI en coin (Coinalyze/archive Binance = TradingView) — vert=OI↑ · rouge=OI↓",
+                     (0.5, 0.04), xycoords="axes fraction", ha="center", fontsize=7, color="#666")
 
     panels[-1].xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %Hh"))
     fig.autofmt_xdate(rotation=30)

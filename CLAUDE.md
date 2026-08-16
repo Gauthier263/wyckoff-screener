@@ -24,8 +24,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **signale**. `start`/`end` ciblent l'OI Binance d'un **intervalle historique** (ex. mars)
   via les quotidiens d'archive (téléchargements parallélisés + cache disque immuable) — c'est
   le seul intérêt d'`agg3`, l'archive y reste pleinement utilisée (profondeur).
-  `fetch_open_interest_ohlc()` — **bougies OHLC d'OI**. `fetch_binance_oi_archive()` —
-  OI Binance brut (mode `days` ou `start`/`end`). **Métriques tierces pour départager
+  `fetch_open_interest_ohlc()` — **bougies OHLC d'OI**. `fetch_oi_ohlc_coin()` — bougies OHLC
+  d'OI **en coin (BTC)** (Coinalyze récent = TradingView, repli **archive coin** `sum_open_interest`
+  pour l'historique) : la mesure fidèle pour lire la *direction* des positions. `fetch_binance_oi_archive()` —
+  OI Binance brut (`sum_open_interest_value` USD par défaut, `coin=True` → `sum_open_interest` ; mode
+  `days` ou `start`/`end`). `get_exchange` pointe `ccxt` sur `REQUESTS_CA_BUNDLE`/`SSL_CERT_FILE`
+  (CA d'un proxy d'egress) + `trust_env` — sinon `verify=True` ccxt ignore la CA (échec TLS). **Métriques tierces pour départager
   longs/shorts** (Binance via Coinalyze, `_coinalyze_history`) : `fetch_funding_rate`,
   `fetch_long_short_ratio` ([ratio, pct_long]), `fetch_liquidations` ([long_liq, short_liq]).
   Import ccxt paresseux (tests hors-ligne).
@@ -61,6 +65,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   bon côté de la borne). Événements triés par horodatage avant rendu. `detect_window_structure`
   accepte un `oi` (Open Interest) réaligné sur les barres : confirme l'AR (débouclage → OI
   en repli) et annote `WindowEvent.oi_chg` (ΔOI % sur ~3 barres). `--no-oi` pour désactiver.
+  `detect_supply_dryup` / `SupplyDryup` — détecteur GÉNÉRIQUE d'**assèchement progressif de
+  l'offre** dans une consolidation (sans contexte macro imposé). Coil repéré de façon **endogène**
+  (extension arrière tant que l'amplitude reste bornée en ATR + latéralité dérive/amplitude → un
+  markup antérieur est exclu). Signaux VSA combinés en `score` ∈ [0,1] : s1 volume offensif en
+  déclin, s2 tests réussis (touches groupées du support à volume décroissant), s3 asymétrie
+  up/down (proxy-CVD Σ vol·(2·CLV−1)), s4 contraction ATR, s_spring climax→spring→test du spring
+  (Phase C). Support/résistance = médiane du cluster de pivots ; validité = coil + ≥2 tests +
+  **signal directionnel** (asymétrie ou spring+test) + score ≥ plancher (0.60). Tout en unités
+  ATR/ratio → **identique 15m/1h/4h** (fractal). Réutilise les tags Wyckoff (SC/SPRING/ST).
 - `screener/plot.py` — `plot_window_structure` : rendu PNG d'une structure, **3 panneaux**
   (cours / volume / Open Interest). Bougies **dans la MÊME TF que l'analyse** (H4→bougies H4,
   etc. — pas de TF inférieure). Bornes : **plancher = climax (SC), plafond = AR** (miroir en
@@ -70,8 +83,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   ×vol_ratio). Panneau **OI** : bougies d'OI agrégé (`fetch_open_interest_ohlc`, source
   `agg3`) **à la MÊME TF que le cours** (vert = OI↑, rouge = OI↓), omis si OI indispo. Traits
   verticaux d'événement (teintés) sur les 3 panneaux. Horodatage en CEST.
+  `plot_supply_dryup` : rendu 3 panneaux d'une `SupplyDryup` (support 🟦 / résistance 🟥,
+  marqueurs SC/SPRING/ST + ΔOI, **OI en coin** via `fetch_oi_ohlc_coin` — Coinalyze récent,
+  repli archive coin pour l'historique). Accepte un `df` fourni (pas de re-fetch).
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
+  `--dryup [N]` → run_dryup (assèchement de l'offre : coil + tests + spring, OI coin ; défaut 40),
   `--chart` génère le PNG.
 - `screener/theory_table.py` — `build_theory_html` : mémo « Mémo théorie » (**HTML
   cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
@@ -179,6 +196,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
+python -m screener.cli --timeframe 1h --symbols BTC/USDT --dryup --chart    # assèchement de l'offre + PNG (OI coin)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
