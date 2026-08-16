@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from screener.features import add_features
-from screener.window import detect_micro_backup, detect_window_structure
+from screener.window import detect_supply_dryup, detect_window_structure
 
 
 def _df(rows):
@@ -140,50 +140,94 @@ def test_no_structure_on_flat_drift():
     assert not struct.is_valid
 
 
-def test_micro_backup_after_reclaim():
-    """Après le SOS, série de micro back-ups au contact de l'ex-résistance (creek = high de
-    l'AR ≈ 103) : le prix y revient 3× en tenant au-dessus, à volume ET |ΔOI| en assèchement.
-    Le détecteur compte les tests, déduit le niveau de la structure, et valide la fin de Phase B."""
-    rows = _drift(40, 100.0, seed=1)
-    rows += [[100.0, 100.5, 95.0, 99.5, 3200.0]]           # SC : climax, plancher 95.0
-    rows += [[99.5, 103.0, 99.4, 102.6, 800.0]]            # AR : creek à 103.0 (ex-résistance)
-    rows += _drift(4, 102.0, vol=600.0, seed=2)
-    rows += [[96.6, 97.0, 95.6, 96.4, 500.0]]              # ST : test sec près du plancher
-    rows += _drift(3, 97.5, vol=600.0, seed=3)
-    rows += [[98.0, 104.5, 97.8, 104.2, 2600.0]]           # SOS : JAC franchit la creek (103)
-    # 3 micro back-ups qui reviennent tester 103 par en-dessous et tiennent (close ≥ 103),
-    # volume décroissant (assèchement) :
-    rows += [[103.6, 103.8, 102.85, 103.20, 720.0]]        # test 1
-    rows += [[103.3, 103.5, 102.80, 103.10, 620.0]]        # test 2
-    rows += [[103.2, 103.3, 102.90, 103.05, 540.0]]        # test 3
-    df = _df(rows)
+def _markup(n, start, end, vol, seed):
+    """Tendance haussière franche (sert de contexte AVANT le coil : hors bande → exclue
+    du coil endogène, et fournit l'historique vol_ma/ATR)."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    step = (end - start) / n
+    c = start
+    for _ in range(n):
+        o = c
+        c = c + step + rng.normal(0, 0.3)
+        h = max(o, c) + abs(rng.normal(0, 0.4))
+        l = min(o, c) - abs(rng.normal(0, 0.4))
+        rows.append([o, h, l, c, vol * rng.uniform(0.8, 1.1)])
+    return rows
 
-    struct = detect_window_structure(df, lookback=20)
-    assert struct.bias == "accumulation" and struct.is_valid
 
-    # OI globalement en repli avec |ΔOI| qui se tarit sur les 3 back-ups
-    oi_vals = np.linspace(2000.0, 1080.0, len(df))
-    oi_vals[-6:] = [1100.0, 1090.0, 1082.0, 1076.0, 1072.0, 1070.0]  # Δ3 : 24 → 18 → 12
-    oi = pd.DataFrame({"oi": oi_vals}, index=df.index)
+def _spring_coil(seed_a=21, seed_b=22, seed_c=23, vscale=1.0):
+    """Coil d'accumulation générique APRÈS un markup (sans contexte macro imposé) : tests
+    successifs à volume décroissant qui tiennent, un spring sous ~98 puis son test à volume
+    sec, l'ATR qui se contracte. `vscale` multiplie les volumes (invariance d'échelle)."""
+    v = lambda x: x * vscale
+    rows = _markup(26, 90.0, 100.0, vol=v(1000.0), seed=seed_a)   # markup préalable → hors coil
+    # coil autour de 98..101, oscillations qui se resserrent, volume qui s'assèche
+    rows += [[100.0, 101.4, 98.2, 98.6, v(1500.0)]]         # test 1 (vol élevé, large)
+    rows += _drift(3, 99.6, vol=v(950.0), seed=seed_b)
+    rows += [[99.6, 100.1, 98.3, 98.9, v(850.0)]]           # test 2 (vol moindre)
+    rows += _drift(3, 99.3, vol=v(650.0), seed=seed_c)
+    rows += [[99.0, 99.4, 98.35, 99.0, v(520.0)]]           # test 3 (vol sec, creux tenu)
+    rows += _drift(2, 99.1, vol=v(480.0), seed=seed_a + 1)
+    rows += [[98.6, 98.8, 97.1, 98.7, v(760.0)]]            # SPRING : sous 98 puis clôture rentrée
+    rows += [[98.7, 98.95, 97.6, 98.9, v(400.0)]]           # test du spring : vol sec, creux plus haut
+    rows += _drift(3, 99.3, vol=v(460.0), seed=seed_b + 1)
+    return rows
 
-    mb = detect_micro_backup(df, struct, oi=oi, lookback=30)
-    assert mb.is_valid
-    assert mb.n_tests == 3
-    assert abs(mb.level - 103.0) < 1e-6          # niveau = high de l'AR (creek)
-    assert mb.vol_drying                         # volume décroissant test après test
-    assert mb.oi_drying                          # |ΔOI| décroissant
-    # volume strictement en assèchement + chaque test porte théorie + justification
-    vrs = [e.vol_ratio for e in mb.events]
-    assert vrs == sorted(vrs, reverse=True)
-    for e in mb.events:
-        assert e.name == "MICRO_BACKUP"
+
+def test_supply_dryup_coil_with_spring():
+    """Coil générique d'accumulation avec assèchement de l'offre : le détecteur repère le
+    coil de façon endogène, compte les tests réussis, isole le spring + son test, et sort un
+    score élevé — sans aucun contexte macro (pas de back-up to the creek)."""
+    df = _df(_spring_coil())
+    dry = detect_supply_dryup(df, lookback=40)
+
+    assert dry.coil                              # coil détecté (bande + latéralité)
+    assert dry.is_valid                          # ≥ 2 tests + score ≥ 0.5
+    assert dry.n_tests >= 2
+    assert dry.spring is not None                # Phase C repérée
+    assert dry.spring_test is not None
+    assert dry.support < 99.0 < dry.resistance   # support/résistance encadrent le prix
+    assert dry.score >= 0.5
+    # signaux volume renseignés + événements portent théorie/justification
+    assert set(dry.signals) == {"s1", "s2", "s3", "s4", "s_spring"}
+    assert dry.signals["s_spring"] == 1.0        # spring + test présents
+    for e in dry.events:
         assert e.theory and "vol" in e.why
-        assert e.price >= 103.0                  # clôture tient au-dessus du niveau repris
 
 
-def test_micro_backup_none_on_neutral():
-    """Structure neutre → pas de niveau à surveiller, aucun back-up."""
-    struct = detect_window_structure(_df(_drift(80, 100.0, seed=9)), lookback=30)
-    mb = detect_micro_backup(_df(_drift(80, 100.0, seed=9)), struct)
-    assert not mb.is_valid
-    assert mb.n_tests == 0
+def test_supply_dryup_scale_invariant():
+    """Invariance d'échelle de volume : multiplier tous les volumes ne change pas le verdict
+    (les signaux sont en ratio) — proxy de robustesse 15m/1h/4h."""
+    a = detect_supply_dryup(_df(_spring_coil(vscale=1.0)), lookback=40)
+    b = detect_supply_dryup(_df(_spring_coil(vscale=50.0)), lookback=40)
+    assert a.is_valid and b.is_valid
+    assert abs(a.score - b.score) < 1e-9
+    assert a.n_tests == b.n_tests
+
+
+def test_supply_dryup_bias_specific():
+    """Un coil d'accumulation (offre qui s'assèche, demande dessous) ne doit PAS valider en
+    lecture distribution : le signal directionnel (asymétrie proxy-CVD) coupe le mauvais biais."""
+    df = _df(_spring_coil())
+    assert detect_supply_dryup(df, lookback=40, bias="accumulation").is_valid
+    assert not detect_supply_dryup(df, lookback=40, bias="distribution").is_valid
+
+
+def test_supply_dryup_no_false_positive_on_noise():
+    """Aucun faux positif sur du bruit pur (marche aléatoire) : ni coil actionnable, ni score."""
+    valid = [s for s in range(12)
+             if detect_supply_dryup(_df(_drift(60, 100.0, seed=s)), lookback=40).is_valid]
+    assert valid == [], f"faux positifs sur bruit : seeds {valid}"
+
+
+def test_supply_dryup_none_on_trend():
+    """Pas de coil sur une tendance franche (bande trop haute en ATR) → non valide."""
+    rows = _drift(20, 100.0, seed=9)
+    c = 100.0
+    for k in range(30):                          # markup soutenu, aucune latéralité
+        c += 2.0
+        rows.append([c - 1.5, c + 0.5, c - 2.0, c, 1000.0])
+    dry = detect_supply_dryup(_df(rows), lookback=40)
+    assert not dry.coil
+    assert not dry.is_valid

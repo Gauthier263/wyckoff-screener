@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from .events import Thresholds
+from .features import swing_points
 
 # --------------------------------------------------------------------------- #
 # Rappels théoriques (par schéma + événement)
@@ -53,12 +54,6 @@ _THEORY_DESC: dict[tuple[str, str], str] = {
         "plafond puis rejet : piège les acheteurs avant le markdown. Phase C.",
     ("distribution", "LPSY"): "Last Point of Supply — pullback après le SOW : sommet plus "
         "bas sur volume sec, dernier rebond avant la baisse.",
-    ("accumulation", "MICRO_BACKUP"): "Micro back-up — au contact de l'ex-résistance reprise "
-        "(devenue support), série de retests serrés à volume/OI en assèchement : la Phase B "
-        "s'achève, l'offre ne réagit plus. Timing d'entrée fin avant le markup.",
-    ("distribution", "MICRO_BACKUP"): "Micro back-up — au contact de l'ex-support cassé "
-        "(devenu résistance), série de retests serrés à volume/OI en assèchement : la Phase B "
-        "s'achève, la demande ne réagit plus. Timing fin avant le markdown.",
 }
 
 
@@ -85,10 +80,6 @@ def _theory(bias: str, name: str, th: Thresholds) -> str:
         rep = (f"Repère : réaction à volume SEC (≤ ×{th.test_vol}) ; "
                f"{'creux plus HAUT tenant le support' if acc else 'sommet plus BAS tenant la résistance'} "
                f"(le bon côté de la borne cassée).")
-    elif name == "MICRO_BACKUP":
-        rep = (f"Repère : retests SERRÉS au CONTACT du niveau repris (≤ 1 ATR) à volume SEC "
-               f"(≤ ×{th.test_vol}) tenant du bon côté, avec vol× ET |ΔOI| en DÉCROISSANCE test "
-               f"après test (l'activité se tarit = fin de Phase B). ≥ 2 tests pour valider.")
     else:  # SOS / SOW
         rep = (f"Repère : volume SOUTENU (≥ ×{th.sos_vol}) + spread LARGE (≥ {th.wide_spread_atr} ATR) "
                f"+ clôture {close_dir} (clv {'≥ 0.6' if acc else '≤ 0.4'}) confirmant la direction.")
@@ -162,11 +153,6 @@ def _why(name: str, acc: bool, vr: float, sa: float, clv: float, th: Thresholds)
         cote = "creux plus haut tenant le support" if acc else "sommet plus bas tenant la résistance"
         return (f"vol ×{vr:.2f} (sec) + {cote} → dernier point d'appui avant la "
                 f"{'hausse (markup)' if acc else 'baisse (markdown)'}.")
-    if name == "MICRO_BACKUP":
-        cote = "ex-résistance reprise (support)" if acc else "ex-support cassé (résistance)"
-        tari = "l'offre" if acc else "la demande"
-        return (f"vol ×{vr:.2f} (sec, ≤ test {th.test_vol}) + clôture tenant le {cote} → "
-                f"retest sans réaction adverse : {tari} s'est tarie, le niveau ne repousse plus le prix.")
     return ""
 
 
@@ -181,7 +167,7 @@ def _mk(df, i, name, bias, th) -> WindowEvent:
         s = np.clip(0.3 + 0.2 * (vr - th.climax_vol) + 0.3 * (clv if acc else 1 - clv), 0, 1)
     elif name in ("SOS", "SOW"):
         s = np.clip(0.4 + 0.1 * (vr - th.sos_vol) + 0.3 * (clv if acc else 1 - clv), 0, 1)
-    elif name in ("ST", "LPS", "LPSY", "MICRO_BACKUP"):
+    elif name in ("ST", "LPS", "LPSY"):
         s = np.clip(0.5 * (1 - vr), 0, 1)
     elif name in ("SPRING", "UTAD"):
         s = np.clip(0.35 + 0.4 * (clv if acc else 1 - clv), 0, 1)
@@ -363,118 +349,260 @@ def detect_window_structure(
 
 
 # --------------------------------------------------------------------------- #
-# Micro back-up : timing de fin de Phase B au contact d'une ex-résistance reprise
+# Assèchement de l'offre : consolidation qui coile avant un potentiel markup
 # --------------------------------------------------------------------------- #
-@dataclass
-class MicroBackup:
-    """Série de back-ups serrés au contact d'un niveau repris.
+def _slope(y) -> float:
+    """Pente d'une régression linéaire (robuste au bruit vs comparaison barre-à-barre)."""
+    y = np.asarray(y, dtype=float)
+    y = y[~np.isnan(y)]
+    if len(y) < 3:
+        return 0.0
+    x = np.arange(len(y), dtype=float)
+    return float(np.polyfit(x, y, 1)[0])
 
-    En accumulation : l'ex-résistance (borne haute de la plage) reprise devient support,
-    re-testée par en-dessous ; en distribution : l'ex-support (borne basse) cassé devient
-    résistance, re-testé par au-dessus. Matérialise la **fin de Phase B** : le prix revient
-    tester le niveau, le volume ET l'|ΔOI| s'assèchent test après test → readiness Phase C/D
-    (markup / markdown). Le niveau est déduit AUTOMATIQUEMENT de la `WindowStructure`.
+
+@dataclass
+class SupplyDryup:
+    """Consolidation avec **assèchement progressif de l'offre** (miroir : de la demande).
+
+    Détecteur GÉNÉRIQUE, sans contexte macro imposé : le coil est repéré de façon endogène
+    (bande de prix + contraction de l'ATR), n'importe où — après un markup, en milieu de
+    plage, etc. On y mesure un faisceau de signaux VSA (volume d'abord) qui, ensemble, disent
+    que la pression vendeuse se tarit avant une reprise :
+
+      s1  volume des barres OFFENSIVES (baissières en accu) en déclin
+      s2  tests réussis (retours au support à volume décroissant, creux non-descendant)
+      s3  asymétrie up/down (proxy-CVD : Σ vol·(2·CLV−1) qui monte = demande sous la surface)
+      s4  contraction du coil (ATR de la 2ᵉ moitié < 1ʳᵉ moitié = ressort qui se comprime)
+      s_spring  climax → spring → test du spring (Phase C, plus haut signal d'épuisement)
+
+    `score` ∈ [0,1] pondère ces signaux (poids VSA : volume primaire). Tout est en unités
+    ATR / ratio de volume → **identique en 15m, 1h, 4h** (Wyckoff fractal). Les événements
+    internes réutilisent les tags Wyckoff (SC / SPRING / ST) avec leur théorie/justification.
     """
     bias: str
-    level: float
+    support: float
+    resistance: float
+    height_atr: float = np.nan
+    coil: bool = False
     n_tests: int = 0
-    events: list[WindowEvent] = field(default_factory=list)
-    vol_drying: bool = False
-    oi_drying: bool = False
+    tests: list[WindowEvent] = field(default_factory=list)
+    climax: WindowEvent | None = None
+    spring: WindowEvent | None = None
+    spring_test: WindowEvent | None = None
+    signals: dict[str, float] = field(default_factory=dict)
+    score: float = 0.0
+    score_min: float = 0.60
+
+    @property
+    def events(self) -> list[WindowEvent]:
+        evs = list(self.tests)
+        for e in (self.climax, self.spring, self.spring_test):
+            if e is not None:
+                evs.append(e)
+        evs.sort(key=lambda e: e.ts)
+        return evs
+
+    @property
+    def directional(self) -> bool:
+        # un assèchement n'est actionnable qu'avec le côté opposé PRÉSENT : demande sous la
+        # surface (asymétrie proxy-CVD) OU shakeout de Phase C confirmé (spring + son test).
+        return self.signals.get("s3", 0.0) >= 0.3 or (self.spring is not None and self.spring_test is not None)
 
     @property
     def is_valid(self) -> bool:
-        # exploitable = au moins 2 tests qui tiennent, à volume en assèchement
-        return self.n_tests >= 2 and self.vol_drying
+        # exploitable = vrai coil + ≥ 2 tests réussis + signal directionnel + score ≥ plancher
+        return self.coil and self.n_tests >= 2 and self.directional and self.score >= self.score_min
 
 
-def detect_micro_backup(
-    df: pd.DataFrame, structure: WindowStructure, th: Thresholds | None = None,
-    oi=None, lookback: int = 30,
-) -> MicroBackup:
-    """Détecte une séquence de micro back-ups au contact du niveau repris de `structure`.
+# Poids des signaux dans le score composite (hiérarchie VSA : volume primaire).
+_DRYUP_WEIGHTS = {"s1": 0.25, "s2": 0.25, "s3": 0.20, "s4": 0.15, "s_spring": 0.15}
 
-    Le niveau (ex-résistance/ex-support) est déduit AUTOMATIQUEMENT de la structure : borne
-    haute en accumulation (reprise → testée par en-dessous), borne basse en distribution
-    (cassée → testée par au-dessus). On ne scanne qu'APRÈS le signe directionnel (SOS/SOW)
-    s'il existe — c'est là que le back-up a un sens (Phase D) — sinon sur toute la fenêtre.
-    Un test valide : le prix revient AU CONTACT du niveau (≤ 1 ATR) sans le casser franchement
-    et CLÔTURE du bon côté (niveau tenu), à volume sec. L'assèchement est mesuré comme la
-    DÉCROISSANCE de vol_ratio et de |ΔOI| test après test (l'activité se tarit = Phase B révolue).
+
+def detect_supply_dryup(
+    df: pd.DataFrame, th: Thresholds | None = None, oi=None, lookback: int = 40,
+    bias: str = "accumulation", max_coil_atr: float = 10.0, score_min: float = 0.60,
+) -> SupplyDryup:
+    """Cherche, sur la fenêtre récente, une consolidation où l'offre s'assèche (accu) ou la
+    demande s'assèche (dist). Aucun niveau à fournir : le coil et son support/résistance sont
+    déduits des barres. `df` doit porter les features (add_features). `oi` optionnel n'annote
+    que ΔOI par événement (la lecture OI/tierces sera une couche ultérieure).
     """
     th = th or Thresholds()
-    if structure.bias not in ("accumulation", "distribution"):
-        return MicroBackup(structure.bias, np.nan)
-    acc = structure.bias == "accumulation"
-    # Niveau = la BORNE de la plage reprise/cassée, i.e. l'extrême de l'AR (la « creek » en
-    # accu / l'« ice » en dist) — pas le sommet du signe (SOS/SOW) qui, lui, la franchit.
-    # Repli sur la borne de la structure si l'AR n'a pas été isolé.
-    ar = next((e for e in structure.events if e.name == "AR"), None)
-    if ar is not None:
-        level = ar.bar_high if acc else ar.bar_low
-    else:
-        level = structure.high if acc else structure.low
-    if np.isnan(level):
-        return MicroBackup(structure.bias, float("nan"))
+    acc = bias == "accumulation"
+    full = df.iloc[-lookback:]
+    nf = len(full)
+    if nf < 12:
+        return SupplyDryup(bias, np.nan, np.nan)
 
-    win = df.iloc[-lookback:]
+    # --- Coil ENDOGÈNE : on part de la dernière barre et on étend vers l'arrière tant que
+    # l'amplitude (max_high − min_low) reste bornée en ATR. Un markup/markdown antérieur fait
+    # exploser l'amplitude → il est naturellement exclu, isolant la consolidation récente. --- #
+    atr_seed = float(np.nanmedian(full["atr"].values[-max(5, nf // 4):]))
+    if np.isnan(atr_seed) or atr_seed <= 0:
+        atr_seed = (float(full["high"].max()) - float(full["low"].min())) / max(nf, 1)
+    highs, lows = full["high"].values, full["low"].values
+    closes = full["close"].values
+    c_end = float(closes[-1])
+    mh, ml, start = highs[-1], lows[-1], nf - 1
+    for i in range(nf - 2, -1, -1):
+        nh, nl = max(mh, highs[i]), min(ml, lows[i])
+        rng = nh - nl
+        # (a) amplitude bornée en ATR ; (b) LATÉRALITÉ : le prix ne progresse pas net —
+        # une dérive (|close_i − close_fin|) qui dépasse ~0.6× l'amplitude trahit une
+        # tendance (markup/markdown antérieur) → on coupe la consolidation là.
+        if rng > max_coil_atr * atr_seed:
+            break
+        if rng >= 1.5 * atr_seed and abs(c_end - float(closes[i])) > 0.6 * rng:
+            break
+        mh, ml, start = nh, nl, i
+    win = full.iloc[start:]
     n = len(win)
-    if n < 4:
-        return MicroBackup(structure.bias, float(level))
 
-    # OI réaligné sur l'index des barres (comme detect_window_structure)
+    atr_ref = float(np.nanmedian(win["atr"].values))
+    if np.isnan(atr_ref) or atr_ref <= 0:
+        atr_ref = atr_seed
+    # Support/résistance = MÉDIANE du cluster de pivots (le plancher/plafond réellement testé) —
+    # robuste à un reliquat de markup en tête de fenêtre (ses quelques pivots ne pèsent pas
+    # contre le cluster du coil). Repli sur quantiles si trop peu de pivots.
+    sw = swing_points(win, left=2, right=2)
+    lo_piv = win["low"].values[sw["swing_low"].values]
+    hi_piv = win["high"].values[sw["swing_high"].values]
+    support = float(np.median(lo_piv)) if len(lo_piv) >= 2 else float(win["low"].quantile(0.15))
+    resistance = float(np.median(hi_piv)) if len(hi_piv) >= 2 else float(win["high"].quantile(0.85))
+    height_atr = (resistance - support) / atr_ref if atr_ref else np.inf
+    tol_lvl = 1.0 * atr_ref              # « au contact » du support/résistance : ≤ 1 ATR
+    inband = float(((win["close"] >= support - atr_ref) & (win["close"] <= resistance + atr_ref)).mean())
+    coil = n >= 8 and 0 < height_atr <= max_coil_atr and inband >= 0.60
+    res = SupplyDryup(bias, support, resistance, height_atr=height_atr, coil=coil, score_min=score_min)
+    if not coil:
+        return res
+
     oi_aligned = None
     if oi is not None and len(oi):
         s = oi["oi"] if isinstance(oi, pd.DataFrame) else oi
         oi_aligned = s.reindex(df.index, method="nearest")
 
-    # Départ du scan : juste après le signe directionnel (SOS/SOW) de la structure — le
-    # back-up (Phase D) ne se lit qu'une fois le niveau franchi. Sans signe, toute la fenêtre.
-    want = "SOS" if acc else "SOW"
-    sign_ts = None
-    for e in structure.events:
-        if e.name == want:
-            sign_ts = e.ts
-    start = 0
-    if sign_ts is not None:
-        try:
-            gi = df.index.get_loc(sign_ts)
-            start = min(n, max(0, gi - (len(df) - n) + 1))  # position locale dans win
-        except KeyError:
-            start = 0
+    base = len(df) - nf + start          # offset global du 1er bar du coil
 
-    atr_ref = float(np.nanmedian(win["atr"].values))
-    if np.isnan(atr_ref) or atr_ref <= 0:
-        atr_ref = (float(win["high"].max()) - float(win["low"].min())) / max(n, 1)
-    tol = atr_ref          # contact = mèche à moins d'1 ATR du niveau
-    break_tol = 0.5 * atr_ref  # au-delà, ce n'est plus un back-up mais une cassure/spring
+    def g(pos: int) -> int:              # position locale (coil) -> index global (df)
+        return base + pos
+
+    def annotate(ev: WindowEvent) -> WindowEvent:
+        if oi_aligned is not None:
+            ev.oi_chg = _oi_pct(oi_aligned, df.index.get_loc(ev.ts), 3)
+        return ev
+
+    clv = win["clv"].values
+    vr = np.where(np.isnan(win["vol_ratio"].values), 1.0, win["vol_ratio"].values)
+    # côté « offensif » à assécher : offre = barres à clôture basse (accu), demande = hautes (dist)
+    offensive = (clv < 0.5) if acc else (clv >= 0.5)
+
+    # --- s1 : volume offensif en déclin (l'offre/demande qui « parle » s'affaiblit) ---- #
+    off_vr = vr[offensive]
+    s1 = 0.0
+    if len(off_vr) >= 4:
+        h = len(off_vr) // 2
+        v0, v1 = float(np.mean(off_vr[:h])), float(np.mean(off_vr[h:]))
+        s1 = float(np.clip((v0 - v1) / max(v0, 1e-9) / 0.5, 0, 1))  # −50 % de volume → 1.0
+
+    # --- s3 : asymétrie up/down (proxy-CVD) : Σ vol·(2·CLV−1) qui monte (accu) --------- #
+    signed = vr * (2.0 * clv - 1.0)
+    cum = np.cumsum(signed)
+    sl = _slope(cum) * (1 if acc else -1)   # accu : cumul haussier ; dist : baissier
+    s3 = float(np.clip(sl / 0.15, 0, 1))
+
+    # --- s4 : contraction du coil (ATR 2ᵉ moitié < 1ʳᵉ moitié = ressort qui se comprime) - #
+    atrv = win["atr"].values
+    h = n // 2
+    a0, a1 = float(np.nanmedian(atrv[:h])), float(np.nanmedian(atrv[h:]))
+    s4 = float(np.clip((a0 - a1) / max(a0, 1e-9) / 0.4, 0, 1))  # −40 % d'ATR → 1.0
+
+    # --- s2 : tests réussis = TOUCHES distinctes de la zone de support/résistance à volume
+    # DÉCROISSANT. On groupe les barres consécutives « au contact » en une touche (représentée
+    # par sa barre extrême), séparée des suivantes par une sortie de zone. Plus robuste que des
+    # pivots fractals dans le bruit. Support-indépendant : c'est la SÉQUENCE d'assèchement qui
+    # compte, pas un seuil absolu (le 1ᵉʳ test peut être volumique ; l'important est qu'il tarisse).
+    # La pénétration profonde (spring) sort de la zone → exclue ici, traitée en Phase C. #
+    break_tol_test = 0.4 * atr_ref
+    highs_w, lows_w = win["high"].values, win["low"].values
+
+    def in_zone(j: int) -> bool:
+        if acc:
+            return support - break_tol_test <= lows_w[j] <= support + tol_lvl
+        return resistance - tol_lvl <= highs_w[j] <= resistance + break_tol_test
+
+    touches: list[int] = []            # index (local) de la barre extrême de chaque touche
+    j = 0
+    while j < n:
+        if not in_zone(j):
+            j += 1
+            continue
+        best = j
+        while j < n and in_zone(j):
+            if (lows_w[j] < lows_w[best]) if acc else (highs_w[j] > highs_w[best]):
+                best = j
+            j += 1
+        touches.append(best)
 
     tests: list[WindowEvent] = []
-    for j in range(start, n):
-        b = win.iloc[j]
-        vr = float(b["vol_ratio"]) if not np.isnan(b["vol_ratio"]) else 1.0
-        if acc:
-            touch = float(b["low"]) <= level + tol
-            no_break = float(b["low"]) >= level - break_tol
-            holds = float(b["close"]) >= level
-        else:
-            touch = float(b["high"]) >= level - tol
-            no_break = float(b["high"]) <= level + break_tol
-            holds = float(b["close"]) <= level
-        if touch and no_break and holds and vr <= th.test_vol * 1.3:
-            gi = len(df) - n + j
-            ev = _mk(df, gi, "MICRO_BACKUP", structure.bias, th)
-            if oi_aligned is not None:
-                ev.oi_chg = _oi_pct(oi_aligned, gi, 3)
-            tests.append(ev)
+    prev_vol, prev_ext = np.inf, None
+    for t in touches:
+        vt = float(vr[t])
+        ext = float(lows_w[t] if acc else highs_w[t])
+        holds = prev_ext is None or (ext >= prev_ext - 0.15 * atr_ref if acc
+                                     else ext <= prev_ext + 0.15 * atr_ref)
+        if vt <= prev_vol * 1.1 and holds:
+            tests.append(annotate(_mk(df, g(t), "ST", bias, th)))
+            prev_vol, prev_ext = vt, ext
+    s2 = float(np.clip(len(tests) / 3.0, 0, 1))
 
-    mb = MicroBackup(structure.bias, float(level), n_tests=len(tests), events=tests)
-    if len(tests) >= 2:
-        vrs = [e.vol_ratio for e in tests]
-        # assèchement volume : globalement décroissant (dernier ≤ premier, monotone à 10 % près)
-        mb.vol_drying = vrs[-1] <= vrs[0] and all(
-            vrs[k + 1] <= vrs[k] * 1.1 for k in range(len(vrs) - 1)
-        )
-        ois = [abs(e.oi_chg) for e in tests if not np.isnan(e.oi_chg)]
-        mb.oi_drying = len(ois) >= 2 and ois[-1] <= ois[0]
-    return mb
+    # --- s_spring : climax (optionnel) → spring → test du spring (Phase C) ------------- #
+    # Spring (accu) : pénétration brève sous le support puis clôture revenue dans la bande.
+    spring = spring_test = climax = None
+    spr_pos, spr_best = None, None
+    for j in range(n):
+        b = win.iloc[j]
+        if acc:
+            pen = support - float(b["low"])
+            recl = float(b["close"]) >= support and float(b["clv"]) >= 0.5
+        else:
+            pen = float(b["high"]) - resistance
+            recl = float(b["close"]) <= resistance and float(b["clv"]) <= 0.5
+        if pen >= th.pen_atr * atr_ref and recl and (spr_best is None or pen > spr_best):
+            spr_best, spr_pos = pen, j
+    if spr_pos is not None:
+        spring = annotate(_mk(df, g(spr_pos), "SPRING" if acc else "UTAD", bias, th))
+        spr_ext = float(win.iloc[spr_pos]["low"] if acc else win.iloc[spr_pos]["high"])
+        # test du spring : après le spring, retour au support à volume SEC, extrême non dépassé
+        best_v = None
+        for j in range(spr_pos + 1, n):
+            b = win.iloc[j]
+            vj = float(vr[j])
+            if acc:
+                near = float(b["low"]) <= support + tol_lvl and float(b["low"]) >= spr_ext - 0.1 * atr_ref
+                holds = float(b["close"]) >= support
+            else:
+                near = float(b["high"]) >= resistance - tol_lvl and float(b["high"]) <= spr_ext + 0.1 * atr_ref
+                holds = float(b["close"]) <= resistance
+            if near and holds and vj <= th.test_vol and (best_v is None or vj < best_v):
+                best_v, spring_test = vj, annotate(_mk(df, g(j), "ST", bias, th))
+    # Climax optionnel : barre large + volume climactique faisant l'extrême, en début de coil.
+    head = win.iloc[: max(3, n // 2)]
+    cpos = int(head["low"].values.argmin() if acc else head["high"].values.argmax())
+    cbar = win.iloc[cpos]
+    cvr = float(vr[cpos])
+    csa = float(cbar["spread_atr"]) if not np.isnan(cbar["spread_atr"]) else 1.0
+    if cvr >= th.climax_vol and csa >= th.wide_spread_atr:
+        climax = annotate(_mk(df, g(cpos), "SC" if acc else "BC", bias, th))
+    s_spring = 0.5 * (spring is not None) + 0.5 * (spring_test is not None)
+
+    signals = {"s1": s1, "s2": s2, "s3": s3, "s4": s4, "s_spring": s_spring}
+    score = float(sum(_DRYUP_WEIGHTS[k] * v for k, v in signals.items()))
+
+    res.n_tests = len(tests)
+    res.tests = tests
+    res.climax, res.spring, res.spring_test = climax, spring, spring_test
+    res.signals = signals
+    res.score = score
+    return res
