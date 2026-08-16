@@ -153,13 +153,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   - **Fenêtre : minimum 80 bougies** (du contexte autour de la zone analysée), quitte à ne
     commenter qu'une **partie plus récente** du graphe. **TF choisie librement** selon ce qui
     est le plus pertinent pour la lecture.
-  - **Code couleur texte↔graphe** : préfixer les mots-clés du texte inline d'une pastille
-    de couleur assortie à la couleur de l'élément sur le graphe. **Forme = type** : **ronds
-    pour les ÉVÉNEMENTS** (🟢🟠🔵🟣🔴) · **carrés pour les NIVEAUX de prix** (🟩🟧🟦🟪🟥).
-    Palette fixe (couleur = sens) : **vert** demande/force (SC, SOS, OI coin↑) · **rouge**
-    offre/résistance (BC, SOW, distribution) · **orange** piège/faux signal (faux SOS, UTAD,
-    upthrust) · **bleu** bornes de plage / support / repli (LPS) · **violet** spring / pivot /
-    Phase C. Mêmes couleurs sur les marqueurs du graphe.
+  - **JAMAIS de pastilles de couleur ni d'émojis dans le texte des réponses.** Interdiction
+    stricte et permanente : ne préfixer AUCUN mot-clé, événement (SC, AR, ST, SPRING, UTAD,
+    SOS, SOW, LPS, LPSY, BC…) ni niveau de prix par une pastille ronde (🟢🟠🔵🟣🔴) ou carrée
+    (🟩🟧🟦🟪🟥), ni par aucun autre émoji décoratif. Le texte inline reste **entièrement
+    textuel** (gras/italique autorisés pour l'emphase, rien de plus). Cette règle vaut pour
+    **toutes** les réponses de l'environnement, en toute circonstance. Le code couleur ne vit
+    plus **que sur le graphe lui-même** (marqueurs et traits de `plot.py`) : vert = demande/
+    force · rouge = offre/résistance · orange = piège/faux signal · bleu = bornes/support/repli
+    · violet = spring/pivot/Phase C. Aucun report de ces couleurs dans le texte.
   - **Alignement des étiquettes** (bug récurrent des scripts ad hoc) : les bougies sont
     décalées +2h en gardant `tz=UTC` ; les timestamps d'événements doivent l'être *aussi*
     (`pd.Timestamp('HH:MM', tz='UTC')` = heure CEST étiquetée UTC), JAMAIS `+02:00` (que
