@@ -1,0 +1,670 @@
+<title>Timing de la micro-accumulation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f5f7f9; --surface:#ffffff; --surface-2:#eef1f5; --surface-3:#e7ebf1;
+    --ink:#1b2430; --ink-soft:#4b5766; --ink-faint:#7d8898;
+    --border:#dce1e9; --border-strong:#c4cdda;
+    --accent:#2c6e8f; --accent-soft:#e3eef3;
+    --piege:#bd7212; --piege-bg:#f8ecd5;
+    --borne:#2c7bcc; --borne-bg:#e2edfb;
+    --spring:#7a4fca; --spring-bg:#ece4fa;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 8px 26px -14px rgba(20,30,45,.28);
+    --font-display:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --font-body:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e131a; --surface:#151d27; --surface-2:#1b2531; --surface-3:#212d3b;
+      --ink:#e7edf4; --ink-soft:#aab6c6; --ink-faint:#75879b;
+      --border:#27323f; --border-strong:#39485b;
+      --accent:#63b1cf; --accent-soft:#153039;
+      --piege:#e4a23c; --piege-bg:#2b2010;
+      --borne:#5ba7ef; --borne-bg:#0f2338;
+      --spring:#ab8cf1; --spring-bg:#1e1633;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -16px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e131a; --surface:#151d27; --surface-2:#1b2531; --surface-3:#212d3b;
+    --ink:#e7edf4; --ink-soft:#aab6c6; --ink-faint:#75879b;
+    --border:#27323f; --border-strong:#39485b;
+    --accent:#63b1cf; --accent-soft:#153039;
+    --piege:#e4a23c; --piege-bg:#2b2010;
+    --borne:#5ba7ef; --borne-bg:#0f2338;
+    --spring:#ab8cf1; --spring-bg:#1e1633;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -16px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--font-body);font-size:17px;line-height:1.68;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:860px;margin:0 auto;padding:0 22px}
+
+  /* ---- top nav ---- */
+  nav.toc{
+    position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--border);
+  }
+  nav.toc .row{display:flex;gap:4px;overflow-x:auto;padding:9px 22px;max-width:860px;margin:0 auto;
+    scrollbar-width:thin;}
+  nav.toc a{
+    flex:0 0 auto;text-decoration:none;color:var(--ink-soft);font-size:13px;font-weight:600;
+    padding:5px 11px;border-radius:999px;white-space:nowrap;letter-spacing:.01em;
+    border:1px solid transparent;
+  }
+  nav.toc a:hover{color:var(--ink);background:var(--surface-2)}
+  nav.toc a .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:5px}
+  nav.toc a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---- header ---- */
+  header.hero{padding:56px 0 34px}
+  .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font-family:var(--font-display);font-weight:600;font-size:clamp(2.1rem,5.4vw,3.15rem);
+    line-height:1.08;margin:.32em 0 .28em;letter-spacing:-.012em;text-wrap:balance}
+  .lede{font-size:1.12rem;color:var(--ink-soft);max-width:64ch;margin:0}
+  .meta{margin-top:20px;font-size:13.5px;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:6px 16px}
+
+  /* ---- legend ---- */
+  .legend{margin:26px 0 6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px 18px;box-shadow:var(--shadow)}
+  .legend h4{margin:0 0 4px;font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);font-weight:700}
+  .legend .sub{font-size:13px;color:var(--ink-faint);margin:0 0 12px}
+  .legend .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px 18px}
+  .legend .item{display:flex;align-items:baseline;gap:9px;font-size:13.5px;color:var(--ink-soft)}
+  .legend .item b{color:var(--ink);font-weight:600}
+
+  /* pastilles */
+  .dot,.sq{display:inline-block;width:.62em;height:.62em;flex:0 0 auto;position:relative;top:.01em;margin-right:.05em}
+  .dot{border-radius:50%}
+  .sq{border-radius:2px}
+  .c-pie{background:var(--piege)} .c-bor{background:var(--borne)} .c-spr{background:var(--spring)}
+  .kw{font-weight:600;white-space:nowrap}
+  .kw .dot,.kw .sq{margin-right:.35em}
+  .t-pie{color:var(--piege)} .t-bor{color:var(--borne)} .t-spr{color:var(--spring)} .t-acc{color:var(--accent)}
+
+  /* ---- sections ---- */
+  section{padding:30px 0;border-top:1px solid var(--border)}
+  .part-tag{font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--accent);letter-spacing:.04em}
+  h2{font-family:var(--font-display);font-weight:600;font-size:clamp(1.55rem,3.5vw,2.05rem);
+    line-height:1.14;margin:.15em 0 .5em;letter-spacing:-.01em;text-wrap:balance}
+  h3{font-size:1.14rem;font-weight:700;margin:1.9em 0 .5em;letter-spacing:-.005em}
+  h3 .lead{color:var(--accent);font-family:var(--font-mono);font-size:.85em;margin-right:.5em}
+  p{margin:.75em 0}
+  a.src{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+  a.src:hover{border-bottom-color:var(--accent)}
+  strong{font-weight:700;color:var(--ink)}
+  em{font-style:italic}
+  ul,ol{margin:.7em 0;padding-left:1.3em}
+  li{margin:.34em 0}
+  ul.tight li{margin:.18em 0}
+
+  /* callouts */
+  .box{border-radius:13px;padding:15px 17px;margin:18px 0;border:1px solid var(--border);
+    background:var(--surface-2);box-shadow:var(--shadow)}
+  .box .lab{font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:5px}
+  .box.key{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+  .box.key .lab{color:var(--accent)}
+  .box.image{border-left:4px solid var(--borne)}
+  .box.image .lab{color:var(--borne)}
+  .box.warn{border-left:4px solid var(--piege)}
+  .box.warn .lab{color:var(--piege)}
+  .box.mnemo{background:var(--borne-bg);border-color:color-mix(in srgb,var(--borne) 32%,transparent)}
+  .box.mnemo .lab{color:var(--borne)}
+  .box p:first-of-type{margin-top:0}.box p:last-child{margin-bottom:0}
+
+  /* tables */
+  .tbl{overflow-x:auto;margin:18px 0;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface)}
+  caption{caption-side:top;text-align:left;font-size:13px;color:var(--ink-faint);padding:10px 14px 0;font-style:italic}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  thead th{background:var(--surface-2);font-size:12.5px;letter-spacing:.02em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:700;white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.v{font-weight:700}
+
+  /* verdict chips — no red/green */
+  .vd{display:inline-block;font-weight:700;font-size:11.5px;padding:2px 9px;border-radius:6px;white-space:nowrap;
+    letter-spacing:.03em;text-transform:uppercase}
+  .vd-ok{background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+  .vd-no{background:var(--surface-3);color:var(--ink-faint);border:1px solid var(--border-strong)}
+  .vd-mid{background:var(--piege-bg);color:var(--piege);border:1px solid color-mix(in srgb,var(--piege) 32%,transparent)}
+  .em-ok{color:var(--accent);font-weight:700}
+  .em-mut{color:var(--ink-faint);font-weight:700}
+
+  /* ===== bornes diagram ===== */
+  .bornes{margin:22px 0;border:1px solid var(--border);border-radius:16px;overflow:hidden;
+    box-shadow:var(--shadow);background:var(--surface)}
+  .bornes .edge{background:var(--borne-bg);color:var(--borne);font-weight:700;font-size:13.5px;
+    padding:11px 16px;display:flex;align-items:center;gap:9px;letter-spacing:.01em}
+  .bornes .edge.top{border-bottom:2px solid var(--borne)}
+  .bornes .edge.bot{border-top:2px solid var(--borne)}
+  .bornes .edge .sq{width:.7em;height:.7em}
+  .bornes .band{padding:15px 16px;display:grid;gap:10px}
+  .bornes .osc{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--ink-faint);
+    font-size:12.5px;font-style:italic;padding:4px 0;letter-spacing:.03em}
+  .bornes .osc .bar{height:1px;background:var(--border);flex:1}
+  .actor{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14.5px}
+  .actor .who{font-weight:700;min-width:64px}
+  .actor .note{color:var(--ink-faint);font-size:13px;font-style:italic}
+  .chip{font-family:var(--font-mono);font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;letter-spacing:.02em}
+  .chip.open{background:var(--accent);color:#fff}
+  :root[data-theme="dark"] .chip.open{color:#08161c}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip.open{color:#08161c}}
+  .chip.close{background:transparent;color:var(--ink-soft);border:1px solid var(--border-strong)}
+  .chip.oi{background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--border)}
+
+  /* flow (sequence) */
+  .flow{font-family:var(--font-mono);font-size:13.5px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:11px;padding:13px 15px;margin:16px 0;overflow-x:auto;line-height:1.9}
+  .flow .step{white-space:nowrap}
+  .flow .arw{color:var(--ink-faint);margin:0 .3em}
+  .flow b{color:var(--ink)}
+  .flow b.acc{color:var(--accent)}
+
+  /* checklist */
+  ol.check{list-style:none;padding-left:0;counter-reset:ck;display:grid;gap:10px;margin:18px 0}
+  ol.check li{display:grid;grid-template-columns:26px 1fr;gap:0 13px;align-items:start;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;padding:13px 16px;box-shadow:var(--shadow)}
+  ol.check li::before{counter-increment:ck;content:counter(ck);grid-row:1/3;width:26px;height:26px;border-radius:7px;
+    background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px;display:grid;place-items:center;
+    font-variant-numeric:tabular-nums;margin-top:1px}
+  ol.check li .ttl{font-size:15px}
+  ol.check li.go{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+  ol.check li.go::before{background:var(--accent);color:#fff}
+  :root[data-theme="dark"] ol.check li.go::before{color:#08161c}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) ol.check li.go::before{color:#08161c}}
+  .indic{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px}
+  .indic .m{font-family:var(--font-mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:6px;padding:2px 8px;color:var(--ink-soft);white-space:nowrap}
+  .indic .m b{color:var(--ink);font-weight:700}
+
+  code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-2);padding:.12em .4em;border-radius:5px;
+    border:1px solid var(--border)}
+
+  footer{padding:40px 0 64px;color:var(--ink-faint);font-size:13.5px;border-top:1px solid var(--border);margin-top:10px}
+  .oneliner{font-family:var(--font-display);font-size:1.16rem;font-style:italic;color:var(--ink);
+    border-left:3px solid var(--accent);padding:2px 0 2px 16px;margin:16px 0}
+
+  @media (max-width:560px){
+    body{font-size:16px}
+  }
+</style>
+
+<nav class="toc" aria-label="Sommaire">
+  <div class="row">
+    <a href="#p1"><span class="n">01</span>Combien de bougies ?</a>
+    <a href="#p2"><span class="n">02</span>OI : quels shorts ?</a>
+    <a href="#p3"><span class="n">03</span>Paradoxe du volume</a>
+    <a href="#p4"><span class="n">04</span>Test raté : qui achète ?</a>
+    <a href="#p5"><span class="n">05</span>OI ↑ ou ↓ au test ?</a>
+    <a href="#p6"><span class="n">06</span>Vocabulaire</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">Mémo d'étude · Wyckoff crypto</span>
+    <h1>Timing de la micro-accumulation</h1>
+    <p class="lede">Après un back-up to the edge of the creek : quand la Phase B est-elle vraiment révolue, et comment lire l'offre, la demande et l'OI pour ne pas s'engager trop tôt. Tout le fil de la discussion, rien perdu.</p>
+    <div class="meta">
+      <span>Fil rouge → volume, puis OI, puis métriques tierces</span>
+      <span>·</span>
+      <span>5 questions + convention vocabulaire</span>
+    </div>
+
+    <div class="legend">
+      <h4>Grammaire couleur du mémo</h4>
+      <p class="sub"><b>Forme = type</b> : <span class="dot c-bor"></span> rond = <b>événement</b> · <span class="sq c-bor"></span> carré = <b>niveau de prix</b>. <b>Couleur = sens.</b></p>
+      <div class="grid">
+        <div class="item"><span class="dot c-pie"></span><span><b>Orange</b> — piège / faux signal (UTAD, upthrust, faux SOS)</span></div>
+        <div class="item"><span class="dot c-bor"></span><span><b>Bleu</b> — bornes de plage / support / repli (LPS)</span></div>
+        <div class="item"><span class="dot c-spr"></span><span><b>Violet</b> — spring / pivot / Phase C</span></div>
+      </div>
+    </div>
+
+    <div class="box key" style="margin-top:22px">
+      <span class="lab">Le fil rouge, à graver</span>
+      <p><strong>Ni le volume ni l'OI ne se lisent comme des scalaires.</strong> L'<strong>OI</strong> se lit selon le <strong>lieu</strong> (le P&amp;L des positions décide qui a intérêt à clôturer) ; le <strong>volume</strong> se lit selon la <strong>direction de la bougie</strong> (offre vs demande) <em>et</em> le résultat qu'il produit (effort vs résultat). Les cinq réponses ci-dessous ne sont que des applications de ces deux règles.</p>
+    </div>
+  </header>
+</div>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1"><div class="wrap">
+  <span class="part-tag">PARTIE 01</span>
+  <h2>Combien de bougies faut-il attendre avant un markup ?</h2>
+  <p>Le résultat central va à contre-courant de l'intuition : <strong>il n'existe aucun nombre de bougies qui « garantit » un markup.</strong> Aucune école sérieuse n'en donne. Ce que toutes donnent, c'est une <strong>horloge comportementale</strong> (épuisement de l'offre mesuré au volume) et des <strong>quasi-minimums structurels</strong>.</p>
+
+  <h3><span class="lead">1.0</span>L'horloge est comportementale, pas temporelle</h3>
+  <p>Wyckoff ne compte jamais les bougies. Sa loi de <strong>Cause &amp; Effet</strong> dit que le temps / la largeur passés dans la plage ≈ l'énergie stockée, donc l'ampleur du markup à venir. C'est une <strong>proportionnalité</strong>, pas un seuil : <em>grosse cause = gros effet</em>.</p>
+  <div class="box warn">
+    <span class="lab">Conséquence contre-intuitive</span>
+    <p>Une micro-accumulation <strong>trop courte</strong> n'est pas « prête plus vite » — elle plaide <strong>contre</strong> un markup durable. Peu de cause = peu d'effet (rebond faible, ou reprise du markdown). En downtrend, le défaut = <strong>redistribution</strong> : une micro-accu expédiée en 3 bougies est justement le profil d'un <strong>LPSY / faux support</strong> avant continuation baissière.</p>
+  </div>
+  <p>« Combien de bougies <strong>minimum</strong> » est donc la mauvaise variable. La bonne : <strong>l'offre est-elle épuisée ?</strong> — et ça se lit dans l'ordre VSA imposé.</p>
+
+  <h3><span class="lead">1.1</span>L'ordre de lecture : volume → OI → tertiaire</h3>
+  <ol>
+    <li><strong>Volume / spread d'abord</strong> (force primaire) : effort vs résultat au contact du support. Les creux successifs se font-ils à volume <strong>décroissant</strong> (offre qui s'assèche) ou l'offre revient-elle à chaque test (pas prêt) ?</li>
+    <li><strong>OI ensuite</strong> : les replis vers le support <strong>ferment-ils</strong> des positions (débouclage / prise de profit des shorts = absorption réelle) ou en <strong>ouvrent-ils</strong> (offre encore active) ?</li>
+    <li><strong>Tertiaire, seulement si le prix cale</strong> : ratio long/short, funding, liquidations pour trancher un OI ambigu.</li>
+  </ol>
+  <p>Le « minimum » réel = <strong>le nombre de bougies qu'il faut pour que le volume meure sur les tests</strong>. C'est une conséquence observée, pas un compteur prédictible.</p>
+
+  <h3><span class="lead">1.2</span>Le cas concret : micro-SC → AR → spring léger → et après ?</h3>
+  <p>Réponse nette : <strong>non, tu n'es pas mécaniquement en C puis D.</strong> Un ou plusieurs re-tests sont ici le <strong>scénario de base</strong>, pas l'exception. Pense <strong>fractal</strong> : cette micro-accu au BUEC est une structure Wyckoff <strong>complète</strong> en soi (échelle locale).</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Ton événement</th><th>Rôle micro</th><th>Ce qu'il verrouille</th><th>Ce qu'il ne verrouille PAS</th></tr></thead>
+    <tbody>
+      <tr><td class="v">micro-SC</td><td>Phase A — <em>stopping action</em></td><td>La réaction baissière dans le support cale</td><td>Rien sur la reprise haussière</td></tr>
+      <tr><td class="v"><span class="kw t-bor"><span class="dot c-bor"></span>AR</span></td><td>fin Phase A</td><td>Le range micro est né (borne haute = sommet AR)</td><td>—</td></tr>
+      <tr><td class="v"><span class="kw t-spr"><span class="dot c-spr"></span>Spring léger</span></td><td>Phase C — <em>tentative</em></td><td>Un test sous le low a rejeté…</td><td><strong>la validation de C</strong> : un spring <strong>doit être testé</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>Le point critique : <strong>un spring n'est confirmé que par son test</strong> (secondary test). Un spring <em>léger</em> = flush peu profond = <strong>offre pas totalement purgée</strong> → elle réapparaît typiquement sur le rebond suivant, qui butera sur la résistance → nouveau repli → nouveau test. <strong>C'est mécaniquement pourquoi ton « deuxième test de la résistance » est le cas normal après un spring léger.</strong></p>
+
+  <h3><span class="lead">1.3</span>La séquence qui te fait vraiment passer B → C → D</h3>
+  <ol>
+    <li><span class="kw t-spr"><span class="dot c-spr"></span>Test du spring</span> — repli sur la zone du spring, <strong>volume nettement plus faible que le climax</strong> (~30-50 %), <strong>low plus haut</strong> que le spring. S'il tient → <strong>Phase C validée</strong>. S'il casse à volume revenu → <strong>retour en Phase B</strong>, pas prêt.</li>
+    <li><strong>SOS / jump</strong> — poussée qui <strong>casse le haut du micro-range (sommet AR)</strong> avec <strong>spread large + volume en expansion</strong> (≥ ~1,5× moyenne). Sans ça, une cassure de la résistance n'est qu'une <span class="kw t-pie"><span class="dot c-pie"></span>tentative</span> (upthrust possible), pas un SOS.</li>
+    <li><span class="kw t-bor"><span class="dot c-bor"></span>LPS</span> — repli qui fait un <strong>higher low au-dessus de l'ancienne résistance</strong>, sur <strong>volume sec</strong>. C'est <strong>le</strong> feu vert Phase D → markup (E).</li>
+  </ol>
+  <p>Tant que tu n'as pas #2 + #3, chaque retour à la résistance peut être un rejet (offre encore là) et non le départ. <strong>Distinguer le vrai SOS d'un énième rejet = volume + spread + follow-through + tenue du LPS.</strong></p>
+
+  <h3><span class="lead">1.4</span>Les quasi-minimums des autres écoles</h3>
+  <p>Toutes décrivent le <strong>même phénomène</strong> (offre qui s'épuise avant expansion) et convergent sur un « minimum » toujours <strong>structurel / volumétrique</strong>, jamais un simple compte.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>École</th><th>« Minimum » proposé</th><th>Signal de fin</th><th>Traduction pour ton BUEC</th></tr></thead>
+    <tbody>
+      <tr><td class="v">Wyckoff — Cause &amp; Effet</td><td>Largeur du range ∝ ampleur du markup</td><td>Proportionnalité (P&amp;F count)</td><td>Micro-accu trop étroite ⇒ markup faible/avorté. Durée = <em>proxy d'énergie</em>.</td></tr>
+      <tr><td class="v">Wyckoff — spring/test</td><td>Le spring <strong>exige</strong> ≥ 1 test valide</td><td>Test à volume &lt; climax, higher low</td><td>Ton spring léger n'est pas fini tant qu'il n'est pas testé.</td></tr>
+      <tr><td class="v">O'Neil — handle (cup&amp;handle)</td><td>Handle <strong>≥ ~5 barres</strong> (idéal 3-4 sem.), dérive à volume sec ; cup 7→65 sem.</td><td>Volume mort au bas de la base</td><td>Le BUEC/LPS = l'analogue exact du handle : &lt; ~5 barres = trop serré, sujet au shakeout.</td></tr>
+      <tr><td class="v">Minervini — VCP</td><td><strong>2 à 6 contractions</strong> de plus en plus serrées (ex. 18→12→6 %), volume déclinant</td><td>Dernière contraction la plus étroite, <strong>volume mort</strong>, puis breakout à volume +40-50 %</td><td>« Combien de bougies » → « combien de contractions jusqu'à volume mort + range minimal ».</td></tr>
+      <tr><td class="v">Range contraction (Crabel — NR7/inside)</td><td>Grappe de barres à range contracté</td><td>L'expansion suit la <strong>compression</strong>, pas un compteur</td><td>Cherche le <em>coil</em> (bougies de plus en plus petites) au contact du support.</td></tr>
+      <tr><td class="v">Market Profile</td><td>La zone de balance a besoin de <strong>temps</strong> pour bâtir de l'acceptation</td><td>Acceptation vs rejet de la valeur</td><td>Cassure avec peu de temps-dans-la-zone tend à <strong>retomber</strong> (structure pauvre).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box key">
+    <span class="lab">Le dénominateur commun</span>
+    <p>L'expansion (markup) suit <strong>la compression du range + la mort du volume + un test bas-volume qui tient</strong>. Trois écoles, un seul mécanisme. Le temps est un <strong>symptôme</strong> de l'épuisement de l'offre, pas sa cause.</p>
+  </div>
+
+  <h3><span class="lead">1.5</span>La signature de volume en deux temps</h3>
+  <p>Il n'y a pas de plancher absolu de volume ; il y a une <strong>relation en deux temps</strong>, et c'est <em>elle</em> le vrai déclencheur :</p>
+  <ul>
+    <li><strong>Temps 1 — assèchement</strong> : sur les tests successifs du support/spring, le volume doit <strong>décroître</strong> (idéalement chaque test &lt; le précédent, spring/ST ~30-50 % du climax). Offre qui part.</li>
+    <li><strong>Temps 2 — expansion</strong> : sur le SOS, le volume doit <strong>exploser</strong> (≥ ~1,5× moyenne) avec spread large. Demande qui arrive. <strong>Un breakout à volume faible est un piège</strong> (upthrust).</li>
+  </ul>
+  <p>À croiser avec l'<strong>OI en coin</strong> (les tests doivent <strong>fermer</strong> des positions ; le SOS doit s'accompagner d'OI cohérent avec de la vraie demande) et, si le prix cale au contact, avec les <strong>3 tertiaires</strong>.</p>
+
+  <h3><span class="lead">1.6</span>Checklist — « la Phase B est-elle révolue ? »</h3>
+  <p>Coche dans l'ordre — tu ne t'engages en Phase C→D que quand le bas de la liste est vrai. Chaque étape porte ses <strong>indicateurs mesurables</strong> (noms des features/seuils du screener).</p>
+
+  <div class="box">
+    <span class="lab">Indicateurs — rappel des définitions</span>
+    <ul class="tight" style="margin:0">
+      <li><strong>RVol</strong> = <code>vol_ratio</code> = volume de la bougie ÷ moyenne mobile du volume (vol MA). <em>&gt;1 = au-dessus de la normale ; &lt;1 = sous la normale (séchage).</em></li>
+      <li><strong>spread_atr</strong> = (haut − bas) ÷ <strong>ATR</strong> = largeur de la bougie en unités d'ATR. <em>≥1,5 = bougie large ; &lt;1 = bougie étroite.</em></li>
+      <li><strong>CLV</strong> = position de la clôture dans la bougie. <em>Proche du haut = acheteurs tiennent la barre ; proche du bas = vendeurs.</em></li>
+      <li><strong>ATR</strong> = volatilité moyenne. <em>Sa baisse continue = compression (coil).</em></li>
+      <li><strong>vol vs climax</strong> = volume du test ÷ volume du climax. <em>Le tell d'assèchement le plus parlant.</em></li>
+    </ul>
+    <p style="margin-top:10px;font-size:13.5px;color:var(--ink-faint)">Seuils = <code>Thresholds</code> ajustables du screener : <code>climax_vol</code>, <code>test_vol</code>, <code>sos_vol</code>, <code>wide_spread_atr</code>. Les valeurs ci-dessous sont des ordres de grandeur typiques, à caler par l'optimiseur.</p>
+  </div>
+
+  <ol class="check">
+    <li>
+      <span class="ttl"><strong>Climax de la réaction (micro-SC) passé + AR trace la borne haute.</strong></span>
+      <div class="indic">
+        <span class="m">RVol ≥ <b>climax_vol</b> (~2×)</span>
+        <span class="m">spread_atr ≥ <b>wide_spread_atr</b> (~1,5–2×)</span>
+        <span class="m">CLV se <b>redresse</b> (clôture quitte les bas)</span>
+        <span class="m">AR = rebond réflexe, <b>OI en repli</b></span>
+      </div>
+    </li>
+    <li>
+      <span class="ttl"><strong>Tests du support à volume décroissant</strong> (offre qui s'assèche) — souvent 2-3, pas un seul.</span>
+      <div class="indic">
+        <span class="m">chaque test : RVol &lt; <b>précédent</b></span>
+        <span class="m">vol test ≤ <b>30–50 %</b> du climax</span>
+        <span class="m">RVol ≤ <b>test_vol</b> (~≤1×, idéal 0,7×)</span>
+        <span class="m">spread_atr <b>en baisse</b> (spread se resserre)</span>
+      </div>
+    </li>
+    <li>
+      <span class="ttl"><span class="kw t-spr"><span class="dot c-spr"></span>Spring testé</span> : repli à volume &lt; climax, higher low, qui tient.</span>
+      <div class="indic">
+        <span class="m">spring = mèche sous le low, <b>clôture au-dessus</b></span>
+        <span class="m">test : RVol ≤ <b>30–50 %</b> du climax</span>
+        <span class="m"><b>higher low</b> vs spring</span>
+        <span class="m">CLV <b>fort</b> (clôture haute)</span>
+        <span class="m">spread_atr &lt; <b>1</b> (bougie étroite)</span>
+        <span class="m"><b>OI ↓</b> sur le test</span>
+      </div>
+    </li>
+    <li>
+      <span class="ttl"><strong>Range en compression (coil)</strong> au contact — bougies de plus en plus petites, volume mort.</span>
+      <div class="indic">
+        <span class="m"><b>ATR en baisse</b> continue</span>
+        <span class="m">bougies <b>inside / NR7</b></span>
+        <span class="m">RVol <b>mort</b> (≤0,5–0,7×)</span>
+        <span class="m">chaque contraction ≈ <b>½</b> de la précédente (VCP)</span>
+      </div>
+    </li>
+    <li>
+      <span class="ttl"><strong>SOS</strong> : cassure du sommet AR à spread large + volume en expansion (sinon = <span class="kw t-pie">tentative</span>).</span>
+      <div class="indic">
+        <span class="m">RVol ≥ <b>sos_vol</b> (~1,5–2×)</span>
+        <span class="m">spread_atr ≥ <b>wide_spread_atr</b></span>
+        <span class="m">CLV <b>proche du haut</b></span>
+        <span class="m">casse le <b>sommet AR</b></span>
+        <span class="m"><b>OI coin ↑</b> avec prix ↑</span>
+      </div>
+    </li>
+    <li class="go">
+      <span class="ttl"><span class="kw t-bor"><span class="dot c-bor"></span>LPS</span> : higher low au-dessus de l'ex-résistance, volume sec → <em>là</em> tu es en Phase D.</span>
+      <div class="indic">
+        <span class="m">repli à RVol <b>sec</b> (≤0,5–0,7×)</span>
+        <span class="m">vol ≤ <b>40–50 %</b> du SOS/spring</span>
+        <span class="m"><b>higher low</b> &gt; ex-résistance</span>
+        <span class="m">spread_atr <b>faible</b></span>
+        <span class="m"><b>OI ↓</b> sur le repli (repli sec)</span>
+      </div>
+    </li>
+  </ol>
+  <p>Tant que 3-4 ne sont pas cochés, <strong>attends-toi à un/plusieurs re-tests de la résistance</strong> — comportement normal, surtout après un spring <em>léger</em>. Le nombre exact de tests = fonction de l'offre résiduelle, que <strong>seul le volume révèle</strong>, bougie après bougie.</p>
+
+  <div class="box"><span class="lab">Sources</span>
+    <p style="font-size:14px;line-height:1.75">
+      <a class="src" href="https://tradingwyckoff.com/en/test/">Trading Wyckoff — Secondary Test</a> ·
+      <a class="src" href="https://tradingwyckoff.com/en/last-point-of-support/">Trading Wyckoff — LPS</a> ·
+      <a class="src" href="https://tradingwyckoff.com/en/cause-and-effect/">Trading Wyckoff — Cause &amp; Effet</a> ·
+      <a class="src" href="https://chartschool.stockcharts.com/table-of-contents/market-analysis/wyckoff-analysis-articles/the-wyckoff-method-a-tutorial">StockCharts — Wyckoff Method</a> ·
+      <a class="src" href="https://traderlion.com/technical-analysis/volatility-contraction-pattern/">Minervini VCP — TraderLion</a> ·
+      <a class="src" href="https://chartschool.stockcharts.com/table-of-contents/chart-analysis/chart-patterns/cup-with-handle">O'Neil Cup with Handle — StockCharts</a>
+    </p>
+  </div>
+
+  <p class="oneliner">Ne compte pas les bougies — compte les <strong>tests à volume décroissant</strong>. Le markup ne devient probable que quand un test se fait sur volume mort <em>et</em> que le range s'est compressé, puis se confirme après SOS + LPS.</p>
+</div></section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2"><div class="wrap">
+  <span class="part-tag">PARTIE 02</span>
+  <h2>OI : quels shorts se débouclent, et pourquoi en bas plutôt qu'en haut ?</h2>
+
+  <div class="box key">
+    <span class="lab">Le principe qui débloque tout</span>
+    <p>Une variation d'OI ne se lit <strong>jamais</strong> dans l'absolu, parce que <strong>l'incitation d'un trader à clôturer dépend de son P&amp;L</strong>, et son P&amp;L dépend du prix <strong>par rapport à son entrée</strong>. Or dans un range, chaque camp est entré à une borne précise. Donc <strong>le même mouvement d'OI signifie l'inverse en haut et en bas.</strong></p>
+  </div>
+
+  <h3><span class="lead">2.0</span>Le schéma à retenir : qui se trouve à chaque borne</h3>
+  <div class="bornes">
+    <div class="edge top"><span class="sq c-bor"></span> RÉSISTANCE — haut du range</div>
+    <div class="band">
+      <div class="actor">
+        <span class="who">Shorts</span><span class="chip open">OUVRENT ↗</span><span class="chip oi">OI ↑</span>
+        <span class="note">ils vendent le haut (nouvelle offre)</span>
+      </div>
+      <div class="actor">
+        <span class="who">Longs</span><span class="chip close">ENCAISSENT</span><span class="chip oi">OI ↓</span>
+        <span class="note">prise de profit des longs</span>
+      </div>
+    </div>
+    <div class="osc"><span class="bar"></span> ↕ oscillation dans le range <span class="bar"></span></div>
+    <div class="band">
+      <div class="actor">
+        <span class="who">Longs</span><span class="chip open">OUVRENT ↗</span><span class="chip oi">OI ↑</span>
+        <span class="note">ils achètent le bas (nouvelle demande)</span>
+      </div>
+      <div class="actor">
+        <span class="who">Shorts</span><span class="chip close">ENCAISSENT</span><span class="chip oi">OI ↓</span>
+        <span class="note">prise de profit des shorts</span>
+      </div>
+    </div>
+    <div class="edge bot"><span class="sq c-bor"></span> SUPPORT = edge of the creek — bas du range</div>
+  </div>
+
+  <div class="box mnemo">
+    <span class="lab">La règle mnémotechnique</span>
+    <p><strong>On OUVRE une position à la borne qui lui est favorable</strong> (long en bas, short en haut) <strong>et on l'ENCAISSE à la borne opposée.</strong></p>
+    <p style="margin-top:8px">Formule courte : <em>« les longs naissent en bas, les shorts naissent en haut ; chacun encaisse chez l'autre. »</em></p>
+    <p style="margin-top:8px">Conséquence directe pour ton accu : <strong>au SUPPORT, une baisse d'OI = shorts qui encaissent + longs faibles secoués = absorption</strong>. Une hausse d'OI au support = nouveaux shorts qui pressent = offre encore active.</p>
+  </div>
+
+  <p><strong>Pourquoi les shorts prennent leur profit en bas et pas en haut :</strong> un short entré près de la résistance est <strong>en profit maximal quand le prix atteint le support</strong>. Le bas du range, c'est <em>son objectif</em>. Le geste rationnel d'un short en gain = <strong>encaisser = racheter (buy to close)</strong>. Personne n'initie un short <em>neuf</em> en bas (shorter dans le support = mauvais risk/reward) : on ouvre un short <strong>en haut</strong>, on le ferme <strong>en bas</strong>. Symétriquement, un long neuf achète en bas, un long en profit vend en haut.</p>
+
+  <h3><span class="lead">2.1</span>Ce que ça donne à lire, borne par borne</h3>
+  <div class="tbl"><table>
+    <caption>Au support (repli)</caption>
+    <thead><tr><th>L'OI…</th><th>Interprétation</th><th>Verdict accu</th></tr></thead>
+    <tbody>
+      <tr><td class="v">baisse (OI↓)</td><td>shorts en profit qui <strong>rachètent</strong> + longs faibles <strong>flushés</strong> → dé-levier ; si le prix <strong>tient</strong>, un acheteur <strong>absorbe</strong></td><td><span class="vd vd-ok">absorption</span></td></tr>
+      <tr><td class="v">monte (OI↑)</td><td>de <strong>nouveaux shorts</strong> pressent le support (ils <em>ouvrent</em> dans le creux)</td><td><span class="vd vd-no">offre active</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <caption>À la résistance (rebond)</caption>
+    <thead><tr><th>L'OI…</th><th>Interprétation</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td class="v">monte (OI↑)</td><td>nouveaux shorts qui <strong>vendent la résistance</strong> = offre neuve empilée</td><td><span class="vd vd-no">offre active</span></td></tr>
+      <tr><td class="v">baisse (OI↓) + prix qui perce</td><td>shorts qui capitulent + longs qui poussent</td><td><span class="vd vd-ok">vers le SOS</span></td></tr>
+    </tbody>
+  </table></div>
+  <p>Le tell haussier : <strong>OI↓ sur un repli qui tient</strong> = le creux n'attire <strong>aucun vendeur neuf</strong>, il ne fait que <strong>liquider</strong> des positions existantes pendant qu'un gros acheteur éponge. L'offre est <strong>consommée</strong>, pas ajoutée.</p>
+
+  <h3><span class="lead">2.2</span>La nuance à ne pas zapper</h3>
+  <div class="box warn">
+    <span class="lab">Déblaiement ≠ carburant</span>
+    <p>La <strong>prise de profit des shorts n'est pas le carburant</strong> du markup — c'est le <strong>déblaiement</strong>. Elle retire des vendeurs, elle dé-risque, mais un rebond porté <em>uniquement</em> par ce rachat s'essouffle (les shorts finissent d'encaisser, puis plus personne n'achète). Exemple CLAUDE.md : cassure BTC 64 800, OI USD +0,81 % « demande » alors qu'OI <strong>coin</strong> −0,36 % = <strong>prise de profit des shorts</strong>, pas de la vraie demande.</p>
+  </div>
+  <p>Le vrai carburant = <strong>OI coin↑ AVEC prix↑</strong> sur le SOS = <strong>nouveaux longs</strong> qui entrent. Séquence idéale complète :</p>
+  <div class="flow">
+    <span class="step"><b>Repli au support</b> : OI↓ (prise de profit shorts + flush)</span><span class="arw">→</span><span class="step">l'offre part</span><br>
+    <span class="step"><b>Coil / silence</b> : OI plat</span><span class="arw">→</span><span class="step">équilibre, ressort armé</span><br>
+    <span class="step"><b class="acc">SOS / cassure</b> : OI↑ + prix↑ (spread large)</span><span class="arw">→</span><span class="step">demande NEUVE = carburant</span>
+  </div>
+  <p>Et si au support le prix <strong>cale</strong> (OI↑ à prix plat = longs <em>ou</em> shorts qui ouvrent, indécidable), croise tes <strong>3 tertiaires</strong> : ratio long/short (↓ = des shorts entrent), funding, liquidations.</p>
+
+  <p class="oneliner">L'OI n'a aucun sens sans le lieu : en bas, un short encaisse (OI↓ = absorption) ; en haut, un short neuf vend (OI↑ = offre). Même variation, sens opposé.</p>
+</div></section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3"><div class="wrap">
+  <span class="part-tag">PARTIE 03</span>
+  <h2>Le paradoxe du volume</h2>
+  <p>Deux gênes légitimes : <em>« si le volume sèche, la demande sèche aussi ? »</em> et <em>« forte offre + prix qui monte = demande présente, pourquoi ce n'est pas bon ? »</em>. Elles viennent d'une prémisse cachée : traiter le volume comme un <strong>scalaire</strong>. Le déblocage :</p>
+  <div class="box">
+    <span class="lab">« Scalaire » ?</span>
+    <p>Un <strong>scalaire</strong> = un nombre à une seule dimension, une <strong>magnitude nue</strong> (comme une température : juste « combien »). À l'opposé, une grandeur <em>orientée</em> porte en plus une direction. Dire « le volume n'est pas un scalaire » = il ne se résume pas à « beaucoup / peu » : il porte une <strong>direction</strong> (bougie haussière/baissière = demande/offre) et un <strong>lieu</strong> (où dans la structure). Le lire comme une magnitude nue jette l'information qui compte. <span style="color:var(--ink-faint)">(Terme de physique employé ici par métaphore.)</span></p>
+  </div>
+  <div class="box key">
+    <span class="lab">La règle</span>
+    <p><strong>Le volume n'est pas un scalaire, il est <em>signé</em> par la direction de la bougie, et lu selon le <em>lieu</em>.</strong><br>
+    Volume sur une bougie <strong>baissière</strong> = mesure de l'<strong>OFFRE</strong> (qui accepte de vendre quand ça baisse ?).<br>
+    Volume sur une bougie <strong>haussière</strong> = mesure de la <strong>DEMANDE</strong> (qui accepte d'acheter quand ça monte ?).</p>
+  </div>
+  <div class="box image">
+    <span class="lab">Pas une ironie — la direction dit qui est l'AGRESSEUR</span>
+    <p>Ce n'est <strong>pas</strong> « seuls les vendeurs tradent quand ça baisse » (rappel Partie 4 : <strong>tout échange a un acheteur ET un vendeur</strong>). C'est que la <strong>direction de la bougie révèle quel camp était l'agresseur</strong> — celui qui a frappé les ordres passifs et poussé le prix :</p>
+    <ul class="tight" style="margin:.5em 0 0">
+      <li><strong>ça BAISSE</strong> → les <strong>vendeurs sont agressifs</strong> (ils vendent au marché, en frappant les acheteurs passifs). Le volume mesure la force de l'<strong>OFFRE</strong>. Oui, « vendre quand ça baisse » = <strong>vendre dans la faiblesse</strong> : exactement ce que fait l'offre qui capitule.</li>
+      <li><strong>ça MONTE</strong> → les <strong>acheteurs sont agressifs</strong> (ils lèvent les offres, paient plus cher / <em>chasent</em>). Le volume mesure la force de la <strong>DEMANDE</strong>.</li>
+    </ul>
+    <p style="margin-top:.6em">Le camp <strong>passif</strong> (les ordres à cours limité qui se font remplir) est de l'autre côté — souvent <strong>l'absorbeur</strong>. D'où : au <strong>test</strong> (sonde baissière), volume mort = personne ne se presse de vendre = <strong>no supply</strong> ; sur le <strong>SOS</strong> (bougie haussière), gros volume = la demande <strong>chasse</strong>.</p>
+  </div>
+
+  <h3><span class="lead">3a</span>« Le séchage assèche-t-il aussi la demande ? »</h3>
+  <p>Le test (spring/ST) est une <strong>sonde vers le bas</strong>, dans le support. Baisser le prix, c'est <strong>inviter à vendre</strong>. Donc le volume sur cette sonde mesure <strong>l'offre uniquement</strong>.</p>
+  <div class="box image">
+    <span class="lab">Image — la ligne de pêche</span>
+    <p>Tu jettes la ligne (prix qui descend) pour voir s'il reste des poissons (vendeurs). <strong>Aucune touche = volume mort = plus rien à vendre</strong> (<em>no supply</em>). Ça ne dit <strong>rien</strong> sur la présence d'acheteurs : ce n'est pas leur tour. Au contraire, <strong>s'il n'y a plus de vendeurs, il suffit d'un souffle de demande pour faire remonter le prix</strong>. Le test prouve l'absence d'offre ; le <strong>rebond qui suit</strong> prouvera la présence de demande. Deux mesures, deux moments.</p>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Contexte</th><th>Volume mort veut dire…</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>sur une <strong>sonde baissière</strong> (test du support)</td><td><strong>no supply</strong> — plus de vendeurs</td><td><span class="vd vd-ok">favorable</span></td></tr>
+      <tr><td>sur un <strong>rebond</strong> (bougie haussière)</td><td><strong>no demand</strong> — rebond creux, va échouer</td><td><span class="vd vd-no">défavorable</span></td></tr>
+    </tbody>
+  </table></div>
+  <p>C'est <strong>la direction de la bougie qui désambiguïse</strong>. L'intuition « la demande sèche aussi » est juste <em>pendant le coil</em> — mais c'est voulu : le silence, c'est de l'<strong>énergie potentielle</strong> (le ressort armé). On n'achète pas le silence ; on achète le <strong>réveil</strong> de la demande.</p>
+
+  <h3><span class="lead">3b</span>« Forte offre mais le prix monte = demande présente. Pourquoi pas favorable ? »</h3>
+  <p>Ici l'intuition est <strong>partiellement juste</strong> : <strong>oui</strong>, une forte offre <em>absorbée</em> avec le prix qui monte et qui <strong>tient</strong>, c'est précisément un <strong>SOS</strong> = vraie demande qui bat l'offre = <strong>haussier</strong>.</p>
+  <p>Ce qui est défavorable, c'est autre chose : l'offre qui <strong>revient sur les tests baissiers</strong> (sondes vers le bas répétées à gros volume) — ça empêche le séchage. À ne pas confondre avec une <strong>bougie haussière à gros volume</strong>.</p>
+  <p>Le vrai discriminateur = la <strong>loi Effort vs Résultat</strong> : gros volume = gros <strong>effort</strong>. La question n'est jamais « y a-t-il de l'offre ? » mais <strong>« l'effort produit-il le résultat attendu ? »</strong> — le résultat se lit dans le <strong>spread, la clôture (CLV) et le follow-through</strong>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Bougie <strong>haussière</strong> à <strong>fort volume</strong> (effort ↑)</th><th>Résultat</th><th>Lecture</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>spread large, clôture haute, ça suit</td><td>effort = résultat</td><td>demande <strong>bat</strong> l'offre = <strong>SOS / absorption réussie</strong></td><td><span class="vd vd-ok">favorable</span></td></tr>
+      <tr><td>petit spread, clôture faible / mèche haute, ça retombe</td><td>effort ≫ résultat</td><td>l'offre <strong>plafonne</strong> malgré la hausse = <span class="kw t-pie">churn / upthrust</span></td><td><span class="vd vd-no">défavorable</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="box image">
+    <span class="lab">Image — le ballon de plage sous l'eau</span>
+    <p>Pousser un ballon sous l'eau = l'offre qui presse. Si, malgré une poussée énorme (gros volume), le prix <strong>monte franchement et reste haut</strong>, la demande a <strong>vaincu</strong> la pression = le ballon t'a échappé vers le haut = haussier. Mais si, sous cette même poussée énorme, le prix ne monte <strong>qu'à peine puis se fait ré-enfoncer</strong> (clôture faible, rejet), la petite hausse n'est <strong>pas</strong> la demande qui gagne — c'est la <strong>tension avant que l'offre ne le repousse</strong>. Même volume, résultat opposé.</p>
+  </div>
+
+  <h3><span class="lead">↔</span>La synthèse à graver</h3>
+  <p>Pour un markup, il faut <strong>les deux, dans l'ordre</strong>, et ce ne sont pas les mêmes bougies :</p>
+  <div class="flow">
+    <span class="step">1) <b>OFFRE prouvée ABSENTE</b> → sur les sondes <b>BAISSIÈRES</b> : volume mort (no supply)</span><span class="arw">=</span><span class="step">ressort armé (potentiel)</span><br>
+    <span class="step">2) <b class="acc">DEMANDE prouvée PRÉSENTE</b> → sur la <b>CASSURE HAUSSIÈRE</b> : volume en expansion, spread large, clôture forte, ça tient (SOS)</span><span class="arw">=</span><span class="step">libération (cinétique)</span>
+  </div>
+  <ul class="tight">
+    <li>Le <strong>dry-up seul</strong> (étape 1) est <strong>nécessaire mais pas suffisant</strong> — c'est le setup, pas l'entrée. « La demande sèche aussi » est exact à ce stade : elle est <em>dormante</em>, c'est normal.</li>
+    <li>L'<strong>entrée</strong>, c'est quand la demande se <strong>réveille</strong> (expansion de volume à la hausse = étape 2). On achète le <strong>réveil</strong>, jamais le silence.</li>
+  </ul>
+
+  <p class="oneliner">Le volume se lit signé par la direction (offre sur les baisses, demande sur les hausses) et jugé par le résultat qu'il produit (effort vs résultat). Un chiffre de volume nu ne dit rien.</p>
+</div></section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4"><div class="wrap">
+  <span class="part-tag">PARTIE 04</span>
+  <h2>Test raté : qui achète, puisque le prix revient dans le range ?</h2>
+
+  <h3><span class="lead">4.0</span>Le rappel mécanique qui recadre la question</h3>
+  <p><strong>Tout volume a un acheteur ET un vendeur, à parts strictement égales.</strong> Chaque contrat vendu est acheté par quelqu'un. Donc « qui achète pendant le test raté ? » a une réponse triviale : <strong>il y a <em>toujours</em> un acheteur</strong>. Et le fait que le prix soit <strong>revenu dans le range prouve</strong> qu'il y a eu <em>assez</em> d'achat.</p>
+  <div class="box warn">
+    <span class="lab">Le retour dans le range n'est pas une force</span>
+    <p>Le retour dans le range est le <strong>minimum vital</strong> : s'il n'y avait <em>pas</em> eu assez d'acheteurs, le prix aurait <strong>cassé le support = markdown</strong>. Tout test qui échoue revient dans le range <em>par définition</em>. La vraie question n'est pas <em>« y a-t-il eu un acheteur »</em> mais <strong>« quelle est la QUALITÉ de cet acheteur »</strong> — et c'est le <strong>fort volume</strong> qui trahit sa basse qualité.</p>
+  </div>
+
+  <h3><span class="lead">4.1</span>Le casting des acheteurs d'un test raté</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Qui achète</th><th>Nature de l'achat</th><th>Ce que ça devient</th></tr></thead>
+    <tbody>
+      <tr><td class="v">Shorts qui prennent leur profit (buy to close)</td><td>prise de profit, <strong>finie / exhaustible</strong></td><td>s'arrête dès qu'ils ont racheté → plus de bougie de soutien</td></tr>
+      <tr><td class="v">Dip-buyers / longs faibles / retail réactif</td><td>achat réflexe « du support », sous-capitalisé</td><td><strong>l'offre de demain</strong> — ils revendront au prochain repli/rebond</td></tr>
+      <tr><td class="v">Market makers / liquidité passive</td><td>non-directionnel, ils <em>fournissent</em> de la liquidité</td><td>neutre, disparaît</td></tr>
+      <tr><td class="v">L'opérateur composite <em>(peut-être)</em></td><td>absorption</td><td>mais <strong>s'il doit manger <em>autant</em> de volume, l'offre n'est pas finie</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>Ces acheteurs ramènent le prix dans le range, mais ce sont des mains <strong>faibles ou temporaires</strong>. La prise de profit <strong>s'épuise</strong> ; les dip-buyers <strong>deviennent l'offre</strong> qui fera échouer le <em>prochain</em> test. C'est mécaniquement pourquoi <strong>les tests ratés se répètent</strong>.</p>
+  <div class="box image">
+    <span class="lab">Image — la porte à tambour</span>
+    <p>Les sauveurs d'aujourd'hui sont les vendeurs de demain. Un long faible qui achète le support à fort volume est un futur vendeur : au moindre rebond raté ou nouveau creux, il liquide → il <strong>recharge</strong> l'offre au-dessus. Tant que ce carrousel tourne (fort volume à chaque passage), l'offre n'est jamais purgée.</p>
+  </div>
+
+  <h3><span class="lead">4.2</span>Pourquoi le FORT volume est le juge, pas le retour</h3>
+  <div class="flow">
+    <span class="step"><b class="acc">TEST RÉUSSI (no supply)</b> : petit creux, VOLUME MORT, remonte SANS effort → l'offre EST partie</span><br>
+    <span class="step"><b>TEST RATÉ (supply active)</b> : creux profond, GROS VOLUME, ramené de force → l'offre est TOUJOURS là</span>
+  </div>
+  <p>Le fort volume dit : <em>« il a fallu une bagarre énorme pour tenir le niveau »</em>. Un opérateur qui a vraiment fini d'accumuler n'a <strong>pas besoin de se battre</strong> — le prix lève sur volume léger parce qu'il n'y a <strong>plus personne en face</strong>.</p>
+
+  <h3><span class="lead">4.3</span>La nuance : absorption ≠ test raté</h3>
+  <p>Un fort volume au support n'est pas <em>automatiquement</em> baissier. La <strong>même bougie</strong> peut être une <strong>absorption / climax</strong> (haussier) — c'est le <strong>CLV / clôture</strong> + <strong>ce qui SUIT</strong> qui tranchent :</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th><span class="em-mut">Test raté (pas prêt)</span></th><th><span class="em-ok">Absorption / climax (prêt)</span></th></tr></thead>
+    <tbody>
+      <tr><td class="v">Clôture de la bougie</td><td>molle, mèche en haut, revient sans conviction</td><td><strong>forte, longue mèche basse</strong>, clôture haute</td></tr>
+      <tr><td class="v">Ce qui suit</td><td>l'offre <strong>revient</strong> au test suivant (encore gros volume)</td><td>tests suivants à <strong>volume sec</strong> qui <strong>tiennent</strong></td></tr>
+      <tr><td class="v">L'acheteur réel</td><td>prise de profit shorts + mains faibles</td><td><strong>gros opérateur</strong> qui a <em>tout</em> absorbé</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Impossible à trancher sur la seule bougie du test</strong> — il faut la <strong>suite</strong>. Un fort volume n'est validé comme absorption <em>qu'après</em> un test ultérieur à volume mort. Sinon, présomption de <strong>test raté</strong> (mains faibles).</p>
+
+  <h3><span class="lead">4.4</span>Le croisement OI</h3>
+  <ul>
+    <li><strong>OI↓</strong> pendant le test → l'achat = <strong>prise de profit des shorts</strong> (rachat pour clôturer). Finie → soutien qui va s'éteindre. Explique un retour-dans-le-range <em>sans lendemain</em>.</li>
+    <li><strong>OI↑</strong> pendant le test qui revient → <strong>nouveaux longs</strong> qui bottom-fishent. Ce sont les <strong>mains faibles / future offre</strong>. Rebond fragile.</li>
+    <li>Prix qui <strong>cale</strong> (OI↑ à prix plat, indécidable) → <strong>3 tertiaires</strong> : ratio long/short (↓ = shorts qui entrent), funding, liquidations (long_liq = les dip-buyers sortis de force = la porte à tambour confirmée).</li>
+  </ul>
+
+  <p class="oneliner">Sur un test raté, l'acheteur existe toujours (le retour le prouve), mais c'est de la prise de profit des shorts qui s'épuise et des mains faibles qui deviennent l'offre de demain — et c'est le fort volume qui le dénonce, pas le retour lui-même.</p>
+</div></section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5"><div class="wrap">
+  <span class="part-tag">PARTIE 05</span>
+  <h2>Test d'un support en accu : OI croissant ou décroissant ?</h2>
+  <div class="box key">
+    <span class="lab">Réponse directe</span>
+    <p>Sur le <strong>test</strong> d'un support en accu, tu préfères un <strong>OI décroissant</strong>. Mais le <em>pourquoi</em> compte plus que la règle, et la préférence <strong>s'inverse au SOS</strong>.</p>
+  </div>
+
+  <h3><span class="lead">5.1</span>Pourquoi décroissant est le bon tell sur un test</h3>
+  <p>Le test est une <strong>sonde vers le bas</strong>. Un OI qui <strong>baisse</strong> veut dire que le mouvement <strong>ferme des positions</strong> (dé-levier) au lieu d'en <strong>ouvrir</strong> :</p>
+  <ul class="tight">
+    <li>côté vendeurs : des <strong>longs faibles qui capitulent</strong> (le spring fait exactement ce boulot : secouer les mains faibles) ;</li>
+    <li>côté acheteurs : des <strong>shorts qui prennent leur profit</strong> (rachat pour clôturer).</li>
+  </ul>
+  <p>Le point crucial : <strong>aucune offre neuve n'est créée.</strong> Personne n'ouvre de short frais pour presser le support. Le marché <strong>fait le ménage</strong> au lieu d'attirer des vendeurs = signature d'un test <em>propre</em>.</p>
+  <p>À l'inverse, un <strong>OI croissant</strong> sur la sonde baissière = de <strong>nouvelles positions s'ouvrent dans le creux</strong>, en général mauvais : soit de <span class="kw t-pie">nouveaux shorts</span> qui pressent (offre qui grossit), soit des <span class="kw t-bor">longs faibles</span> qui bottom-fishent (la porte à tambour).</p>
+
+  <h3><span class="lead">5.2</span>À croiser toujours avec le volume (le 2×2)</h3>
+  <p>L'OI seul ne suffit pas — <strong>volume d'abord</strong>. Le test idéal = <strong>volume mort + OI↓</strong>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>OI ↓ (dé-levier)</th><th>OI ↑ (nouvelles positions)</th></tr></thead>
+    <tbody>
+      <tr><td class="v">Volume faible</td><td><span class="vd vd-ok">test propre</span><br><span style="font-size:13.5px">no supply + purge → <em>l'idéal</em></span></td><td><span class="vd vd-mid">ambigu</span><br><span style="font-size:13.5px">positionnement furtif → croiser tertiaires</span></td></tr>
+      <tr><td class="v">Volume fort</td><td><span class="vd vd-mid">flush climactique</span><br><span style="font-size:13.5px">capitulation / SC — <em>stopping action</em>, pas le test tranquille → attendre la suite</span></td><td><span class="vd vd-no">pas prêt</span><br><span style="font-size:13.5px">bataille / offre neuve qui presse</span></td></tr>
+    </tbody>
+  </table></div>
+  <p>Le coin <strong>volume sec + OI↓</strong> est ta cible sur un test de Phase C.</p>
+
+  <h3><span class="lead">5.3</span>La nuance honnête, et le renversement au SOS</h3>
+  <p>Un OI <strong>croissant</strong> au support <em>pourrait</em> théoriquement être de l'<strong>accumulation furtive</strong> (smart money qui ouvre discrètement des longs pendant que le prix tient). Mais tu <strong>ne peux pas</strong> le distinguer de nouveaux shorts sur le seul OI → dès que le prix cale, <strong>croise les 3 tertiaires</strong>. En pratique, la vraie accumulation est <em>discrète</em> et ne gonfle pas l'OI sur le test : elle se <strong>révèle plus tard</strong>, sur le markup.</p>
+  <div class="flow">
+    <span class="step">Sur le <b class="acc">TEST</b> (sonde ↓, Phase C) → <b>OI DÉCROISSANT = bon</b> (purge, pas d'offre neuve)</span><br>
+    <span class="step">Sur le <b class="acc">SOS</b> (poussée ↑, Phase D) → <b>OI CROISSANT = bon</b> (longs NEUFS = carburant)</span>
+  </div>
+  <p>Un OI qui <strong>monte</strong> sur le SOS = <strong>demande committée neuve</strong> (le vrai carburant). Un OI qui <strong>baisse</strong> sur le SOS = juste de la <strong>prise de profit des shorts</strong> → rebond creux, sans lendemain.</p>
+
+  <p class="oneliner">Sur le test, tu veux voir l'OI fondre (le marché se dé-lève, l'offre ne se recharge pas) ; sur la cassure, tu veux le voir enfler (des longs neufs prennent le relais). Décroissant au test, croissant au SOS.</p>
+</div></section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6"><div class="wrap">
+  <span class="part-tag">PARTIE 06</span>
+  <h2>Convention de vocabulaire : « prise de profit des shorts »</h2>
+  <p>Inscrite dans <code>CLAUDE.md</code> (section Conventions), appliquée dans tout ce mémo.</p>
+  <div class="box key">
+    <span class="lab">La règle</span>
+    <p>Dire <strong>« prise de profit des shorts »</strong>, jamais <strong>« short covering »</strong>. On préfère l'angle <em>intention / P&amp;L</em> (les shorts en gain au support <strong>encaissent</strong>) au terme mécanique anglais.</p>
+  </div>
+  <p>Les deux décrivent le <strong>même geste</strong> sous deux angles :</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Terme</th><th>Angle</th><th>Ce qu'il dit</th></tr></thead>
+    <tbody>
+      <tr><td class="v">« prise de profit des shorts » <em>(défaut)</em></td><td>intention / P&amp;L</td><td><em>pourquoi</em> : ils sont en gain au support, ils encaissent</td></tr>
+      <tr><td class="v">« rachat pour clôturer (buy to close) → OI↓ »</td><td>mécanique</td><td><em>comment</em> ça se traduit : un achat, donc de l'OI qui baisse — à réserver aux passages qui expliquent l'effet sur l'OI ou le prix</td></tr>
+    </tbody>
+  </table></div>
+  <p>Symétrie côté longs : <strong>« prise de profit des longs »</strong> = vente pour clôturer.</p>
+</div></section>
+
+<div class="wrap">
+  <footer>
+    <p class="oneliner">Le fil rouge des cinq réponses : ni l'OI ni le volume ne se lisent comme des scalaires. L'OI selon le lieu (P&amp;L → qui a intérêt à clôturer) ; le volume selon la direction de la bougie (offre vs demande) et le résultat produit (effort vs résultat).</p>
+    <p>Mémo d'étude — screener Wyckoff crypto. Aide à la décision discrétionnaire, jamais d'exécution automatique.</p>
+  </footer>
+</div>
