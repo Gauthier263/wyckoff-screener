@@ -51,6 +51,7 @@ class Trade:
     exit: float
     r: float             # résultat en multiples de risque
     outcome: str         # "win" | "loss" | "timeout"
+    score: float = float("nan")   # score du setup (dryup) ; NaN pour les événements
 
 
 def _simulate_exit(feat: pd.DataFrame, t: int, direction: str,
@@ -126,6 +127,125 @@ def backtest_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> li
     return backtest_features(symbol, feat, cfg, p, th)
 
 
+def backtest_dryup_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTParams,
+                            th: Thresholds, entry_start: int | None = None,
+                            entry_end: int | None = None, score_min: float = 0.60,
+                            bias: str = "accumulation") -> list[Trade]:
+    """Backtest de l'assèchement de l'offre (long en accumulation / short en distribution).
+
+    À la barre t, on détecte `detect_supply_dryup` sur `feat[:t+1]` (causal, pas de lookahead).
+    Setup valide + score ≥ `score_min` → entrée à la clôture de t. Le stop est **structurel** :
+    juste sous le support / le low du spring (invalidation du coil), avec un tampon `stop_atr`
+    en ATR ; objectif = entrée ± rr × risque. Une position à la fois, sans chevauchement.
+    """
+    from .window import detect_supply_dryup
+    lookback = cfg.get("dryup", 40)
+    warmup = lookback + cfg["vol_ma"] + cfg["atr_period"]
+    n = len(feat)
+    lo = max(warmup, entry_start if entry_start is not None else warmup)
+    hi = entry_end if entry_end is not None else n
+    acc = bias == "accumulation"
+    trades: list[Trade] = []
+
+    t = lo
+    while t < hi:
+        sl = feat.iloc[: t + 1]
+        atr_t = float(feat["atr"].iloc[t])
+        if not atr_t or np.isnan(atr_t):
+            t += 1
+            continue
+        d = detect_supply_dryup(sl, th=th, lookback=lookback, bias=bias)
+        if not d.is_valid or d.score < score_min:
+            t += 1
+            continue
+
+        entry = float(feat["close"].iloc[t])
+        if acc:
+            spring_ext = d.spring.bar_low if d.spring else d.support
+            stop = min(d.support, spring_ext) - p.stop_atr * atr_t
+            direction = "long"
+        else:
+            spring_ext = d.spring.bar_high if d.spring else d.resistance
+            stop = max(d.resistance, spring_ext) + p.stop_atr * atr_t
+            direction = "short"
+        risk = abs(entry - stop)
+        if risk <= 0:
+            t += 1
+            continue
+        target = entry + p.rr * risk if acc else entry - p.rr * risk
+
+        exit_i, exit_px, outcome = _simulate_exit(feat, t, direction, entry, stop, target, p)
+        r = ((exit_px - entry) if acc else (entry - exit_px)) / risk
+        trades.append(Trade(symbol, "DRYUP", direction, t, entry, stop, target,
+                            exit_i, exit_px, float(r), outcome, float(d.score)))
+        t = exit_i + 1 + p.cooldown
+    return trades
+
+
+def backtest_dryup_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams,
+                          score_min: float = 0.60, oos: float = 0.0,
+                          bias: str = "accumulation") -> tuple[list[Trade], list[Trade]]:
+    """Renvoie (trades_IS, trades_OOS). `oos`=0 → tout dans IS. Split temporel par symbole :
+    IS = barres d'entrée [warmup, split), OOS = [split, n) avec split=(1−oos)·n."""
+    feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
+    th = Thresholds(**cfg.get("thresholds", {}))
+    n = len(feat)
+    if oos <= 0:
+        return backtest_dryup_features(symbol, feat, cfg, p, th, score_min=score_min, bias=bias), []
+    split = int((1 - oos) * n)
+    is_tr = backtest_dryup_features(symbol, feat, cfg, p, th, entry_end=split,
+                                    score_min=score_min, bias=bias)
+    oos_tr = backtest_dryup_features(symbol, feat, cfg, p, th, entry_start=split,
+                                     score_min=score_min, bias=bias)
+    return is_tr, oos_tr
+
+
+def aggregate_by_score(trades: list[Trade],
+                       buckets=((0.60, 0.70), (0.70, 0.75), (0.75, 1.01))) -> pd.DataFrame:
+    """Ventile les trades par tranche de score (le score est le signal de qualité du dryup)."""
+    if not trades:
+        return pd.DataFrame()
+    df = pd.DataFrame([t.__dict__ for t in trades])
+    rows = []
+    for blo, bhi in buckets:
+        g = df[(df["score"] >= blo) & (df["score"] < bhi)]
+        if not len(g):
+            continue
+        wins, losses = g[g["r"] > 0]["r"], g[g["r"] <= 0]["r"]
+        pf = wins.sum() / abs(losses.sum()) if losses.sum() != 0 else np.inf
+        rows.append({
+            "score": f"[{blo:.2f},{bhi:.2f})", "n": len(g),
+            "win%": round(100 * (g["r"] > 0).mean(), 1),
+            "R_moy": round(g["r"].mean(), 3), "R_total": round(g["r"].sum(), 2),
+            "profit_factor": round(pf, 2) if np.isfinite(pf) else "∞",
+        })
+    return pd.DataFrame(rows)
+
+
+def run_backtest_dryup(cfg: dict, p: BTParams, score_min: float = 0.60,
+                       oos: float = 0.0, bias: str = "accumulation"
+                       ) -> tuple[list[Trade], list[Trade]]:
+    """Backtest dryup sur tout l'univers. Renvoie (trades_IS, trades_OOS)."""
+    from . import data as data_mod
+    ex = data_mod.get_exchange(cfg["exchange"])
+    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    is_all: list[Trade] = []
+    oos_all: list[Trade] = []
+    for sym in universe:
+        try:
+            df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
+            # exclut stables/pegs (ne markupent pas) : volatilité quasi nulle
+            if df["close"].pct_change().abs().median() < 0.003:
+                continue
+            it, ot = backtest_dryup_symbol(sym, df, cfg, p, score_min=score_min, oos=oos, bias=bias)
+            is_all += it
+            oos_all += ot
+        except Exception as e:
+            import sys
+            print(f"  [skip] {sym}: {e}", file=sys.stderr)
+    return is_all, oos_all
+
+
 def aggregate(trades: list[Trade]) -> pd.DataFrame:
     if not trades:
         return pd.DataFrame()
@@ -180,16 +300,42 @@ def main() -> None:
     ap.add_argument("--symbols", nargs="*", default=cfg["symbols"])
     ap.add_argument("--top", type=int, default=cfg["top"])
     ap.add_argument("--limit", type=int, default=cfg["limit"])
-    ap.add_argument("--stop-atr", type=float, default=1.0)
+    ap.add_argument("--stop-atr", type=float, default=1.0,
+                    help="tampon du stop en ATR (dryup : sous le support/spring)")
     ap.add_argument("--rr", type=float, default=2.0)
     ap.add_argument("--max-hold", type=int, default=30)
+    ap.add_argument("--dryup", action="store_true", help="backtest du détecteur d'assèchement de l'offre")
+    ap.add_argument("--score-min", type=float, default=0.60, help="score minimum du setup dryup")
+    ap.add_argument("--dryup-lookback", type=int, default=40)
+    ap.add_argument("--oos", type=float, default=0.0, help="fraction OOS (ex. 0.3) → split IS/OOS temporel")
+    ap.add_argument("--bias", choices=["accumulation", "distribution"], default="accumulation")
     ap.add_argument("--csv", default="backtest_trades.csv")
     ap.add_argument("--no-cache", action="store_true")
     args = ap.parse_args()
 
     cfg.update(timeframe=args.timeframe, symbols=args.symbols, top=args.top,
-               limit=args.limit, use_cache=not args.no_cache)
+               limit=args.limit, use_cache=not args.no_cache, dryup=args.dryup_lookback)
     p = BTParams(stop_atr=args.stop_atr, rr=args.rr, max_hold=args.max_hold)
+
+    if args.dryup:
+        is_tr, oos_tr = run_backtest_dryup(cfg, p, score_min=args.score_min, oos=args.oos, bias=args.bias)
+        hdr = (f"\nBacktest DRYUP {cfg['timeframe']} ({args.bias}) — stop support−{p.stop_atr} ATR, "
+               f"objectif {p.rr}R, hold max {p.max_hold}, score≥{args.score_min}")
+        print(hdr)
+        if args.oos > 0:
+            for lbl, tr in (("IN-SAMPLE", is_tr), (f"OUT-OF-SAMPLE ({args.oos:.0%})", oos_tr)):
+                print(f"\n=== {lbl} — {len(tr)} trades ===")
+                if tr:
+                    print(aggregate(tr).to_string(index=False))
+                    print("par score :"); print(aggregate_by_score(tr).to_string(index=False))
+        else:
+            trades = is_tr
+            print(f"— {len(trades)} trades")
+            if trades:
+                print(aggregate(trades).to_string(index=False))
+                print("\npar tranche de score :"); print(aggregate_by_score(trades).to_string(index=False))
+            pd.DataFrame([t.__dict__ for t in trades]).to_csv(args.csv, index=False)
+        return
 
     stats, trades = run_backtest(cfg, p)
     if stats.empty:

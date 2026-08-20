@@ -46,6 +46,12 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/backtest.py` — walk-forward sans lookahead. `backtest_features` (coeur
   réutilisable, fenêtre [entry_start, entry_end)), `backtest_symbol`, `aggregate`.
   Entrée à la clôture de t sur déclencheur frais (bars_ago==0), stop ATR + objectif R.
+  `backtest_dryup_features` / `backtest_dryup_symbol` / `run_backtest_dryup` — backtest du
+  détecteur d'assèchement (`--dryup`, long en accu) : entrée à la clôture sur setup valide +
+  score ≥ `--score-min`, **stop structurel** sous le support/low du spring (tampon `--stop-atr`
+  en ATR), cible R. `aggregate_by_score` ventile par tranche de score ; `--oos` fait un split
+  IS/OOS temporel. Résultat 4h (top cryptos) : espérance positive IS **et** OOS (PF ~1.4/1.6),
+  le score comme gradient de qualité — sans frais/slippage (TODO).
 - `screener/optimize.py` — grid-search des seuils. `grid_search` (split IS/OOS),
   `metric_value` (robust = espérance − z·erreur-type ; plancher min_trades),
   `overfit_report` (verdict robuste/fragile/surajustement), `walk_forward` (k plis).
@@ -198,6 +204,7 @@ python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --dryup --chart    # assèchement de l'offre + PNG (OI coin)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
+python -m screener.backtest --timeframe 4h --dryup --score-min 0.7 --oos 0.3   # backtest assèchement (IS/OOS)
 pytest -q
 ```
 
