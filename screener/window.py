@@ -418,6 +418,12 @@ class SupplyDryup:
 # Poids des signaux dans le score composite (hiérarchie VSA : volume primaire).
 _DRYUP_WEIGHTS = {"s1": 0.25, "s2": 0.25, "s3": 0.20, "s4": 0.15, "s_spring": 0.15}
 
+# Force de reclaim minimale d'un SPRING : la clôture doit revenir FRANCHEMENT dans la plage
+# (rejet net du bas), pas juste au-dessus du support. Une mèche sous le support qui ne se
+# reclose que mollement (clv ~0.5-0.68) n'est PAS un spring — juste le bas d'un coil serré.
+# Calibré : vrais springs clv 0.9+, faux ~0.68.
+_SPRING_RECLAIM_CLV = 0.70
+
 
 def detect_supply_dryup(
     df: pd.DataFrame, th: Thresholds | None = None, oi=None, lookback: int = 40,
@@ -565,10 +571,10 @@ def detect_supply_dryup(
         b = win.iloc[j]
         if acc:
             pen = support - float(b["low"])
-            recl = float(b["close"]) >= support and float(b["clv"]) >= 0.5
+            recl = float(b["close"]) >= support and float(b["clv"]) >= _SPRING_RECLAIM_CLV
         else:
             pen = float(b["high"]) - resistance
-            recl = float(b["close"]) <= resistance and float(b["clv"]) <= 0.5
+            recl = float(b["close"]) <= resistance and float(b["clv"]) <= 1.0 - _SPRING_RECLAIM_CLV
         if pen >= th.pen_atr * atr_ref and recl and (spr_best is None or pen > spr_best):
             spr_best, spr_pos = pen, j
     if spr_pos is not None:

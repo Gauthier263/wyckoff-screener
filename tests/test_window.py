@@ -206,6 +206,29 @@ def test_supply_dryup_scale_invariant():
     assert a.n_tests == b.n_tests
 
 
+def test_supply_dryup_weak_reclaim_not_spring():
+    """Une mèche sous le support qui ne se reclose que MOLLEMENT (clv < 0.7) n'est PAS un
+    spring — juste le bas d'un coil serré (cf. faux spring BTC 21/08, clv 0.68). Coil
+    DÉTERMINISTE : la seule barre sous le support clôture mollement."""
+    rows = [[90 + k * (9 / 40), 90 + k * (9 / 40) + 0.2, 90 + k * (9 / 40) - 0.2,
+             90 + k * (9 / 40), 1000.0] for k in range(40)]           # markup warmup
+    rows += [
+        [99.5, 100.0, 98.00, 98.40, 1500.0],   # test1 support≈98, clôture molle
+        [98.6, 99.60, 98.50, 99.30, 1200.0],
+        [99.3, 99.80, 98.05, 98.50, 900.0],    # test2
+        [98.6, 99.50, 98.40, 99.20, 700.0],
+        [99.2, 99.60, 98.02, 98.45, 500.0],    # test3
+        [98.5, 99.40, 98.30, 99.10, 480.0],
+        [99.0, 99.30, 97.40, 97.70, 800.0],    # MÈCHE sous support, close MOU (clv≈0.16)
+        [97.9, 99.00, 97.80, 98.90, 460.0],    # récupération au-dessus
+        [98.9, 99.50, 98.60, 99.20, 500.0],
+    ]
+    dry = detect_supply_dryup(_df(rows), lookback=40)
+    assert dry.spring is None                  # reclaim mou → pas de spring
+    # garde-fou : un vrai spring (clv 0.94) reste bien détecté
+    assert detect_supply_dryup(_df(_spring_coil()), lookback=40).spring is not None
+
+
 def test_supply_dryup_bias_specific():
     """Un coil d'accumulation (offre qui s'assèche, demande dessous) ne doit PAS valider en
     lecture distribution : le signal directionnel (asymétrie proxy-CVD) coupe le mauvais biais."""

@@ -228,6 +228,9 @@ pytest -q
 ```
 
 ## TODO candidats
-- Coûts de transaction (frais + slippage) dans le backtest/optimiseur
 - Alertes webhook sur nouveau setup (Telegram/Discord)
 - Filtrage des setups live par la combinaison validée en OOS
+
+## À NE PAS FAIRE (choix explicites de Gauthier)
+- **Frais / slippage** : NE JAMAIS les ajouter au backtest/optimiseur, ni les proposer. Choix
+  ferme et définitif.
