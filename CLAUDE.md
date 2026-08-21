@@ -4,7 +4,10 @@ Screener Wyckoff crypto (accumulation/distribution), H1/H4, via ccxt.
 Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres automatique.
 
 ## Architecture
-- `screener/data.py` — ccxt : `build_universe()` (top paires USDT par volume),
+- `screener/data.py` — ccxt : `build_universe()` (top paires USDT spot par volume),
+  `build_futures_universe()` (perp/swap USDT — **Bitget & venues futures** ; `include_rwa`/
+  `only_rwa` gèrent les RWA actions/métaux/indices via le flag `isRwa`, `min_vol_musd` filtre
+  la liquidité),
   `fetch_ohlcv()` avec cache parquet. `get_exchange("binance")` route les endpoints
   publics vers le miroir `data-api.binance.vision` (spot, non géo-restreint).
   `fetch_open_interest()` — historique d'OI (perp), indexé ts UTC. `source=binance|okx|agg3` :
@@ -95,7 +98,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--dryup [N]` → run_dryup (assèchement de l'offre : coil + tests + spring, OI coin ; défaut 40),
-  `--chart` génère le PNG.
+  `--chart` génère le PNG (`--chart-top N` = graphes des N meilleurs setups, défaut 4).
+  Univers futures : `--futures` (auto si `--exchange bitget`), `--min-vol M` (liquidité 24h),
+  `--no-rwa` / `--only-rwa` (actions/métaux/indices).
 - `screener/theory_table.py` — `build_theory_html` : mémo « Mémo théorie » (**HTML
   cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
   ses seuils de validité (vol×, spread ATR, clôture) **+ le comportement d'OI attendu**.
@@ -162,6 +167,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **liquidations** (`fetch_liquidations` — long_liq vs short_liq ; ≈0 = mouvement ordonné, pas
   de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
   prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
+- **Scans & récap** (préférences Gauthier) : (1) **titrer chaque tableau récapitulatif avec
+  la date et la timeframe** (ex. « Setups dry-up — 20/08, 4h ») ; (2) pour tout scan/analyse,
+  **produire un graphe des 4 meilleurs setups** (par score) — `--chart --chart-top 4`.
 - **Illustration d'une analyse** (préférences Gauthier) :
   - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
     lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement

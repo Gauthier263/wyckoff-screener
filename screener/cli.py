@@ -152,7 +152,18 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
     en unités ATR/ratio (identique 15m/1h/4h). OI lu en **coin**. Une ligne par événement ;
     graphique 3 panneaux optionnel."""
     ex = data_mod.get_exchange(cfg["exchange"])
-    universe = cfg["symbols"] or data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
+    # Univers : futures/swap (Bitget & co) si --futures ou venue ≠ binance, sinon spot.
+    if cfg["symbols"]:
+        universe = cfg["symbols"]
+    elif cfg.get("futures") or cfg["exchange"] != "binance":
+        universe = data_mod.build_futures_universe(
+            ex, quote=cfg["quote"], top_n=cfg["top"],
+            include_rwa=cfg.get("rwa", True), only_rwa=cfg.get("only_rwa", False),
+            min_vol_musd=cfg.get("min_vol", 0.0))
+        print(f"Univers futures {cfg['exchange']} : {len(universe)} perp "
+              f"(RWA={'oui' if cfg.get('rwa', True) else 'non'}, vol≥{cfg.get('min_vol', 0)}M)", file=sys.stderr)
+    else:
+        universe = data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = Thresholds(**cfg.get("thresholds", {}))
     lookback = cfg.get("dryup", 40)
     bias = cfg["bias"] if cfg["bias"] in ("accumulation", "distribution") else "accumulation"
@@ -162,7 +173,8 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
     print(f"→ mémo théorie : {memo}", file=sys.stderr)
 
     rows: list[dict] = []
-    for sym in universe:
+    valid: list[tuple] = []          # (score, sym, dry, df) pour grapher les meilleurs
+    for i, sym in enumerate(universe, 1):
         try:
             df = data_mod.fetch_ohlcv(ex, sym, cfg["timeframe"], cfg["limit"], cfg["use_cache"])
             df = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
@@ -176,22 +188,32 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
             dry = detect_supply_dryup(df, th=th, oi=oi, lookback=lookback, bias=bias)
             if not dry.is_valid:
                 continue
+            valid.append((dry.score, sym, dry, df))
             for e in dry.events:
                 rows.append({
                     "symbol": sym, "bias": dry.bias, "score": round(dry.score, 2),
-                    "support": round(dry.support, 2), "resistance": round(dry.resistance, 2),
+                    "support": round(dry.support, 6), "resistance": round(dry.resistance, 6),
                     "event": e.name, "time": (e.ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh"),
                     "vol_x": round(e.vol_ratio, 2), "spread_atr": round(e.spread_atr, 2),
                     "clv": round(e.clv, 2), "oi_3h_%": "—" if pd.isna(e.oi_chg) else round(e.oi_chg, 2),
                     "volume/spread → thèse": e.why,
                 })
-            if cfg.get("chart"):
-                from .plot import plot_supply_dryup
-                out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_dryup.png"
-                plot_supply_dryup(sym, cfg["timeframe"], dry, out, ex=ex, df=df)
-                print(f"→ graphique : {out}", file=sys.stderr)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
+        if len(universe) > 30 and i % 40 == 0:
+            print(f"  ...{i}/{len(universe)} ({len(valid)} setups)", file=sys.stderr)
+
+    # Graphes des N meilleurs setups (par score), pas de tous.
+    if cfg.get("chart") and valid:
+        from .plot import plot_supply_dryup
+        for score, sym, dry, df in sorted(valid, key=lambda v: v[0], reverse=True)[: cfg.get("chart_top", 4)]:
+            safe = sym.replace("/", "").replace(":", "").lower()
+            out = f"chart_{safe}_{cfg['timeframe']}_dryup.png"
+            try:
+                plot_supply_dryup(sym, cfg["timeframe"], dry, out, ex=ex, df=df)
+                print(f"→ graphique : {out}  (score {score:.2f})", file=sys.stderr)
+            except Exception as e:
+                print(f"  [chart skip] {sym}: {e}", file=sys.stderr)
     return pd.DataFrame(rows)
 
 
@@ -224,6 +246,13 @@ def main() -> None:
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
     p.add_argument("--dryup", nargs="?", type=int, const=40, default=None,
                    help="mode assèchement de l'offre (coil + tests + spring/Phase C, défaut 40 barres)")
+    p.add_argument("--futures", action="store_true",
+                   help="univers perp/swap (auto si --exchange ≠ binance ; inclut les RWA)")
+    p.add_argument("--min-vol", type=float, default=0.0,
+                   help="filtre de liquidité : volume 24h minimum en M USD (futures)")
+    p.add_argument("--no-rwa", action="store_true", help="exclut les RWA (actions/métaux/indices)")
+    p.add_argument("--only-rwa", action="store_true", help="uniquement les RWA (actions/métaux/indices)")
+    p.add_argument("--chart-top", type=int, default=4, help="nb de graphiques (meilleurs setups) en mode --chart")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
@@ -235,7 +264,8 @@ def main() -> None:
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
                use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
-               oi_source=args.oi_source)
+               oi_source=args.oi_source, futures=args.futures, min_vol=args.min_vol,
+               rwa=not args.no_rwa, only_rwa=args.only_rwa, chart_top=args.chart_top)
     if args.window is not None:
         cfg["window"] = args.window
     if args.dryup is not None:
