@@ -51,6 +51,31 @@ def add_features(df: pd.DataFrame, vol_ma: int = 20, atr_period: int = 14) -> pd
 
 
 # --------------------------------------------------------------------------- #
+# Régime de marché (contexte top-down : gate ON/OFF pour les setups directionnels)
+# --------------------------------------------------------------------------- #
+def market_regime(df: pd.DataFrame, ma: int = 50, slope: int = 10,
+                  deadband: float = 0.5, atr_period: int = 14) -> pd.Series:
+    """Classe chaque barre en régime **causal** : +1 haussier, 0 neutre/range, −1 baissier.
+
+    Heuristique transparente (prix vs moyenne lente + pente de la moyenne, avec **zone morte
+    en ATR** pour que le range ressorte vraiment neutre) :
+      +1 si close > SMA(ma) ET la SMA a monté de > `deadband`×ATR sur `slope` barres,
+      −1 si close < SMA(ma) ET la SMA a baissé d'autant,
+       0 sinon (dérive sous le seuil = indécis / range).
+    Filtre de contexte : par doctrine Wyckoff top-down, une plage dans un downtrend = redistribution
+    → on n'y prend pas un long d'accumulation. Rien de prospectif (rolling/shift = passé seul).
+    """
+    close = df["close"]
+    sma = close.rolling(ma, min_periods=ma).mean()
+    chg = sma - sma.shift(slope)
+    band = deadband * atr(df, atr_period)
+    reg = pd.Series(0, index=df.index, dtype=int)
+    reg[(close > sma) & (chg > band)] = 1
+    reg[(close < sma) & (chg < -band)] = -1
+    return reg
+
+
+# --------------------------------------------------------------------------- #
 # Pivots / swings
 # --------------------------------------------------------------------------- #
 def swing_points(df: pd.DataFrame, left: int = 3, right: int = 3) -> pd.DataFrame:
