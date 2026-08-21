@@ -20,15 +20,22 @@ def _mk(base, rwa, vol):
 
 def _ex():
     specs = [_mk("BTC", False, 100e6), _mk("ETH", False, 50e6),
-             _mk("XAU", True, 5e6), _mk("AAPL", True, 2e6), _mk("SMALL", False, 0.1e6)]
+             _mk("XAU", True, 5e6), _mk("AAPL", True, 2e6), _mk("SMALL", False, 0.1e6),
+             _mk("QQQ", True, 8e6), _mk("TQQQ", True, 3e6)]  # QQQ/TQQQ = ETF
     markets = {s: m for s, m, _ in specs}
     tickers = {s: t for s, _, t in specs}
     return _StubEx(markets, tickers)
 
 
-def test_universe_ranked_and_all_included():
+def test_universe_ranked_and_etf_excluded_by_default():
     u = build_futures_universe(_ex(), top_n=10)
+    assert "QQQ/USDT:USDT" not in u and "TQQQ/USDT:USDT" not in u   # ETF exclus par défaut
     assert u == ["BTC/USDT:USDT", "ETH/USDT:USDT", "XAU/USDT:USDT", "AAPL/USDT:USDT", "SMALL/USDT:USDT"]
+
+
+def test_include_etf():
+    u = build_futures_universe(_ex(), top_n=10, exclude_etf=False)
+    assert "QQQ/USDT:USDT" in u and "TQQQ/USDT:USDT" in u
 
 
 def test_exclude_rwa():

@@ -108,7 +108,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `--dryup [N]` → run_dryup (assèchement de l'offre : coil + tests + spring, OI coin ; défaut 40),
   `--chart` génère le PNG (`--chart-top N` = graphes des N meilleurs setups, défaut 4).
   Univers futures : `--futures` (auto si `--exchange bitget`), `--min-vol M` (liquidité 24h),
-  `--no-rwa` / `--only-rwa` (actions/métaux/indices).
+  `--no-rwa` / `--only-rwa` (actions/métaux/indices), **ETF & produits à levier exclus par
+  défaut** (`ETF_TICKERS`, `--include-etf` pour les garder). `--regime` active le gate
+  contre-tendance sur le scan live (n'affiche les longs qu'hors régime haussier ; colonne `regime`).
 - `screener/theory_table.py` — `build_theory_html` : mémo « Mémo théorie » (**HTML
   cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
   ses seuils de validité (vol×, spread ATR, clôture) **+ le comportement d'OI attendu**.

@@ -16,7 +16,7 @@ import yaml
 
 from . import data as data_mod
 from .events import Thresholds, detect_events
-from .features import add_features, detect_trading_range, swing_points
+from .features import add_features, detect_trading_range, market_regime, swing_points
 from .mtf import MTFResult, combine_mtf
 from .score import SymbolResult, score_symbol
 from .window import detect_supply_dryup, detect_window_structure
@@ -159,9 +159,10 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
         universe = data_mod.build_futures_universe(
             ex, quote=cfg["quote"], top_n=cfg["top"],
             include_rwa=cfg.get("rwa", True), only_rwa=cfg.get("only_rwa", False),
-            min_vol_musd=cfg.get("min_vol", 0.0))
+            min_vol_musd=cfg.get("min_vol", 0.0), exclude_etf=cfg.get("exclude_etf", True))
         print(f"Univers futures {cfg['exchange']} : {len(universe)} perp "
-              f"(RWA={'oui' if cfg.get('rwa', True) else 'non'}, vol≥{cfg.get('min_vol', 0)}M)", file=sys.stderr)
+              f"(RWA={'oui' if cfg.get('rwa', True) else 'non'}, ETF={'non' if cfg.get('exclude_etf', True) else 'oui'}, "
+              f"vol≥{cfg.get('min_vol', 0)}M)", file=sys.stderr)
     else:
         universe = data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
     th = Thresholds(**cfg.get("thresholds", {}))
@@ -188,10 +189,17 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
             dry = detect_supply_dryup(df, th=th, oi=oi, lookback=lookback, bias=bias)
             if not dry.is_valid:
                 continue
+            # Régime courant (contexte). Gate CONTRE-TENDANCE optionnel (--regime) : on écarte
+            # le long d'accu en régime haussier établi (et le short de distrib en baissier).
+            reg = int(market_regime(df).iloc[-1])
+            if cfg.get("regime"):
+                acc = dry.bias == "accumulation"
+                if (reg > 0) if acc else (reg < 0):
+                    continue
             valid.append((dry.score, sym, dry, df))
             for e in dry.events:
                 rows.append({
-                    "symbol": sym, "bias": dry.bias, "score": round(dry.score, 2),
+                    "symbol": sym, "bias": dry.bias, "score": round(dry.score, 2), "regime": reg,
                     "support": round(dry.support, 6), "resistance": round(dry.resistance, 6),
                     "event": e.name, "time": (e.ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh"),
                     "vol_x": round(e.vol_ratio, 2), "spread_atr": round(e.spread_atr, 2),
@@ -252,6 +260,9 @@ def main() -> None:
                    help="filtre de liquidité : volume 24h minimum en M USD (futures)")
     p.add_argument("--no-rwa", action="store_true", help="exclut les RWA (actions/métaux/indices)")
     p.add_argument("--only-rwa", action="store_true", help="uniquement les RWA (actions/métaux/indices)")
+    p.add_argument("--include-etf", action="store_true", help="réintègre les ETF & produits à levier (exclus par défaut)")
+    p.add_argument("--regime", action="store_true",
+                   help="filtre de régime CONTRE-TENDANCE : n'affiche les dry-up longs qu'hors régime haussier établi")
     p.add_argument("--chart-top", type=int, default=4, help="nb de graphiques (meilleurs setups) en mode --chart")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
     p.add_argument("--no-cache", action="store_true")
@@ -265,7 +276,8 @@ def main() -> None:
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
                use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
                oi_source=args.oi_source, futures=args.futures, min_vol=args.min_vol,
-               rwa=not args.no_rwa, only_rwa=args.only_rwa, chart_top=args.chart_top)
+               rwa=not args.no_rwa, only_rwa=args.only_rwa, chart_top=args.chart_top,
+               exclude_etf=not args.include_etf, regime=args.regime)
     if args.window is not None:
         cfg["window"] = args.window
     if args.dryup is not None:
