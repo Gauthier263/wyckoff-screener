@@ -69,31 +69,33 @@ def _is_rwa(m) -> bool:
     return str(m.get("info", {}).get("isRwa", "")).lower() in ("true", "1", "yes")
 
 
-# ETF & produits à levier (RWA) — exclus des scans par défaut. Bitget ne fournit AUCUN flag
-# ETF (tout RWA = 'perpetual') → liste curée, extensible. Ne pas se fier à un suffixe : trop de
-# vraies actions finissent en L/U/X (AAPL, GOOGL, NFLX…).
-ETF_TICKERS = frozenset({
-    # indices / sectoriels
-    "SPX", "INX", "SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "SOXX", "SMH", "GDX", "GDXJ",
-    "SLX", "XLE", "XLF", "XLK", "XBI", "GLD", "SLV", "USO", "UNG", "TLT", "ARKK", "VXX",
-    "KWEB", "FXI", "EEM", "EWZ", "BOTZ",
-    # à levier (indices & mono-actions)
+# INDICES / paniers d'actions (RWA) — exclus des scans par défaut : ce sont des baskets
+# (Nasdaq, S&P, Dow, Russell, secteurs, pays), pas des actions individuelles. On garde donc
+# les actions simples ET les produits MONO-action à levier (AMZU=Amazon, METU=Meta…), qui ne
+# regroupent qu'une seule action. Bitget n'a aucun flag → liste curée, extensible. (Pas de
+# suffixe : trop de vraies actions finissent en L/U/X — AAPL, GOOGL, NFLX…)
+INDEX_TICKERS = frozenset({
+    # indices larges (actions)
+    "SPX", "INX", "SPY", "QQQ", "IWM", "DIA", "VOO", "VTI",
+    # secteurs / thématiques / pays (paniers d'actions)
+    "SOXX", "SMH", "GDX", "GDXJ", "SLX", "XLE", "XLF", "XLK", "XBI", "ARKK",
+    "KWEB", "FXI", "EEM", "EWZ", "BOTZ", "VXX",
+    # versions À LEVIER d'un indice/panier
     "TQQQ", "SQQQ", "SPXL", "SPXS", "SOXL", "SOXS", "TNA", "TZA", "UPRO", "UVXY", "SVXY",
-    "FNGU", "BULZ", "LABU", "LABD", "YINN", "KORU", "AMZU", "AAPU", "MSFU", "METU", "GGLL",
-    "NVDL", "NVDU", "TSLL", "TSLS", "CONL", "MSTU", "MSTX", "MSTZ", "SKUU", "MUU", "MVLL",
-    "SNXX", "XNDU",
+    "FNGU", "BULZ", "LABU", "LABD", "YINN", "KORU",
 })
 
 
 def build_futures_universe(ex, quote: str = "USDT", top_n: int = 150,
                            include_rwa: bool = True, only_rwa: bool = False,
-                           min_vol_musd: float = 0.0, exclude_etf: bool = True) -> list[str]:
+                           min_vol_musd: float = 0.0, exclude_index: bool = True) -> list[str]:
     """Univers **perp USDT (swap)** les plus échangés — pour Bitget & autres venues futures.
 
     `include_rwa` garde les RWA (actions/métaux/indices, flag `isRwa`) en plus de la crypto ;
     `only_rwa` ne garde QUE les RWA ; `min_vol_musd` filtre par volume 24h (M USD) pour écarter
-    les contrats peu liquides ; `exclude_etf` retire les ETF & produits à levier (`ETF_TICKERS`).
-    Renvoie jusqu'à `top_n` symboles ccxt (`BASE/USDT:USDT`).
+    les contrats peu liquides ; `exclude_index` retire les **indices / paniers d'actions**
+    (`INDEX_TICKERS` : Nasdaq, S&P, secteurs… + leurs versions à levier) — les actions simples
+    et mono-actions à levier restent. Renvoie jusqu'à `top_n` symboles ccxt (`BASE/USDT:USDT`).
     """
     swaps = [m for m in ex.markets.values()
              if m.get("swap") and m.get("settle") == quote and m.get("active", True)]
@@ -111,7 +113,7 @@ def build_futures_universe(ex, quote: str = "USDT", top_n: int = 150,
             continue
         if not include_rwa and rwa:
             continue
-        if exclude_etf and m["base"].upper() in ETF_TICKERS:
+        if exclude_index and m["base"].upper() in INDEX_TICKERS:
             continue
         qv = float((tk.get(m["symbol"], {}) or {}).get("quoteVolume") or 0)
         if qv < min_vol_musd * 1e6:

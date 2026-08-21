@@ -159,9 +159,9 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
         universe = data_mod.build_futures_universe(
             ex, quote=cfg["quote"], top_n=cfg["top"],
             include_rwa=cfg.get("rwa", True), only_rwa=cfg.get("only_rwa", False),
-            min_vol_musd=cfg.get("min_vol", 0.0), exclude_etf=cfg.get("exclude_etf", True))
+            min_vol_musd=cfg.get("min_vol", 0.0), exclude_index=cfg.get("exclude_index", True))
         print(f"Univers futures {cfg['exchange']} : {len(universe)} perp "
-              f"(RWA={'oui' if cfg.get('rwa', True) else 'non'}, ETF={'non' if cfg.get('exclude_etf', True) else 'oui'}, "
+              f"(RWA={'oui' if cfg.get('rwa', True) else 'non'}, indices={'non' if cfg.get('exclude_index', True) else 'oui'}, "
               f"vol≥{cfg.get('min_vol', 0)}M)", file=sys.stderr)
     else:
         universe = data_mod.build_universe(ex, quote=cfg["quote"], top_n=cfg["top"])
@@ -260,7 +260,8 @@ def main() -> None:
                    help="filtre de liquidité : volume 24h minimum en M USD (futures)")
     p.add_argument("--no-rwa", action="store_true", help="exclut les RWA (actions/métaux/indices)")
     p.add_argument("--only-rwa", action="store_true", help="uniquement les RWA (actions/métaux/indices)")
-    p.add_argument("--include-etf", action="store_true", help="réintègre les ETF & produits à levier (exclus par défaut)")
+    p.add_argument("--include-indices", action="store_true",
+                   help="réintègre les indices / paniers d'actions (Nasdaq, S&P… exclus par défaut)")
     p.add_argument("--regime", action="store_true",
                    help="filtre de régime CONTRE-TENDANCE : n'affiche les dry-up longs qu'hors régime haussier établi")
     p.add_argument("--chart-top", type=int, default=4, help="nb de graphiques (meilleurs setups) en mode --chart")
@@ -277,7 +278,7 @@ def main() -> None:
                use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
                oi_source=args.oi_source, futures=args.futures, min_vol=args.min_vol,
                rwa=not args.no_rwa, only_rwa=args.only_rwa, chart_top=args.chart_top,
-               exclude_etf=not args.include_etf, regime=args.regime)
+               exclude_index=not args.include_indices, regime=args.regime)
     if args.window is not None:
         cfg["window"] = args.window
     if args.dryup is not None:

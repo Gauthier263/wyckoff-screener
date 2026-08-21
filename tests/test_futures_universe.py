@@ -21,20 +21,22 @@ def _mk(base, rwa, vol):
 def _ex():
     specs = [_mk("BTC", False, 100e6), _mk("ETH", False, 50e6),
              _mk("XAU", True, 5e6), _mk("AAPL", True, 2e6), _mk("SMALL", False, 0.1e6),
-             _mk("QQQ", True, 8e6), _mk("TQQQ", True, 3e6)]  # QQQ/TQQQ = ETF
+             _mk("QQQ", True, 8e6), _mk("TQQQ", True, 3e6),   # indices (paniers) → exclus
+             _mk("AMZU", True, 4e6)]                          # mono-action à levier → gardée
     markets = {s: m for s, m, _ in specs}
     tickers = {s: t for s, _, t in specs}
     return _StubEx(markets, tickers)
 
 
-def test_universe_ranked_and_etf_excluded_by_default():
+def test_universe_ranked_and_indices_excluded_by_default():
     u = build_futures_universe(_ex(), top_n=10)
-    assert "QQQ/USDT:USDT" not in u and "TQQQ/USDT:USDT" not in u   # ETF exclus par défaut
-    assert u == ["BTC/USDT:USDT", "ETH/USDT:USDT", "XAU/USDT:USDT", "AAPL/USDT:USDT", "SMALL/USDT:USDT"]
+    assert "QQQ/USDT:USDT" not in u and "TQQQ/USDT:USDT" not in u   # indices exclus
+    assert "AMZU/USDT:USDT" in u                                    # mono-action à levier gardée
+    assert "AAPL/USDT:USDT" in u and "XAU/USDT:USDT" in u           # action & métal gardés
 
 
-def test_include_etf():
-    u = build_futures_universe(_ex(), top_n=10, exclude_etf=False)
+def test_include_indices():
+    u = build_futures_universe(_ex(), top_n=10, exclude_index=False)
     assert "QQQ/USDT:USDT" in u and "TQQQ/USDT:USDT" in u
 
 
@@ -45,8 +47,9 @@ def test_exclude_rwa():
 
 
 def test_only_rwa():
+    # RWA hors indices : métal (XAU), action (AAPL), mono-action à levier (AMZU) — pas QQQ/TQQQ
     u = build_futures_universe(_ex(), only_rwa=True)
-    assert set(u) == {"XAU/USDT:USDT", "AAPL/USDT:USDT"}
+    assert set(u) == {"XAU/USDT:USDT", "AAPL/USDT:USDT", "AMZU/USDT:USDT"}
 
 
 def test_min_volume_filter():
