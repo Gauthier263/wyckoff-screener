@@ -130,8 +130,7 @@ def backtest_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams) -> li
 def backtest_dryup_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTParams,
                             th: Thresholds, entry_start: int | None = None,
                             entry_end: int | None = None, score_min: float = 0.60,
-                            bias: str = "accumulation", regime=None,
-                            regime_min: int = 0) -> list[Trade]:
+                            bias: str = "accumulation", regime=None) -> list[Trade]:
     """Backtest de l'assèchement de l'offre (long en accumulation / short en distribution).
 
     À la barre t, on détecte `detect_supply_dryup` sur `feat[:t+1]` (causal, pas de lookahead).
@@ -155,10 +154,13 @@ def backtest_dryup_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTPar
         if not atr_t or np.isnan(atr_t):
             t += 1
             continue
-        # Filtre de régime (top-down) : pas de long d'accumulation en régime baissier.
+        # Filtre de régime (CONTRE-TENDANCE) : le dry-up est un signal de RETOURNEMENT —
+        # l'accumulation se fait en fin de baisse, pas en tendance haussière établie. On saute
+        # donc le long quand le régime est déjà franchement haussier (et le short en baissier).
+        # Validé sur Bitget : ce sens redresse l'espérance IS (le sens inverse la dégrade).
         if regime is not None:
             rt = int(regime.iloc[t])
-            if (rt < regime_min) if acc else (rt > -regime_min):
+            if (rt > 0) if acc else (rt < 0):
                 t += 1
                 continue
         d = detect_supply_dryup(sl, th=th, lookback=lookback, bias=bias)
@@ -192,23 +194,22 @@ def backtest_dryup_features(symbol: str, feat: pd.DataFrame, cfg: dict, p: BTPar
 def backtest_dryup_symbol(symbol: str, df: pd.DataFrame, cfg: dict, p: BTParams,
                           score_min: float = 0.60, oos: float = 0.0,
                           bias: str = "accumulation", use_regime: bool = False,
-                          regime_min: int = 0, regime_ma: int = 50
-                          ) -> tuple[list[Trade], list[Trade]]:
+                          regime_ma: int = 50) -> tuple[list[Trade], list[Trade]]:
     """Renvoie (trades_IS, trades_OOS). `oos`=0 → tout dans IS. Split temporel par symbole :
     IS = barres d'entrée [warmup, split), OOS = [split, n). `use_regime` active le filtre de
-    contexte (pas de long en régime baissier), calculé causalement sur le même df."""
+    contexte CONTRE-TENDANCE (pas de long d'accu en régime haussier établi), causal, même df."""
     feat = add_features(df, vol_ma=cfg["vol_ma"], atr_period=cfg["atr_period"])
     th = Thresholds(**cfg.get("thresholds", {}))
     reg = market_regime(feat, ma=regime_ma) if use_regime else None
     n = len(feat)
     if oos <= 0:
         return backtest_dryup_features(symbol, feat, cfg, p, th, score_min=score_min,
-                                       bias=bias, regime=reg, regime_min=regime_min), []
+                                       bias=bias, regime=reg), []
     split = int((1 - oos) * n)
     is_tr = backtest_dryup_features(symbol, feat, cfg, p, th, entry_end=split,
-                                    score_min=score_min, bias=bias, regime=reg, regime_min=regime_min)
+                                    score_min=score_min, bias=bias, regime=reg)
     oos_tr = backtest_dryup_features(symbol, feat, cfg, p, th, entry_start=split,
-                                     score_min=score_min, bias=bias, regime=reg, regime_min=regime_min)
+                                     score_min=score_min, bias=bias, regime=reg)
     return is_tr, oos_tr
 
 

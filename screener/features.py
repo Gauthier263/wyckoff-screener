@@ -62,8 +62,9 @@ def market_regime(df: pd.DataFrame, ma: int = 50, slope: int = 10,
       +1 si close > SMA(ma) ET la SMA a monté de > `deadband`×ATR sur `slope` barres,
       −1 si close < SMA(ma) ET la SMA a baissé d'autant,
        0 sinon (dérive sous le seuil = indécis / range).
-    Filtre de contexte : par doctrine Wyckoff top-down, une plage dans un downtrend = redistribution
-    → on n'y prend pas un long d'accumulation. Rien de prospectif (rolling/shift = passé seul).
+    Classifieur neutre (le SENS du filtre est décidé par l'appelant). Rien de prospectif
+    (rolling/shift = passé seul). NB empirique : pour le dry-up (signal de RETOURNEMENT),
+    c'est le gate **contre-tendance** — long hors régime haussier établi — qui aide, cf. backtest.
     """
     close = df["close"]
     sma = close.rolling(ma, min_periods=ma).mean()

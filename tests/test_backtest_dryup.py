@@ -39,3 +39,20 @@ def test_backtest_dryup_long_win_after_coil():
     # l'agrégat par score renvoie un tableau exploitable
     agg = aggregate_by_score(is_tr)
     assert not agg.empty and {"n", "win%", "R_moy"}.issubset(agg.columns)
+
+
+def test_regime_gate_skips_uptrend_entries():
+    """Le filtre CONTRE-TENDANCE saute les longs d'accu pris en régime haussier établi.
+    Ici le coil suit un markup (régime haussier) → use_regime réduit (voire annule) les entrées."""
+    rows = _drift(50, 92.0, seed=5)
+    rows += _spring_coil()
+    rows += _markup_tail(24, 99.3, 113.0)
+    idx = pd.date_range("2024-01-01", periods=len(rows), freq="h", tz="UTC")
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close", "volume"], index=idx)
+    cfg = {"vol_ma": 20, "atr_period": 14, "dryup": 40}
+    p = BTParams(stop_atr=0.3, rr=2.0, max_hold=40)
+
+    off, _ = backtest_dryup_symbol("SYN/USDT", df, cfg, p, score_min=0.5, use_regime=False)
+    on, _ = backtest_dryup_symbol("SYN/USDT", df, cfg, p, score_min=0.5, use_regime=True)
+    assert len(on) < len(off)                 # le gate écarte des entrées haussières
+    assert len(off) >= 1

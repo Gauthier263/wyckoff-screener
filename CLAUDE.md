@@ -38,8 +38,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
-  `market_regime` — régime causal +1/0/−1 (SMA lente + pente > zone morte ATR) : filtre de
-  contexte top-down (pas de long d'accumulation en régime baissier). Séparé du score (qualité).
+  `market_regime` — régime causal +1/0/−1 (SMA lente + pente > zone morte ATR) : classifieur
+  de contexte, séparé du score (qualité). Le dry-up étant un signal de RETOURNEMENT, c'est le
+  gate **contre-tendance** (long hors régime haussier établi) qui aide — cf. backtest.
   La plage est calculée sur la fenêtre *avant* les `buffer` dernières barres, pour
   qu'un spring récent soit mesuré contre la plage qui le précède.
 - `screener/events.py` — `detect_events` : SPRING, UTAD, SC, BC, SOS, SOW, ST,
@@ -57,9 +58,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   en ATR), cible R. `aggregate_by_score` ventile par tranche de score ; `--oos` fait un split
   IS/OOS temporel. Résultat 4h (top cryptos) : espérance positive IS **et** OOS (PF ~1.4/1.6),
   le score comme gradient de qualité — sans frais/slippage (TODO). `use_regime` branche
-  `market_regime` (gate : pas d'entrée en régime baissier). NB : sur l'univers Bitget élargi
-  (crypto + RWA), l'edge brut est surtout de la **beta de marché** (positif en régime haussier,
-  négatif en range/baisse) — d'où le filtre de régime ; l'edge n'est pas validé sur actions.
+  `market_regime` en gate **CONTRE-TENDANCE** (pas de long d'accu en régime haussier établi) :
+  validé sur Bitget — il **redresse l'espérance IS** (GLOBAL −0.02→+0.04R ; ACTIONS OOS PF
+  1.9→2.9), tandis que le gate trend-following la dégrade (le dry-up est un signal de retournement).
+  NB : sur l'univers Bitget élargi (crypto + RWA), l'edge brut reste très dépendant du régime de
+  marché ; l'edge sur actions n'est validé qu'avec ce gate contre-tendance.
 - `screener/optimize.py` — grid-search des seuils. `grid_search` (split IS/OOS),
   `metric_value` (robust = espérance − z·erreur-type ; plancher min_trades),
   `overfit_report` (verdict robuste/fragile/surajustement), `walk_forward` (k plis).
