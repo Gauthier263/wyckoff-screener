@@ -69,9 +69,6 @@
     line-height:1.08;margin:.32em 0 .28em;letter-spacing:-.012em;text-wrap:balance}
   .lede{font-size:1.12rem;color:var(--ink-soft);max-width:64ch;margin:0}
   .meta{margin-top:20px;font-size:13.5px;color:var(--ink-faint);display:flex;flex-wrap:wrap;gap:6px 16px}
-  .vtag{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.05em;
-    color:var(--accent);background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
-    border-radius:6px;padding:1px 7px}
 
   /* ---- legend ---- */
   .legend{margin:26px 0 6px;background:var(--surface);border:1px solid var(--border);border-radius:14px;
@@ -90,7 +87,6 @@
   .kw{font-weight:600;white-space:nowrap}
   .kw .dot,.kw .sq{margin-right:.35em}
   .t-pie{color:var(--piege)} .t-bor{color:var(--borne)} .t-spr{color:var(--spring)} .t-acc{color:var(--accent)}
-  .faint{color:var(--ink-faint)}
 
   /* ---- sections ---- */
   section{padding:30px 0;border-top:1px solid var(--border)}
@@ -170,9 +166,6 @@
   .flow .arw{color:var(--ink-faint);margin:0 .3em}
   .flow b{color:var(--ink)}
   .flow b.acc{color:var(--accent)}
-  .flow.num{counter-reset:fl;line-height:1.7}
-  .flow.num .step{display:block;white-space:normal}
-  .flow.num .step::before{counter-increment:fl;content:counter(fl) ". ";color:var(--accent);font-weight:700}
 
   /* checklist */
   ol.check{list-style:none;padding-left:0;counter-reset:ck;display:grid;gap:10px;margin:18px 0}
@@ -205,7 +198,6 @@
 
 <nav class="toc" aria-label="Sommaire">
   <div class="row">
-    <a href="#p0"><span class="n">00</span>Le socle</a>
     <a href="#p1"><span class="n">01</span>Combien de bougies ?</a>
     <a href="#p2"><span class="n">02</span>OI : quels shorts ?</a>
     <a href="#p3"><span class="n">03</span>Paradoxe du volume</a>
@@ -221,10 +213,9 @@
     <h1>Timing de la micro-accumulation</h1>
     <p class="lede">Après un back-up to the edge of the creek : quand la Phase B est-elle vraiment révolue, et comment lire l'offre, la demande et l'OI pour ne pas s'engager trop tôt. Tout le fil de la discussion, rien perdu.</p>
     <div class="meta">
-      <span class="vtag">v2</span>
-      <span>socle des primitives ajouté · « offre latente/future » au lieu de « résiduelle »</span>
-      <span>·</span>
       <span>Fil rouge → volume, puis OI, puis métriques tierces</span>
+      <span>·</span>
+      <span>5 questions + convention vocabulaire</span>
     </div>
 
     <div class="legend">
@@ -236,58 +227,13 @@
         <div class="item"><span class="dot c-spr"></span><span><b>Violet</b> — spring / pivot / Phase C</span></div>
       </div>
     </div>
+
+    <div class="box key" style="margin-top:22px">
+      <span class="lab">Le fil rouge, à graver</span>
+      <p><strong>Ni le volume ni l'OI ne se lisent comme des scalaires.</strong> L'<strong>OI</strong> se lit selon le <strong>lieu</strong> (le P&amp;L des positions décide qui a intérêt à clôturer) ; le <strong>volume</strong> se lit selon la <strong>direction de la bougie</strong> (offre vs demande) <em>et</em> le résultat qu'il produit (effort vs résultat). Les cinq réponses ci-dessous ne sont que des applications de ces deux règles.</p>
+    </div>
   </header>
 </div>
-
-<!-- ============ SOCLE ============ -->
-<section id="p0"><div class="wrap">
-  <span class="part-tag">LE SOCLE</span>
-  <h2>Les primitives de lecture</h2>
-  <p>Avant les cinq questions : <strong>trois principes</strong> qui sous-tendent tout le reste. Les réponses n'en sont que des applications — si un passage te semble obscur plus bas, il renvoie presque toujours à l'un d'eux.</p>
-
-  <h3><span class="lead">P1</span>Rien ne se lit comme un scalaire</h3>
-  <p><strong>Ni le volume ni l'OI ne sont des magnitudes nues.</strong> Un <strong>scalaire</strong> = un nombre à une seule dimension, juste « combien » (comme une température). À l'opposé, une grandeur <em>orientée</em> porte en plus une direction et un contexte. <span class="faint">(Terme de physique employé ici par métaphore.)</span></p>
-  <ul class="tight">
-    <li>Le <strong>volume</strong> se lit selon la <strong>direction</strong> de la bougie (offre vs demande — Principe&nbsp;3), le <strong>lieu</strong> (où dans la structure) et le <strong>résultat</strong> produit (effort vs résultat).</li>
-    <li>L'<strong>OI</strong> se lit selon le <strong>lieu</strong> : le P&amp;L des positions décide qui a intérêt à clôturer (voir Partie&nbsp;02).</li>
-  </ul>
-  <p>Le réduire à « beaucoup / peu » jette l'information qui compte.</p>
-
-  <h3><span class="lead">P2</span>Offre &amp; demande sont des <em>flux</em> — un long est de l'offre future</h3>
-  <div class="box key">
-    <span class="lab">Le principe</span>
-    <p><strong>Demande = l'acte d'acheter. Offre = l'acte de vendre.</strong> Ce sont des <strong>flux</strong> (des actes), pas des <strong>positions</strong> (des stocks détenus). Une position longue n'est ni l'un ni l'autre : c'est de l'inventaire. Le flux qui l'a créée était de la demande <em>au passé</em> — déjà absorbé dans le prix. Son seul futur possible, c'est <strong>vendre</strong>. Donc <strong>tout long ouvert est de l'offre latente (future).</strong></p>
-  </div>
-  <div class="tbl"><table>
-    <thead><tr><th>Un long…</th><th>Est / a été</th><th>Pourquoi</th></tr></thead>
-    <tbody>
-      <tr><td class="v">au moment de l'ACHAT</td><td>a <strong>été</strong> de la demande</td><td>flux passé, déjà dans le prix</td></tr>
-      <tr><td class="v">tant qu'il DÉTIENT</td><td><strong>est</strong> de l'offre latente</td><td>son seul futur = vendre</td></tr>
-    </tbody>
-  </table></div>
-  <p>Un long n'<strong>est</strong> pas de la demande ; il en <strong>a été</strong>. On le regarde par son <strong>prochain geste</strong>, et le prochain geste d'un long, c'est toujours vendre. <strong>Analogie :</strong> un commerçant qui a acheté du stock était acheteur le jour de l'achat ; aujourd'hui il détient de la marchandise à revendre = de l'<strong>offre potentielle</strong> pour le marché.</p>
-  <p>Les <strong>mains faibles</strong> / <strong>longs piégés</strong> (achetés plus haut, sous l'eau) sont la part <em>dangereuse</em> de cette offre latente : pressés de sortir à breakeven, ils forment l'<strong>offre en surplomb (overhead supply)</strong> qui <strong>plafonne les rebonds</strong> à la <span class="kw t-bor"><span class="sq c-bor"></span>résistance</span>.</p>
-  <div class="box mnemo">
-    <span class="lab">Ce que l'opérateur cherche</span>
-    <p>Accumuler, c'est <strong>assécher l'offre future</strong> : absorber l'offre disponible <em>et</em> secouer les détenteurs faibles pour qu'au moment du markup il ne reste <strong>plus d'offre en surplomb</strong> à combattre. <strong>Un markup est facile quand il n'y a plus personne à vendre au-dessus.</strong></p>
-  </div>
-
-  <h3><span class="lead">P3</span>La direction de la bougie désigne l'AGRESSEUR</h3>
-  <p><strong>Tout échange a un acheteur ET un vendeur, à parts égales</strong> — les deux sont donc toujours présents. Ce que la <strong>direction</strong> de la bougie révèle, c'est <strong>quel camp était l'agresseur</strong> (celui qui frappe les ordres passifs et pousse le prix) :</p>
-  <ul class="tight">
-    <li><strong>ça BAISSE</strong> → vendeurs agressifs → le volume mesure l'<strong>OFFRE agressive</strong> (à quel point les vendeurs se pressent). « Vendre quand ça baisse » = vendre dans la faiblesse : exactement ce que fait l'offre qui se déleste.</li>
-    <li><strong>ça MONTE</strong> → acheteurs agressifs → le volume mesure la <strong>DEMANDE agressive</strong> (à quel point les acheteurs chassent).</li>
-  </ul>
-  <p>Le camp <strong>passif</strong> (ordres à cours limité qui se font remplir) est de l'autre côté — souvent l'<strong>absorbeur</strong>. Il ne se lit <em>pas</em> au volume mais au <strong>résultat</strong> (spread, clôture) : même bougie, deux questions.</p>
-  <div class="tbl"><table>
-    <caption>Sur une bougie baissière, deux questions distinctes</caption>
-    <thead><tr><th>On demande…</th><th>On mesure…</th><th>On le lit par…</th></tr></thead>
-    <tbody>
-      <tr><td class="v">« qui se presse de vendre ? » (agresseur)</td><td>l'OFFRE / l'effort</td><td>le <strong>volume</strong> de la bougie</td></tr>
-      <tr><td class="v">« qui achète le creux ? » (passif)</td><td>la DEMANDE / l'absorption</td><td>le <strong>résultat</strong> : clôture forte, mèche basse, prix qui ne cède pas</td></tr>
-    </tbody>
-  </table></div>
-</div></section>
 
 <!-- ============ PART 1 ============ -->
 <section id="p1"><div class="wrap">
@@ -301,7 +247,7 @@
     <span class="lab">Conséquence contre-intuitive</span>
     <p>Une micro-accumulation <strong>trop courte</strong> n'est pas « prête plus vite » — elle plaide <strong>contre</strong> un markup durable. Peu de cause = peu d'effet (rebond faible, ou reprise du markdown). En downtrend, le défaut = <strong>redistribution</strong> : une micro-accu expédiée en 3 bougies est justement le profil d'un <strong>LPSY / faux support</strong> avant continuation baissière.</p>
   </div>
-  <p>« Combien de bougies <strong>minimum</strong> » est donc la mauvaise variable. La bonne : <strong>l'offre future est-elle asséchée ?</strong> (Principe&nbsp;2) — et ça se lit dans l'ordre VSA imposé.</p>
+  <p>« Combien de bougies <strong>minimum</strong> » est donc la mauvaise variable. La bonne : <strong>l'offre est-elle épuisée ?</strong> — et ça se lit dans l'ordre VSA imposé.</p>
 
   <h3><span class="lead">1.1</span>L'ordre de lecture : volume → OI → tertiaire</h3>
   <ol>
@@ -321,28 +267,7 @@
       <tr><td class="v"><span class="kw t-spr"><span class="dot c-spr"></span>Spring léger</span></td><td>Phase C — <em>tentative</em></td><td>Un test sous le low a rejeté…</td><td><strong>la validation de C</strong> : un spring <strong>doit être testé</strong></td></tr>
     </tbody>
   </table></div>
-  <p>Le point critique : <strong>un spring n'est confirmé que par son test</strong> (secondary test). Au moment où il se produit, ce n'est qu'une <strong>hypothèse</strong> ; c'est le test qui tranche (retour à volume sec + higher low qui tient → validé ; volume qui revient + nouveau low → échoué).</p>
-
-  <h3><span class="lead">1.2b</span>Pourquoi un spring léger appelle d'autres tests</h3>
-  <div class="box image">
-    <span class="lab">La fonction d'un spring</span>
-    <p>Un spring est un <strong>shakeout</strong> conçu pour <strong>assécher l'offre latente</strong> (Principe&nbsp;2) : déclencher les <strong>stops des mains faibles</strong>, forcer les <strong>longs piégés</strong> à lâcher, <strong>vider le réservoir de vendeurs latents</strong> (l'offre en surplomb). Il <em>convertit</em> l'offre future en offre réalisée — que l'opérateur absorbe — pour qu'elle ne pèse plus sur le markup.</p>
-  </div>
-  <p>Un spring <strong>léger</strong> (pénétration peu profonde, petit volume, récupération rapide) ne creuse pas assez : il ne flushe qu'une <strong>fraction</strong> de l'offre latente. Le reste survit → il faut d'autres tests pour finir le travail :</p>
-  <div class="flow num">
-    <span class="step"><b>Spring léger</b> → ne flushe qu'une fraction de l'offre latente</span>
-    <span class="step"><b>Offre latente survivante</b> → il reste des vendeurs avec de l'inventaire</span>
-    <span class="step"><b>Rebond off le spring</b> → ils ne bradent pas ; ils attendent un meilleur prix</span>
-    <span class="step"><b>Prix monte vers la résistance</b> → là où l'offre en surplomb est concentrée (breakeven)</span>
-    <span class="step"><b>L'offre s'abat</b> → le rebond BUTE / se fait rejeter à la résistance</span>
-    <span class="step"><b>Nouveau repli</b> → rejeté, le prix redescend vers le support</span>
-    <span class="step"><b>= NOUVEAU TEST</b> → même question : l'offre est-elle enfin sèche ?</span>
-  </div>
-  <p>D'où : ton « deuxième test de la résistance » n'est <strong>pas une anomalie</strong>, c'est la <strong>suite logique d'un flush incomplet</strong>. Le <strong>nombre de tests = fonction de l'offre latente restante</strong> ; il devrait décroître à mesure que chaque test se fait à volume plus faible. Corollaire : un spring <strong>profond</strong> est souvent plus <em>définitif</em> (il purge plus d'un coup) ; un spring léger <em>appelle</em> presque toujours d'autres tests.</p>
-  <div class="box warn">
-    <span class="lab">Bonus — le second effet d'un spring (côté demande)</span>
-    <p>Au-delà de purger l'offre, un spring <strong>piège les vendeurs de cassure</strong> (les bears qui shortent la fausse rupture sous le support). Quand le prix « spring » et remonte, ces shorts sont pris à revers → <strong>rachat forcé = demande future</strong>. Le spring nettoie donc l'offre <em>et</em> fabrique de la demande.</p>
-  </div>
+  <p>Le point critique : <strong>un spring n'est confirmé que par son test</strong> (secondary test). Un spring <em>léger</em> = flush peu profond = <strong>offre pas totalement purgée</strong> → elle réapparaît typiquement sur le rebond suivant, qui butera sur la résistance → nouveau repli → nouveau test. <strong>C'est mécaniquement pourquoi ton « deuxième test de la résistance » est le cas normal après un spring léger.</strong></p>
 
   <h3><span class="lead">1.3</span>La séquence qui te fait vraiment passer B → C → D</h3>
   <ol>
@@ -373,8 +298,8 @@
   <h3><span class="lead">1.5</span>La signature de volume en deux temps</h3>
   <p>Il n'y a pas de plancher absolu de volume ; il y a une <strong>relation en deux temps</strong>, et c'est <em>elle</em> le vrai déclencheur :</p>
   <ul>
-    <li><strong>Temps 1 — assèchement</strong> : sur les tests successifs du support/spring, le volume doit <strong>décroître</strong> (idéalement chaque test &lt; le précédent, spring/ST ~30-50 % du climax). L'offre latente s'épuise.</li>
-    <li><strong>Temps 2 — expansion</strong> : sur le SOS, le volume doit <strong>exploser</strong> (≥ ~1,5× moyenne) avec spread large. La demande arrive. <strong>Un breakout à volume faible est un piège</strong> (upthrust).</li>
+    <li><strong>Temps 1 — assèchement</strong> : sur les tests successifs du support/spring, le volume doit <strong>décroître</strong> (idéalement chaque test &lt; le précédent, spring/ST ~30-50 % du climax). Offre qui part.</li>
+    <li><strong>Temps 2 — expansion</strong> : sur le SOS, le volume doit <strong>exploser</strong> (≥ ~1,5× moyenne) avec spread large. Demande qui arrive. <strong>Un breakout à volume faible est un piège</strong> (upthrust).</li>
   </ul>
   <p>À croiser avec l'<strong>OI en coin</strong> (les tests doivent <strong>fermer</strong> des positions ; le SOS doit s'accompagner d'OI cohérent avec de la vraie demande) et, si le prix cale au contact, avec les <strong>3 tertiaires</strong>.</p>
 
@@ -404,7 +329,7 @@
       </div>
     </li>
     <li>
-      <span class="ttl"><strong>Tests du support à volume décroissant</strong> (offre latente qui s'assèche) — souvent 2-3, pas un seul.</span>
+      <span class="ttl"><strong>Tests du support à volume décroissant</strong> (offre qui s'assèche) — souvent 2-3, pas un seul.</span>
       <div class="indic">
         <span class="m">chaque test : RVol &lt; <b>précédent</b></span>
         <span class="m">vol test ≤ <b>30–50 %</b> du climax</span>
@@ -453,7 +378,7 @@
       </div>
     </li>
   </ol>
-  <p>Tant que 3-4 ne sont pas cochés, <strong>attends-toi à un/plusieurs re-tests de la résistance</strong> — comportement normal, surtout après un spring <em>léger</em>. Le nombre exact de tests = fonction de l'<strong>offre latente restante</strong>, que <strong>seul le volume révèle</strong>, bougie après bougie.</p>
+  <p>Tant que 3-4 ne sont pas cochés, <strong>attends-toi à un/plusieurs re-tests de la résistance</strong> — comportement normal, surtout après un spring <em>léger</em>. Le nombre exact de tests = fonction de l'offre résiduelle, que <strong>seul le volume révèle</strong>, bougie après bougie.</p>
 
   <div class="box"><span class="lab">Sources</span>
     <p style="font-size:14px;line-height:1.75">
@@ -476,7 +401,7 @@
 
   <div class="box key">
     <span class="lab">Le principe qui débloque tout</span>
-    <p>Une variation d'OI ne se lit <strong>jamais</strong> dans l'absolu (Principe&nbsp;1), parce que <strong>l'incitation d'un trader à clôturer dépend de son P&amp;L</strong>, et son P&amp;L dépend du prix <strong>par rapport à son entrée</strong>. Or dans un range, chaque camp est entré à une borne précise. Donc <strong>le même mouvement d'OI signifie l'inverse en haut et en bas.</strong></p>
+    <p>Une variation d'OI ne se lit <strong>jamais</strong> dans l'absolu, parce que <strong>l'incitation d'un trader à clôturer dépend de son P&amp;L</strong>, et son P&amp;L dépend du prix <strong>par rapport à son entrée</strong>. Or dans un range, chaque camp est entré à une borne précise. Donc <strong>le même mouvement d'OI signifie l'inverse en haut et en bas.</strong></p>
   </div>
 
   <h3><span class="lead">2.0</span>Le schéma à retenir : qui se trouve à chaque borne</h3>
@@ -489,7 +414,7 @@
       </div>
       <div class="actor">
         <span class="who">Longs</span><span class="chip close">ENCAISSENT</span><span class="chip oi">OI ↓</span>
-        <span class="note">prise de profit des longs (ils vendent)</span>
+        <span class="note">prise de profit des longs</span>
       </div>
     </div>
     <div class="osc"><span class="bar"></span> ↕ oscillation dans le range <span class="bar"></span></div>
@@ -500,7 +425,7 @@
       </div>
       <div class="actor">
         <span class="who">Shorts</span><span class="chip close">ENCAISSENT</span><span class="chip oi">OI ↓</span>
-        <span class="note">prise de profit des shorts (ils rachètent)</span>
+        <span class="note">prise de profit des shorts</span>
       </div>
     </div>
     <div class="edge bot"><span class="sq c-bor"></span> SUPPORT = edge of the creek — bas du range</div>
@@ -510,16 +435,7 @@
     <span class="lab">La règle mnémotechnique</span>
     <p><strong>On OUVRE une position à la borne qui lui est favorable</strong> (long en bas, short en haut) <strong>et on l'ENCAISSE à la borne opposée.</strong></p>
     <p style="margin-top:8px">Formule courte : <em>« les longs naissent en bas, les shorts naissent en haut ; chacun encaisse chez l'autre. »</em></p>
-  </div>
-
-  <div class="box">
-    <span class="lab">Le détail qui verrouille tout (Principe 3 en action)</span>
-    <p>À une borne, les <strong>deux</strong> gestes vont dans le <strong>même sens de flux</strong> :</p>
-    <ul class="tight" style="margin:.4em 0 0">
-      <li>au <strong>support</strong> : ouvrir un long <em>et</em> clôturer un short (prise de profit des shorts) sont tous deux des <strong>ACHATS</strong> (demande) → le prix est <strong>soutenu</strong> ;</li>
-      <li>à la <strong>résistance</strong> : ouvrir un short <em>et</em> clôturer un long (prise de profit des longs) sont tous deux des <strong>VENTES</strong> (offre) → le prix est <strong>plafonné</strong>.</li>
-    </ul>
-    <p style="margin-top:.6em">L'OI ne fait que dire <strong>lequel ouvre (OI↑) et lequel ferme (OI↓)</strong> — le <em>sens du flux</em>, lui, est fixé par la borne.</p>
+    <p style="margin-top:8px">Conséquence directe pour ton accu : <strong>au SUPPORT, une baisse d'OI = shorts qui encaissent + longs faibles secoués = absorption</strong>. Une hausse d'OI au support = nouveaux shorts qui pressent = offre encore active.</p>
   </div>
 
   <p><strong>Pourquoi les shorts prennent leur profit en bas et pas en haut :</strong> un short entré près de la résistance est <strong>en profit maximal quand le prix atteint le support</strong>. Le bas du range, c'est <em>son objectif</em>. Le geste rationnel d'un short en gain = <strong>encaisser = racheter (buy to close)</strong>. Personne n'initie un short <em>neuf</em> en bas (shorter dans le support = mauvais risk/reward) : on ouvre un short <strong>en haut</strong>, on le ferme <strong>en bas</strong>. Symétriquement, un long neuf achète en bas, un long en profit vend en haut.</p>
@@ -563,10 +479,29 @@
 <section id="p3"><div class="wrap">
   <span class="part-tag">PARTIE 03</span>
   <h2>Le paradoxe du volume</h2>
-  <p>Deux gênes légitimes — et le <strong>socle (Principe&nbsp;3)</strong> les résout d'un coup. Elles viennent toutes deux de la même erreur : traiter le volume comme un <strong>scalaire</strong> (Principe&nbsp;1) au lieu d'une grandeur <em>signée par la direction</em> et <em>jugée par le résultat</em>.</p>
+  <p>Deux gênes légitimes : <em>« si le volume sèche, la demande sèche aussi ? »</em> et <em>« forte offre + prix qui monte = demande présente, pourquoi ce n'est pas bon ? »</em>. Elles viennent d'une prémisse cachée : traiter le volume comme un <strong>scalaire</strong>. Le déblocage :</p>
+  <div class="box">
+    <span class="lab">« Scalaire » ?</span>
+    <p>Un <strong>scalaire</strong> = un nombre à une seule dimension, une <strong>magnitude nue</strong> (comme une température : juste « combien »). À l'opposé, une grandeur <em>orientée</em> porte en plus une direction. Dire « le volume n'est pas un scalaire » = il ne se résume pas à « beaucoup / peu » : il porte une <strong>direction</strong> (bougie haussière/baissière = demande/offre) et un <strong>lieu</strong> (où dans la structure). Le lire comme une magnitude nue jette l'information qui compte. <span style="color:var(--ink-faint)">(Terme de physique employé ici par métaphore.)</span></p>
+  </div>
+  <div class="box key">
+    <span class="lab">La règle</span>
+    <p><strong>Le volume n'est pas un scalaire, il est <em>signé</em> par la direction de la bougie, et lu selon le <em>lieu</em>.</strong><br>
+    Volume sur une bougie <strong>baissière</strong> = mesure de l'<strong>OFFRE agressive</strong> (à quel point les <strong>vendeurs se pressent</strong> de vendre, en poussant le prix vers le bas ?).<br>
+    Volume sur une bougie <strong>haussière</strong> = mesure de la <strong>DEMANDE agressive</strong> (à quel point les <strong>acheteurs chassent</strong>, en levant les prix vers le haut ?).</p>
+  </div>
+  <div class="box image">
+    <span class="lab">Pas une ironie — la direction dit qui est l'AGRESSEUR</span>
+    <p>Ce n'est <strong>pas</strong> « seuls les vendeurs tradent quand ça baisse » (rappel Partie 4 : <strong>tout échange a un acheteur ET un vendeur</strong>). C'est que la <strong>direction de la bougie révèle quel camp était l'agresseur</strong> — celui qui a frappé les ordres passifs et poussé le prix :</p>
+    <ul class="tight" style="margin:.5em 0 0">
+      <li><strong>ça BAISSE</strong> → les <strong>vendeurs sont agressifs</strong> (ils vendent au marché, en frappant les acheteurs passifs). Le volume mesure la force de l'<strong>OFFRE</strong>. Oui, « vendre quand ça baisse » = <strong>vendre dans la faiblesse</strong> : exactement ce que fait l'offre qui capitule.</li>
+      <li><strong>ça MONTE</strong> → les <strong>acheteurs sont agressifs</strong> (ils lèvent les offres, paient plus cher / <em>chasent</em>). Le volume mesure la force de la <strong>DEMANDE</strong>.</li>
+    </ul>
+    <p style="margin-top:.6em">Le camp <strong>passif</strong> (les ordres à cours limité qui se font remplir) est de l'autre côté — souvent <strong>l'absorbeur</strong>. D'où : au <strong>test</strong> (sonde baissière), volume mort = personne ne se presse de vendre = <strong>no supply</strong> ; sur le <strong>SOS</strong> (bougie haussière), gros volume = la demande <strong>chasse</strong>.</p>
+  </div>
 
   <h3><span class="lead">3a</span>« Le séchage assèche-t-il aussi la demande ? »</h3>
-  <p>Le test (spring/ST) est une <strong>sonde vers le bas</strong>, dans le support. Baisser le prix, c'est <strong>inviter à vendre</strong> — donc le volume sur cette sonde mesure <strong>l'offre agressive</strong> (Principe&nbsp;3), pas la demande.</p>
+  <p>Le test (spring/ST) est une <strong>sonde vers le bas</strong>, dans le support. Baisser le prix, c'est <strong>inviter à vendre</strong>. Donc le volume sur cette sonde mesure <strong>l'offre uniquement</strong>.</p>
   <div class="box image">
     <span class="lab">Image — la ligne de pêche</span>
     <p>Tu jettes la ligne (prix qui descend) pour voir s'il reste des poissons (vendeurs). <strong>Aucune touche = volume mort = plus rien à vendre</strong> (<em>no supply</em>). Ça ne dit <strong>rien</strong> sur la présence d'acheteurs : ce n'est pas leur tour. Au contraire, <strong>s'il n'y a plus de vendeurs, il suffit d'un souffle de demande pour faire remonter le prix</strong>. Le test prouve l'absence d'offre ; le <strong>rebond qui suit</strong> prouvera la présence de demande. Deux mesures, deux moments.</p>
@@ -616,7 +551,7 @@
   <h2>Test raté : qui achète, puisque le prix revient dans le range ?</h2>
 
   <h3><span class="lead">4.0</span>Le rappel mécanique qui recadre la question</h3>
-  <p><strong>Tout volume a un acheteur ET un vendeur, à parts strictement égales</strong> (Principe&nbsp;3). Donc « qui achète pendant le test raté ? » a une réponse triviale : <strong>il y a <em>toujours</em> un acheteur</strong>. Et le fait que le prix soit <strong>revenu dans le range prouve</strong> qu'il y a eu <em>assez</em> d'achat.</p>
+  <p><strong>Tout volume a un acheteur ET un vendeur, à parts strictement égales.</strong> Chaque contrat vendu est acheté par quelqu'un. Donc « qui achète pendant le test raté ? » a une réponse triviale : <strong>il y a <em>toujours</em> un acheteur</strong>. Et le fait que le prix soit <strong>revenu dans le range prouve</strong> qu'il y a eu <em>assez</em> d'achat.</p>
   <div class="box warn">
     <span class="lab">Le retour dans le range n'est pas une force</span>
     <p>Le retour dans le range est le <strong>minimum vital</strong> : s'il n'y avait <em>pas</em> eu assez d'acheteurs, le prix aurait <strong>cassé le support = markdown</strong>. Tout test qui échoue revient dans le range <em>par définition</em>. La vraie question n'est pas <em>« y a-t-il eu un acheteur »</em> mais <strong>« quelle est la QUALITÉ de cet acheteur »</strong> — et c'est le <strong>fort volume</strong> qui trahit sa basse qualité.</p>
@@ -627,12 +562,12 @@
     <thead><tr><th>Qui achète</th><th>Nature de l'achat</th><th>Ce que ça devient</th></tr></thead>
     <tbody>
       <tr><td class="v">Shorts qui prennent leur profit (buy to close)</td><td>prise de profit, <strong>finie / exhaustible</strong></td><td>s'arrête dès qu'ils ont racheté → plus de bougie de soutien</td></tr>
-      <tr><td class="v">Dip-buyers / longs faibles / retail réactif</td><td>achat réflexe « du support », sous-capitalisé</td><td><strong>l'offre latente de demain</strong> — ils revendront au prochain repli/rebond</td></tr>
+      <tr><td class="v">Dip-buyers / longs faibles / retail réactif</td><td>achat réflexe « du support », sous-capitalisé</td><td><strong>l'offre de demain</strong> — ils revendront au prochain repli/rebond</td></tr>
       <tr><td class="v">Market makers / liquidité passive</td><td>non-directionnel, ils <em>fournissent</em> de la liquidité</td><td>neutre, disparaît</td></tr>
       <tr><td class="v">L'opérateur composite <em>(peut-être)</em></td><td>absorption</td><td>mais <strong>s'il doit manger <em>autant</em> de volume, l'offre n'est pas finie</strong></td></tr>
     </tbody>
   </table></div>
-  <p>Ces acheteurs ramènent le prix dans le range, mais ce sont des mains <strong>faibles ou temporaires</strong>. La prise de profit <strong>s'épuise</strong> ; les dip-buyers <strong>deviennent de l'offre latente</strong> (Principe&nbsp;2) qui fera échouer le <em>prochain</em> test. C'est mécaniquement pourquoi <strong>les tests ratés se répètent</strong>.</p>
+  <p>Ces acheteurs ramènent le prix dans le range, mais ce sont des mains <strong>faibles ou temporaires</strong>. La prise de profit <strong>s'épuise</strong> ; les dip-buyers <strong>deviennent l'offre</strong> qui fera échouer le <em>prochain</em> test. C'est mécaniquement pourquoi <strong>les tests ratés se répètent</strong>.</p>
   <div class="box image">
     <span class="lab">Image — la porte à tambour</span>
     <p>Les sauveurs d'aujourd'hui sont les vendeurs de demain. Un long faible qui achète le support à fort volume est un futur vendeur : au moindre rebond raté ou nouveau creux, il liquide → il <strong>recharge</strong> l'offre au-dessus. Tant que ce carrousel tourne (fort volume à chaque passage), l'offre n'est jamais purgée.</p>
@@ -660,11 +595,11 @@
   <h3><span class="lead">4.4</span>Le croisement OI</h3>
   <ul>
     <li><strong>OI↓</strong> pendant le test → l'achat = <strong>prise de profit des shorts</strong> (rachat pour clôturer). Finie → soutien qui va s'éteindre. Explique un retour-dans-le-range <em>sans lendemain</em>.</li>
-    <li><strong>OI↑</strong> pendant le test qui revient → <strong>nouveaux longs</strong> qui bottom-fishent. Ce sont les <strong>mains faibles / offre latente</strong>. Rebond fragile.</li>
+    <li><strong>OI↑</strong> pendant le test qui revient → <strong>nouveaux longs</strong> qui bottom-fishent. Ce sont les <strong>mains faibles / future offre</strong>. Rebond fragile.</li>
     <li>Prix qui <strong>cale</strong> (OI↑ à prix plat, indécidable) → <strong>3 tertiaires</strong> : ratio long/short (↓ = shorts qui entrent), funding, liquidations (long_liq = les dip-buyers sortis de force = la porte à tambour confirmée).</li>
   </ul>
 
-  <p class="oneliner">Sur un test raté, l'acheteur existe toujours (le retour le prouve), mais c'est de la prise de profit des shorts qui s'épuise et des mains faibles qui deviennent l'offre latente de demain — et c'est le fort volume qui le dénonce, pas le retour lui-même.</p>
+  <p class="oneliner">Sur un test raté, l'acheteur existe toujours (le retour le prouve), mais c'est de la prise de profit des shorts qui s'épuise et des mains faibles qui deviennent l'offre de demain — et c'est le fort volume qui le dénonce, pas le retour lui-même.</p>
 </div></section>
 
 <!-- ============ PART 5 ============ -->
@@ -683,7 +618,7 @@
     <li>côté acheteurs : des <strong>shorts qui prennent leur profit</strong> (rachat pour clôturer).</li>
   </ul>
   <p>Le point crucial : <strong>aucune offre neuve n'est créée.</strong> Personne n'ouvre de short frais pour presser le support. Le marché <strong>fait le ménage</strong> au lieu d'attirer des vendeurs = signature d'un test <em>propre</em>.</p>
-  <p>À l'inverse, un <strong>OI croissant</strong> sur la sonde baissière = de <strong>nouvelles positions s'ouvrent dans le creux</strong>, en général mauvais : soit de <span class="kw t-pie">nouveaux shorts</span> qui pressent (offre qui grossit), soit des <span class="kw t-bor">longs faibles</span> qui bottom-fishent (la porte à tambour → offre latente).</p>
+  <p>À l'inverse, un <strong>OI croissant</strong> sur la sonde baissière = de <strong>nouvelles positions s'ouvrent dans le creux</strong>, en général mauvais : soit de <span class="kw t-pie">nouveaux shorts</span> qui pressent (offre qui grossit), soit des <span class="kw t-bor">longs faibles</span> qui bottom-fishent (la porte à tambour).</p>
 
   <h3><span class="lead">5.2</span>À croiser toujours avec le volume (le 2×2)</h3>
   <p>L'OI seul ne suffit pas — <strong>volume d'abord</strong>. Le test idéal = <strong>volume mort + OI↓</strong>.</p>
@@ -729,7 +664,7 @@
 
 <div class="wrap">
   <footer>
-    <p class="oneliner">Le socle des cinq réponses : <strong>(1)</strong> rien n'est un scalaire ; <strong>(2)</strong> offre &amp; demande sont des flux — un long est de l'offre future ; <strong>(3)</strong> la direction de la bougie désigne l'agresseur. Tout le reste en découle.</p>
+    <p class="oneliner">Le fil rouge des cinq réponses : ni l'OI ni le volume ne se lisent comme des scalaires. L'OI selon le lieu (P&amp;L → qui a intérêt à clôturer) ; le volume selon la direction de la bougie (offre vs demande) et le résultat produit (effort vs résultat).</p>
     <p>Mémo d'étude — screener Wyckoff crypto. Aide à la décision discrétionnaire, jamais d'exécution automatique.</p>
   </footer>
 </div>
