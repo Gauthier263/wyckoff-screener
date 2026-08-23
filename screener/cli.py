@@ -137,7 +137,8 @@ def run_window(cfg: dict) -> pd.DataFrame:
                 })
             if cfg.get("chart"):
                 from .plot import plot_window_structure
-                out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_window.png"
+                stamp = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(hours=2)).strftime("%Y%m%d-%Hh%M")
+                out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}_window_{stamp}.png"
                 plot_window_structure(sym, cfg["timeframe"], struct, out, ex=ex,
                                       oi_source=cfg.get("oi_source", "binance"))
                 print(f"→ graphique : {out}", file=sys.stderr)
@@ -216,7 +217,8 @@ def run_dryup(cfg: dict) -> pd.DataFrame:
         from .plot import plot_supply_dryup
         for score, sym, dry, df in sorted(valid, key=lambda v: v[0], reverse=True)[: cfg.get("chart_top", 4)]:
             safe = sym.replace("/", "").replace(":", "").lower()
-            out = f"chart_{safe}_{cfg['timeframe']}_dryup.png"
+            stamp = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(hours=2)).strftime("%Y%m%d-%Hh%M")
+            out = f"chart_{safe}_{cfg['timeframe']}_dryup_{stamp}.png"
             try:
                 plot_supply_dryup(sym, cfg["timeframe"], dry, out, ex=ex, df=df)
                 print(f"→ graphique : {out}  (score {score:.2f})", file=sys.stderr)
