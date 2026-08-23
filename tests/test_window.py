@@ -206,6 +206,27 @@ def test_supply_dryup_scale_invariant():
     assert a.n_tests == b.n_tests
 
 
+def test_supply_dryup_breakout_not_spring():
+    """Une bougie qui pénètre la borne mais CLÔTURE de l'autre côté de la plage (cassure /
+    breakout climactique, ex. ONT ×17.3) n'est PAS un spring : il doit reclôturer DANS la plage."""
+    rows = [[90 + k * (9 / 40), 90 + k * (9 / 40) + 0.2, 90 + k * (9 / 40) - 0.2,
+             90 + k * (9 / 40), 1000.0] for k in range(40)]           # markup warmup
+    rows += [
+        [99.4, 99.60, 98.00, 98.50, 1200.0],    # test1 support≈98
+        [98.6, 99.55, 98.50, 99.20, 900.0],
+        [99.2, 99.60, 98.05, 98.55, 700.0],     # test2
+        [98.6, 99.50, 98.40, 99.10, 600.0],
+        [99.1, 99.55, 98.02, 98.60, 500.0],     # test3
+        [98.7, 99.50, 98.45, 99.15, 480.0],
+        [98.5, 100.80, 97.00, 100.60, 3000.0],  # CASSURE : dip sous support puis close AU-DESSUS résistance
+        [100.6, 101.00, 100.20, 100.80, 800.0],
+    ]
+    dry = detect_supply_dryup(_df(rows), lookback=40)
+    assert dry.spring is None                    # clôture hors plage → cassure, pas spring
+    # garde-fou : un vrai spring (clôture DANS la plage, clv 0.94) reste détecté
+    assert detect_supply_dryup(_df(_spring_coil()), lookback=40).spring is not None
+
+
 def test_supply_dryup_bias_specific():
     """Un coil d'accumulation (offre qui s'assèche, demande dessous) ne doit PAS valider en
     lecture distribution : le signal directionnel (asymétrie proxy-CVD) coupe le mauvais biais."""

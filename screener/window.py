@@ -563,12 +563,17 @@ def detect_supply_dryup(
     spr_pos, spr_best = None, None
     for j in range(n):
         b = win.iloc[j]
+        # Le spring/upthrust doit RECLÔTURER DANS LA PLAGE (support ≤ close ≤ résistance) :
+        # une bougie qui pénètre la borne mais clôture DE L'AUTRE CÔTÉ de la plage est une
+        # CASSURE (breakout climactique), pas un shakeout — ex. ONT ×17.3 qui casse au-dessus
+        # de la résistance. En plus du rejet (clv) et du retour du bon côté de la borne pénétrée.
+        in_range = support <= float(b["close"]) <= resistance
         if acc:
             pen = support - float(b["low"])
-            recl = float(b["close"]) >= support and float(b["clv"]) >= 0.5
+            recl = in_range and float(b["close"]) >= support and float(b["clv"]) >= 0.5
         else:
             pen = float(b["high"]) - resistance
-            recl = float(b["close"]) <= resistance and float(b["clv"]) <= 0.5
+            recl = in_range and float(b["close"]) <= resistance and float(b["clv"]) <= 0.5
         if pen >= th.pen_atr * atr_ref and recl and (spr_best is None or pen > spr_best):
             spr_best, spr_pos = pen, j
     if spr_pos is not None:
