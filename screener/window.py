@@ -418,6 +418,12 @@ class SupplyDryup:
 # Poids des signaux dans le score composite (hiérarchie VSA : volume primaire).
 _DRYUP_WEIGHTS = {"s1": 0.25, "s2": 0.25, "s3": 0.20, "s4": 0.15, "s_spring": 0.15}
 
+# Un SPRING est un REJET, pas une simple bougie haussière : le low sous le support doit être
+# rejeté par une MÈCHE BASSE dominante (≥ cette fraction du range de la barre). Sinon un gros
+# corps vert qui pique sous le support serait pris à tort (cf. META). Calibré : vrais springs
+# mèche 53-81 % du range, faux ~25 %. (Miroir : upthrust = mèche HAUTE dominante.)
+_SPRING_WICK_FRAC = 0.50
+
 
 def detect_supply_dryup(
     df: pd.DataFrame, th: Thresholds | None = None, oi=None, lookback: int = 40,
@@ -567,13 +573,20 @@ def detect_supply_dryup(
         # une bougie qui pénètre la borne mais clôture DE L'AUTRE CÔTÉ de la plage est une
         # CASSURE (breakout climactique), pas un shakeout — ex. ONT ×17.3 qui casse au-dessus
         # de la résistance. En plus du rejet (clv) et du retour du bon côté de la borne pénétrée.
-        in_range = support <= float(b["close"]) <= resistance
+        # ET le low/high pénétré doit être REJETÉ par une MÈCHE dominante (≥ _SPRING_WICK_FRAC du
+        # range) : un gros CORPS haussier qui pique sous le support n'est pas un rejet, juste une
+        # bougie haussière (cf. META). La mèche ≥ 50 % implique déjà clv ≥ 0.5.
+        o, c = float(b["open"]), float(b["close"])
+        rng_bar = float(b["high"]) - float(b["low"])
+        in_range = support <= c <= resistance
         if acc:
             pen = support - float(b["low"])
-            recl = in_range and float(b["close"]) >= support and float(b["clv"]) >= 0.5
+            lower_wick = min(o, c) - float(b["low"])
+            recl = in_range and c >= support and rng_bar > 0 and lower_wick >= _SPRING_WICK_FRAC * rng_bar
         else:
             pen = float(b["high"]) - resistance
-            recl = in_range and float(b["close"]) <= resistance and float(b["clv"]) <= 0.5
+            upper_wick = float(b["high"]) - max(o, c)
+            recl = in_range and c <= resistance and rng_bar > 0 and upper_wick >= _SPRING_WICK_FRAC * rng_bar
         if pen >= th.pen_atr * atr_ref and recl and (spr_best is None or pen > spr_best):
             spr_best, spr_pos = pen, j
     if spr_pos is not None:

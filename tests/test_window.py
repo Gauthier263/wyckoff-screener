@@ -227,6 +227,35 @@ def test_supply_dryup_breakout_not_spring():
     assert detect_supply_dryup(_df(_spring_coil()), lookback=40).spring is not None
 
 
+def _coil_with_dip(dip_bar):
+    """Coil déterministe (support ≈ 98) avec UNE barre qui pique sous le support."""
+    rows = [[90 + k * (9 / 40), 90 + k * (9 / 40) + 0.2, 90 + k * (9 / 40) - 0.2,
+             90 + k * (9 / 40), 1000.0] for k in range(40)]
+    rows += [
+        [99.5, 100.0, 98.00, 98.40, 1500.0],
+        [98.6, 99.60, 98.50, 99.30, 1200.0],
+        [99.3, 99.80, 98.05, 98.50, 900.0],
+        [98.6, 99.50, 98.40, 99.20, 700.0],
+        [99.2, 99.60, 98.02, 98.45, 500.0],
+        [98.5, 99.40, 98.30, 99.10, 480.0],
+        dip_bar,
+        [98.2, 99.00, 98.00, 98.90, 460.0],
+        [98.9, 99.50, 98.60, 99.20, 500.0],
+    ]
+    return rows
+
+
+def test_supply_dryup_bullish_body_not_spring():
+    """Un gros CORPS haussier qui pique sous le support (petite mèche) n'est PAS un spring —
+    juste une bougie haussière (cf. META). Seule une MÈCHE de rejet dominante l'est."""
+    # corps haussier : mèche basse 0.7 / range 1.6 = 0.44 < 0.5 → pas un rejet (clv 0.94 pourtant)
+    body = [98.10, 99.00, 97.40, 98.90, 800.0]
+    assert detect_supply_dryup(_df(_coil_with_dip(body)), lookback=40).spring is None
+    # pin-bar : mèche basse 1.4 / range 1.6 = 0.88 ≥ 0.5 → vrai rejet
+    pin = [98.85, 99.00, 97.40, 98.80, 800.0]
+    assert detect_supply_dryup(_df(_coil_with_dip(pin)), lookback=40).spring is not None
+
+
 def test_supply_dryup_bias_specific():
     """Un coil d'accumulation (offre qui s'assèche, demande dessous) ne doit PAS valider en
     lecture distribution : le signal directionnel (asymétrie proxy-CVD) coupe le mauvais biais."""
