@@ -1,5 +1,9 @@
 # Mémo — Les TESTS du Composite Operator
 
+> ⚠️ **Errata** : ce premier mémo contient des erreurs (dates et attributions d'auteurs, définition
+> de la barre de test de Williams, « test sec sans réponse = neutre », LPS vs BUEC, origine des
+> termes…). Version vérifiée et approfondie : `docs/memo_deep_focus_test_CO.html` (§10 Errata).
+
 Volet « campagne & vérification » de la méthode : comment le CO vérifie qu'une campagne est prête.
 Mémos frères : mémo théorie (`theory_table.py` → `memo_theorie.html`) et mémo comportement à la
 résistance (UTAD, LPSY, upthrust).

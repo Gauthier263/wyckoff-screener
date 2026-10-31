@@ -107,22 +107,37 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   *contexte/biais* sans écraser les étiquettes locales ; (5) **cartographier l'emboîtement**
   (la structure locale exécute une sous-phase de la supérieure) ; la **confluence** local↔macro
   donne le signal le plus fort. Ne pas plaquer les étiquettes macro sur une analyse locale.
-- **Tests du Composite Operator** (référence complète : `docs/memo_tests_CO.md`). Le test est le
-  **contrôle-qualité** de la campagne : il ne crée pas de cause, il la mesure ; chaque transition
-  de phase est gardée par un test (ST → tests de Phase B → spring + test → LPS → BUEC). Règles :
-  (1) **5 conditions toutes nécessaires** : vol ≤ ×test_vol (et < passage précédent sur la zone),
-  spread ≤ narrow_spread_atr, higher low vs le low testé, clv ≥ reclaim_clv, et **une cause en
-  amont** (climax/spring/shakeout/SOS) — une bougie sèche hors séquence n'est PAS un test ; crypto :
-  OI plat/↓ (un « test » à OI↑ n'en est pas un) ; (2) **règle de Williams** : test à volume fort
-  (≥ ~×1.5) = test raté → noter le niveau, attendre le re-test sec ; test sec validé seulement par
-  une **réponse haussière ≤ 3 barres** (sinon no supply + no demand = neutre) ; (3) **type de spring
-  → exigence de test** : #3 effleurement sec = son propre test · #2 absorbé = test du spring requis ·
-  #1 terminal shakeout = test(s) obligatoire(s), éventuellement **différé en back-up** si la réponse
-  est explosive ; (4) **LPS ≠ BUEC** : LPS successifs = *avant* la cassure, *dans* la plage, testent
-  la demande (plusieurs, en escalier) ; BUEC = *après* le JAC, sur l'ancienne résistance, teste le
-  changement de polarité (un seul ; clôture dans la plage = upthrust) ; (5) **statut** : spring/
-  événement C-D reste « possible » tant que son test n'a pas eu lieu ; test sec + réponse > SOS
-  volumique ; des retours à volume décroissant forment un **gradient** de maturation.
+- **Tests du Composite Operator** (référence vérifiée : `docs/memo_deep_focus_test_CO.html`, source
+  `reports/Mémo Deep Focus Test Composite Operator.md` ; il corrige `docs/memo_tests_CO.md`, cf. son
+  §10 Errata). Le test est le **contrôle-qualité** de la campagne : il ne crée pas de cause, il la
+  mesure ; chaque transition de phase est gardée par un test (ST → tests de Phase B → spring + test
+  *ou* LPS de Phase C → LPS de Phase D → BU/BUEC). [H] = heuristique du projet, pas doctrine. Règles :
+  (1) **Validité hiérarchisée** — *nécessaire* : une **cause en amont** (climax/spring/shakeout/SOS ;
+  une bougie sèche hors séquence n'est PAS un test), le **lieu** (retour sur la zone de l'action
+  testée), un **volume inférieur à celui de l'action testée** (vol(ST) < vol(SC), vol(test) <
+  vol(spring), vol(BU) < vol(JAC)), en baisse d'un passage à l'autre ; *qualité* : spread qui se
+  resserre à l'échelle du swing (pas une condition nécessaire, ni une exigence de la barre de test
+  VSA), creux plus haut (grade A ; léger sous-percement sur volume plus faible = grade B ; creux plus
+  bas **et** plus volumique = rejet), clôture ≥ reclaim_clv [H] ; *validation* : la **réponse**.
+  `vol_ratio ≤ test_vol` n'est qu'un filtre secondaire [H]. Crypto : OI coin plat/↓ = constructif
+  (fermetures, absorption) ; **OI↑ = test non validé (ambigu)** → croiser ratio L/S, funding,
+  liquidations ; (2) **règle de Williams** : test à volume fort (≥ ~×1.5 [H]) = test raté **par
+  défaut** → noter le niveau, attendre le re-test sec ; exceptions de Williams : bad news/shakeout,
+  marché haussier, **marchés à terme** (perps : l'OI coin départage). Réponse haussière attendue en
+  1–3 barres [H] ; **test sec sans réponse = *negative action* = faiblesse**, pas un signal neutre.
+  **Barre de test VSA ≠ no supply** : « volume < 2 barres précédentes » + spread étroit définit le
+  *no supply*, pas le test ; (3) **type de spring → exigence de test** (numérotation stable chez
+  SMI, Fraser et Villahermosa) : #3 léger et sec = pas de test requis (un test n'est pas rare ;
+  confirmation par la demande et le retour dans la plage) · #2 modéré, volume en hausse = acheter le
+  test (Fraser) · #1 terminal shakeout = entrée sur test réussi seulement ; le « test différé en
+  back-up » après une réponse explosive est une extension du projet [H] ; (4) **LPS vs BU/BUEC =
+  convention opérationnelle** : le low du BU **est** un LPS (StockCharts/WA, Pruden). LPS de Phase D
+  = *avant* le JAC, *dans* la plage, teste la demande (creux montants) ; BU/BUEC = *après* le JAC,
+  sur l'ancienne résistance, teste le changement de polarité (souvent un, parfois deux).
+  Invalidation : annoncer l'école — stricte (clôture de retour dans la plage = upthrust) ou
+  tolérante (stop structurel sous le spring) ; (5) **statut** : un spring/événement C-D reste
+  « possible » tant que son test n'a pas eu lieu ; « test sec + réponse > SOS volumique » [H] ; des
+  retours à volume décroissant forment un **gradient** de maturation (sourcé).
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
