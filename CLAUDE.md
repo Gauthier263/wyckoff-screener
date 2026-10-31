@@ -107,6 +107,22 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   *contexte/biais* sans écraser les étiquettes locales ; (5) **cartographier l'emboîtement**
   (la structure locale exécute une sous-phase de la supérieure) ; la **confluence** local↔macro
   donne le signal le plus fort. Ne pas plaquer les étiquettes macro sur une analyse locale.
+- **Tests du Composite Operator** (référence complète : `docs/memo_tests_CO.md`). Le test est le
+  **contrôle-qualité** de la campagne : il ne crée pas de cause, il la mesure ; chaque transition
+  de phase est gardée par un test (ST → tests de Phase B → spring + test → LPS → BUEC). Règles :
+  (1) **5 conditions toutes nécessaires** : vol ≤ ×test_vol (et < passage précédent sur la zone),
+  spread ≤ narrow_spread_atr, higher low vs le low testé, clv ≥ reclaim_clv, et **une cause en
+  amont** (climax/spring/shakeout/SOS) — une bougie sèche hors séquence n'est PAS un test ; crypto :
+  OI plat/↓ (un « test » à OI↑ n'en est pas un) ; (2) **règle de Williams** : test à volume fort
+  (≥ ~×1.5) = test raté → noter le niveau, attendre le re-test sec ; test sec validé seulement par
+  une **réponse haussière ≤ 3 barres** (sinon no supply + no demand = neutre) ; (3) **type de spring
+  → exigence de test** : #3 effleurement sec = son propre test · #2 absorbé = test du spring requis ·
+  #1 terminal shakeout = test(s) obligatoire(s), éventuellement **différé en back-up** si la réponse
+  est explosive ; (4) **LPS ≠ BUEC** : LPS successifs = *avant* la cassure, *dans* la plage, testent
+  la demande (plusieurs, en escalier) ; BUEC = *après* le JAC, sur l'ancienne résistance, teste le
+  changement de polarité (un seul ; clôture dans la plage = upthrust) ; (5) **statut** : spring/
+  événement C-D reste « possible » tant que son test n'a pas eu lieu ; test sec + réponse > SOS
+  volumique ; des retours à volume décroissant forment un **gradient** de maturation.
 - **Ordre d'analyse imposé (hiérarchie VSA) : volume → OI → métriques tierces.** Toute lecture
   de suivi se fait *dans cet ordre* : (1) le **volume/spread** d'abord (la force primaire :
   effort vs résultat, vol×, clôture/CLV) ; (2) puis l'**OI** (le volume ouvre-t-il ou ferme-t-il
