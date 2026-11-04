@@ -70,6 +70,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   ×vol_ratio). Panneau **OI** : bougies d'OI agrégé (`fetch_open_interest_ohlc`, source
   `agg3`) **à la MÊME TF que le cours** (vert = OI↑, rouge = OI↓), omis si OI indispo. Traits
   verticaux d'événement (teintés) sur les 3 panneaux. Horodatage en CEST.
+- `screener/interactive.py` — **graphe interactif HTML** (`build_interactive_html`) : page
+  autonome (Lightweight Charts de TradingView **inliné**, `screener/vendor/`, hors-ligne) avec
+  cours / volume (+ vol MA) / OI en 3 panneaux synchronisés, **même TF**, heure CEST, zoom/pan ;
+  à côté, le **texte de l'analyse** + tables niveaux / mouvements / événements. Les références
+  `{ID}` du texte deviennent des **pastilles cliquables** (clic → le graphe s'y recentre et
+  surligne ; survol d'une bougie d'événement → sa ligne s'allume). Contenu = structure détectée
+  (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
+  `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
+  CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
+  --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
@@ -139,6 +149,14 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **liquidations** (`fetch_liquidations` — long_liq vs short_liq ; ≈0 = mouvement ordonné, pas
   de flush forcé). Ne jamais affirmer « longs piégés / shorts qui pressent » sur le seul couple
   prix+OI : confirmer avec ces tells (toutes Binance via Coinalyze, mêmes clé/repli que l'OI).
+- **Analyse BTC = graphe interactif d'abord** (but : zéro aller-retour avec TradingView).
+  Pour toute analyse, écrire un `notes.json` (gabarit `examples/notes_btc_1h.json`) : chaque
+  **niveau** cité = un ID `N1…` avec prix + `reason` (justification obligatoire, cf. « Niveaux
+  toujours justifiés ») ; chaque **mouvement** évoqué (rebond, retour sur borne, cassure,
+  réintégration) = une zone `M1…` (de/à en CEST) ; le **texte** cite ces IDs entre accolades
+  (`{N1}`, `{M2}`, `{BC}`) pour qu'ils deviennent cliquables. Générer la page
+  (`python -m screener.interactive … --notes`) et la **livrer dans le fil** (rendu HTML). Kinds
+  = palette ci-dessous : demand vert · supply rouge · trap orange · range bleu · pivot violet.
 - **Illustration d'une analyse** (préférences Gauthier) :
   - Embarquer le graphique *inline* dans la réponse avec `![alt](chemin.png)` (pas de
     lien cliquable `[texte](...)`). En session distante/web, **livrer le PNG directement
@@ -179,6 +197,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
+python -m screener.interactive --symbol BTC/USDT --timeframe 1h --notes examples/notes_btc_1h.json  # graphe interactif
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
