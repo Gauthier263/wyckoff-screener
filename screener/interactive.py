@@ -1,0 +1,693 @@
+"""
+interactive.py — Graphe interactif HTML (texte de l'analyse ↔ graphe, sur une seule page).
+
+But : supprimer l'aller-retour analyse ↔ TradingView. La page embarque :
+  * un graphe **Lightweight Charts** (librairie open-source de TradingView, même rendu,
+    zoom/pan à la souris) en 3 panneaux synchronisés : cours / volume (+ vol MA) / OI ;
+    bougies **dans la même TF que l'analyse**, horodatage CEST ;
+  * un **panneau latéral** : texte de l'analyse + table des niveaux + table des événements.
+    Chaque référence du texte (`{BH}`, `{SC}`, `{N1}`, `{M1}`…) devient une **pastille
+    cliquable** : clic → le graphe se recentre et met l'élément en surbrillance ; survol →
+    surbrillance seule. Inversement, survoler une bougie d'événement surligne sa ligne.
+
+La librairie est **inlinée** (screener/vendor, Apache-2.0) : le fichier marche hors-ligne,
+sans CDN, et se partage tel quel.
+
+Deux sources de contenu, combinables :
+  1. `struct` (`WindowStructure` détectée) → bornes de plage + événements auto ;
+  2. `notes` (dict / JSON écrit pour une analyse discrétionnaire) :
+       {
+         "title": "BTC H1 — redistribution ?",
+         "levels": [{"id": "N1", "price": 75736, "label": "plancher",
+                     "reason": "low de l'AR, borne basse", "kind": "range"}],
+         "zones":  [{"id": "M1", "from": "03/11 14:00", "to": "03/11 20:00",
+                     "label": "rebond sur la borne", "kind": "range"}],
+         "events": [{"id": "UT1", "name": "UT?", "time": "03/11 18:00",
+                     "kind": "trap", "where": "high", "why": "…"}],
+         "text":   "### Lecture\\n{BC} fixe le plafond {BH}… **{N1}** tient."
+       }
+     Heures des notes en **CEST** (heure affichée sur le graphe), formats acceptés :
+     « JJ/MM HH:MM », « AAAA-MM-JJ HH:MM ». `kind` = sens/couleur (palette CLAUDE.md) :
+     demand (vert) · supply (rouge) · trap (orange) · range (bleu) · pivot (violet).
+
+CLI :
+    python -m screener.interactive --symbol BTC/USDT --timeframe 1h [--notes notes.json]
+"""
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import math
+import re
+import sys
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from .window import WindowStructure
+
+_VENDOR = Path(__file__).with_name("vendor") / "lightweight-charts-5.0.8.js"
+
+# Palette fixe CLAUDE.md : couleur = sens.
+KIND_COLOR = {
+    "demand": "#22a861",   # vert  : demande / force (SC, SOS, OI coin↑)
+    "supply": "#e0473e",   # rouge : offre / résistance (BC, SOW)
+    "trap": "#f08c1a",     # orange: piège / faux signal (UTAD, upthrust, faux SOS)
+    "range": "#3b82f6",    # bleu  : bornes de plage / support / repli (LPS)
+    "pivot": "#9b5de5",    # violet: spring / pivot / Phase C
+    "neutral": "#8a8f98",
+}
+EVENT_KIND = {
+    "SC": "demand", "SOS": "demand", "BC": "supply", "SOW": "supply",
+    "UTAD": "trap", "SPRING": "pivot", "AR": "range", "ST": "range",
+    "LPS": "range", "LPSY": "supply",
+}
+# Extrême de la barre sur lequel poser le marqueur (cohérent avec plot._wanted_extreme).
+_HIGH_EVENTS_ACC = {"AR", "SOS", "UTAD", "LPSY", "BC"}
+_HIGH_EVENTS_DIS = {"BC", "ST", "SOS", "UTAD", "LPSY"}
+
+
+def _fmt_price(v: float) -> str:
+    a = abs(v)
+    if a >= 1000:
+        return f"{v:,.0f}".replace(",", " ")
+    if a >= 1:
+        return f"{v:.2f}"
+    if a >= 0.01:
+        return f"{v:.4f}"
+    return f"{v:.6f}"
+
+
+def _plain(s: str) -> str:
+    """Retire l'emphase markdown (*x*, **x**) des textes affichés tels quels en table."""
+    return re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", s or "")
+
+
+def _precision(v: float) -> int:
+    a = abs(v)
+    return 0 if a >= 10000 else 1 if a >= 1000 else 2 if a >= 1 else 4 if a >= 0.01 else 6
+
+
+def _parse_local(s: str, year: int, tz_hours: int) -> pd.Timestamp:
+    """Heure CEST (texte) → Timestamp UTC réel."""
+    s = s.strip()
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%d/%m/%Y %H:%M", "%d/%m %H:%M",
+                "%d/%m %Hh", "%Y-%m-%d %Hh"):
+        try:
+            d = datetime.strptime(s, fmt)
+            if "%Y" not in fmt:
+                d = d.replace(year=year)
+            return pd.Timestamp(d, tz="UTC") - pd.Timedelta(hours=tz_hours)
+        except ValueError:
+            continue
+    raise ValueError(f"heure non reconnue : {s!r} (attendu « JJ/MM HH:MM »)")
+
+
+def _sec(ts: pd.Timestamp, tz_hours: int) -> int:
+    """Secondes epoch décalées de +tz_hours : Lightweight Charts affiche en UTC, on lui
+    donne donc l'heure CEST « étiquetée UTC » (même convention que plot.py)."""
+    return int(ts.timestamp()) + tz_hours * 3600
+
+
+# --------------------------------------------------------------------------- #
+# Texte : mini-markdown + références cliquables
+# --------------------------------------------------------------------------- #
+_REF = re.compile(r"\{([A-Za-z][A-Za-z0-9_+\-?]*)\}")
+
+
+def render_text(text: str, refs: dict[str, dict]) -> str:
+    """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; `{ID}` → pastille
+    cliquable si l'ID est connu (niveau, zone ou événement), sinon laissé tel quel."""
+
+    def inline(s: str) -> str:
+        s = html.escape(s, quote=False)
+        s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
+        s = re.sub(r"\*([^*\s][^*]*?)\*", r"<em>\1</em>", s)
+
+        def chip(m):
+            rid = m.group(1)
+            r = refs.get(rid)
+            if r is None:
+                return m.group(0)
+            shape = "sq" if r["type"] == "level" else "zn" if r["type"] == "zone" else "dot"
+            return (f'<button class="ref {shape}" data-ref="{html.escape(rid)}" '
+                    f'style="--c:{r["color"]}"><i></i>{html.escape(r["chip"])}</button>')
+        return _REF.sub(chip, s)
+
+    out, para, items = [], [], []
+
+    def flush():
+        if para:
+            out.append(f"<p>{inline(' '.join(para))}</p>")
+            para.clear()
+        if items:
+            out.append("<ul>" + "".join(f"<li>{inline(i)}</li>" for i in items) + "</ul>")
+            items.clear()
+
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            flush()
+        elif line.startswith("#"):
+            flush()
+            out.append(f"<h3>{inline(line.lstrip('#').strip())}</h3>")
+        elif line[:2] in ("- ", "* ", "• "):
+            if para:
+                out.append(f"<p>{inline(' '.join(para))}</p>")
+                para.clear()
+            items.append(line[2:])
+        else:
+            if items:
+                flush()
+            para.append(line)
+    flush()
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# Modèle : niveaux, zones, événements
+# --------------------------------------------------------------------------- #
+def _struct_items(struct: WindowStructure | None) -> tuple[list[dict], list[dict]]:
+    """Bornes (BH/BB) + événements issus de la détection automatique."""
+    if struct is None or not struct.events:
+        return [], []
+    acc = struct.bias == "accumulation"
+    ev = {e.name: e for e in struct.events}
+    levels: list[dict] = []
+    if acc and "SC" in ev:
+        levels.append(dict(id="BB", price=ev["SC"].bar_low, label="borne basse",
+                           reason="plancher = low du SC (climax vendeur absorbé)", kind="range"))
+        if "AR" in ev:
+            levels.append(dict(id="BH", price=ev["AR"].bar_high, label="borne haute",
+                               reason="plafond = high de l'AR (rebond réflexe post-SC)", kind="range"))
+    elif not acc and "BC" in ev:
+        levels.append(dict(id="BH", price=ev["BC"].bar_high, label="borne haute",
+                           reason="plafond = high du BC (climax acheteur distribué)", kind="range"))
+        if "AR" in ev:
+            levels.append(dict(id="BB", price=ev["AR"].bar_low, label="borne basse",
+                               reason="plancher = low de l'AR (repli réflexe post-BC)", kind="range"))
+    highs = _HIGH_EVENTS_ACC if acc else _HIGH_EVENTS_DIS
+    events, seen = [], {}
+    for e in struct.events:
+        n = seen.get(e.name, 0) + 1
+        seen[e.name] = n
+        where = "high" if e.name in highs else "low"
+        events.append(dict(
+            id=e.name if n == 1 else f"{e.name}{n}", name=e.name, ts=e.ts,
+            kind=EVENT_KIND.get(e.name, "neutral"), where=where,
+            price=e.bar_high if where == "high" else e.bar_low,
+            vol_ratio=e.vol_ratio, spread_atr=e.spread_atr, clv=e.clv,
+            oi_chg=None if pd.isna(e.oi_chg) else float(e.oi_chg),
+            why=e.why, theory=e.theory, auto=True))
+    return levels, events
+
+
+def _bar_at(df: pd.DataFrame, ts: pd.Timestamp) -> int:
+    """Index de la barre contenant `ts` (dernière barre ouverte ≤ ts)."""
+    i = int(df.index.searchsorted(ts, side="right")) - 1
+    return min(max(i, 0), len(df) - 1)
+
+
+def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
+                struct: WindowStructure | None = None, notes: dict | None = None,
+                oi_ohlc: pd.DataFrame | None = None, tz_hours: int = 2,
+                tz_label: str = "CEST", min_bars: int = 80) -> dict:
+    """Assemble les données sérialisées en JSON pour la page (fonction pure, hors-ligne)."""
+    notes = notes or {}
+    if "vol_ma" not in df.columns:
+        from .features import add_features
+        df = add_features(df)
+    year = int(df.index[-1].year)
+
+    levels, events = _struct_items(struct)
+    by_id = {lv["id"]: lv for lv in levels}
+    for lv in notes.get("levels", []):          # les notes priment sur l'auto (même ID)
+        by_id[lv["id"]] = {"kind": "range", "label": "", "reason": "", **lv}
+    levels = list(by_id.values())
+
+    ev_by_id = {e["id"]: e for e in events}
+    for e in notes.get("events", []):
+        ts = _parse_local(e["time"], year, tz_hours)
+        i = _bar_at(df, ts)
+        bar = df.iloc[i]
+        where = e.get("where", "high")
+        ev_by_id[e["id"]] = dict(
+            id=e["id"], name=e.get("name", e["id"]), ts=df.index[i],
+            kind=e.get("kind", EVENT_KIND.get(e.get("name", ""), "neutral")), where=where,
+            price=float(bar["high"] if where == "high" else bar["low"]),
+            vol_ratio=float(bar.get("vol_ratio", np.nan)),
+            spread_atr=float(bar.get("spread_atr", np.nan)), clv=float(bar.get("clv", np.nan)),
+            oi_chg=None, why=e.get("why", ""), theory=e.get("theory", ""), auto=False)
+    events = sorted(ev_by_id.values(), key=lambda e: e["ts"])
+
+    zones = []
+    for z in notes.get("zones", []):
+        t0 = _parse_local(z["from"], year, tz_hours)
+        t1 = _parse_local(z["to"], year, tz_hours)
+        i0, i1 = sorted((_bar_at(df, t0), _bar_at(df, t1)))
+        seg = df.iloc[i0:i1 + 1]
+        zones.append(dict(
+            id=z["id"], label=z.get("label", ""), reason=z.get("reason", ""),
+            kind=z.get("kind", "range"), i0=i0, i1=i1,
+            t0=_sec(df.index[i0], tz_hours), t1=_sec(df.index[i1], tz_hours),
+            lo=float(z.get("low", seg["low"].min())), hi=float(z.get("high", seg["high"].max()))))
+
+    # Fenêtre initiale : ≥ min_bars, couvrant les événements/zones + la dernière barre.
+    anchors = [_bar_at(df, e["ts"]) for e in events] + [z["i0"] for z in zones]
+    first = min(anchors) - 12 if anchors else len(df) - min_bars
+    first = max(0, min(first, len(df) - min_bars))
+
+    pr = _precision(float(df["close"].iloc[-1]))
+    candles, volume, vol_ma = [], [], []
+    ev_bars = {_bar_at(df, e["ts"]): e for e in events}
+    for i, (ts, r) in enumerate(df.iterrows()):
+        t = _sec(ts, tz_hours)
+        candles.append(dict(time=t, open=round(float(r["open"]), pr + 1),
+                            high=round(float(r["high"]), pr + 1),
+                            low=round(float(r["low"]), pr + 1),
+                            close=round(float(r["close"]), pr + 1)))
+        e = ev_bars.get(i)
+        volume.append(dict(time=t, value=float(r["volume"]),
+                           up=bool(r["close"] >= r["open"]),
+                           ev=(KIND_COLOR[e["kind"]] if e else None)))
+        if not math.isnan(float(r["vol_ma"])):
+            vol_ma.append(dict(time=t, value=float(r["vol_ma"])))
+
+    oi, oi_unit = [], ""
+    if oi_ohlc is not None and len(oi_ohlc):
+        med = float(oi_ohlc["close"].median())
+        scale, oi_unit = (1e9, "Md$") if med > 1e6 else (1e3, "k coin")
+        lo_ts, hi_ts = df.index[0], df.index[-1]
+        for ts, r in oi_ohlc.loc[lo_ts:hi_ts].iterrows():
+            oi.append(dict(time=_sec(ts, tz_hours),
+                           **{k: float(r[k]) / scale for k in ("open", "high", "low", "close")}))
+
+    def ev_out(e):
+        return dict(id=e["id"], name=e["name"], time=_sec(e["ts"], tz_hours),
+                    label=(e["ts"] + pd.Timedelta(hours=tz_hours)).strftime("%d/%m %H:%M"),
+                    kind=e["kind"], color=KIND_COLOR.get(e["kind"], KIND_COLOR["neutral"]),
+                    where=e["where"], price=e["price"], price_txt=_fmt_price(e["price"]),
+                    vol_ratio=None if pd.isna(e["vol_ratio"]) else round(float(e["vol_ratio"]), 2),
+                    spread_atr=None if pd.isna(e["spread_atr"]) else round(float(e["spread_atr"]), 2),
+                    oi_chg=None if e["oi_chg"] is None else round(e["oi_chg"], 2),
+                    why=_plain(e["why"]), theory=_plain(e["theory"]), auto=e["auto"])
+
+    lv_out = [dict(id=lv["id"], price=float(lv["price"]), price_txt=_fmt_price(float(lv["price"])),
+                   label=lv.get("label", ""), reason=lv.get("reason", ""), kind=lv["kind"],
+                   color=KIND_COLOR.get(lv["kind"], KIND_COLOR["neutral"]))
+              for lv in sorted(levels, key=lambda x: -float(x["price"]))]
+    zn_out = [dict(z, color=KIND_COLOR.get(z["kind"], KIND_COLOR["neutral"]),
+                   span=(f"{(df.index[z['i0']] + pd.Timedelta(hours=tz_hours)).strftime('%d/%m %H:%M')}"
+                         f" → {(df.index[z['i1']] + pd.Timedelta(hours=tz_hours)).strftime('%d/%m %H:%M')}"))
+              for z in zones]
+    ev_list = [ev_out(e) for e in events]
+
+    refs = {lv["id"]: dict(type="level", color=lv["color"],
+                           chip=f'{lv["id"]} {lv["price_txt"]}') for lv in lv_out}
+    refs.update({z["id"]: dict(type="zone", color=z["color"],
+                               chip=f'{z["id"]} {z["label"]}'.strip()) for z in zn_out})
+    refs.update({e["id"]: dict(type="event", color=e["color"], chip=e["id"]) for e in ev_list})
+
+    bias = struct.bias if struct is not None and struct.events else "—"
+    seq = " → ".join(e["name"] for e in ev_list) or "—"
+    text = notes.get("text") or _auto_text(bias, lv_out, ev_list)
+    last = float(df["close"].iloc[-1])
+    return dict(
+        symbol=symbol, timeframe=timeframe, tz=tz_label, bias=bias, seq=seq,
+        title=notes.get("title") or f"{symbol} {timeframe} — {bias}",
+        last=last, last_txt=_fmt_price(last),
+        last_time=(df.index[-1] + pd.Timedelta(hours=tz_hours)).strftime("%d/%m %H:%M"),
+        precision=pr, candles=candles, volume=volume, vol_ma=vol_ma, oi=oi, oi_unit=oi_unit,
+        levels=lv_out, zones=zn_out, events=ev_list, first=first,
+        text_html=render_text(text, refs),
+    )
+
+
+def _auto_text(bias: str, levels: list[dict], events: list[dict]) -> str:
+    if not events:
+        return "Aucune structure détectée sur la fenêtre — ajoute des `notes` pour annoter."
+    lines = [f"### Structure détectée : {bias}"]
+    ids = {lv["id"] for lv in levels}
+    if {"BH", "BB"} <= ids:
+        lines.append("Plage bornée par {BH} et {BB}.")
+    lines.append("")
+    for e in events:
+        lines.append(f"- {{{e['id']}}} {e['label']} — {e['why']}")
+    return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------- #
+# Rendu HTML
+# --------------------------------------------------------------------------- #
+def build_interactive_html(symbol: str, timeframe: str, df: pd.DataFrame, out_path: str,
+                           struct: WindowStructure | None = None, notes: dict | None = None,
+                           oi_ohlc: pd.DataFrame | None = None, tz_hours: int = 2,
+                           tz_label: str = "CEST") -> str:
+    """Écrit la page interactive autonome (librairie inlinée) et renvoie son chemin."""
+    model = build_model(symbol, timeframe, df, struct, notes, oi_ohlc, tz_hours, tz_label)
+    payload = json.dumps(model, ensure_ascii=False).replace("</", "<\\/")
+    lib = _VENDOR.read_text(encoding="utf-8")
+    page = (_TEMPLATE.replace("__TITLE__", html.escape(model["title"]))
+            .replace("__LIB__", lib).replace("__DATA__", payload))
+    Path(out_path).write_text(page, encoding="utf-8")
+    return out_path
+
+
+_TEMPLATE = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+:root{
+  --bg:#ffffff; --panel:#f6f7f9; --text:#16181d; --muted:#626a76; --border:#dfe2e7;
+  --grid:#eef0f3; --up:#26a69a; --down:#ef5350; --volma:#6b7280; --hl:rgba(59,130,246,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131722; --panel:#1a1f2b; --text:#d8dbe2; --muted:#8b93a1; --border:#2a3040;
+    --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131722; --panel:#1a1f2b; --text:#d8dbe2; --muted:#8b93a1; --border:#2a3040;
+  --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 420px;height:100vh}
+.chartcol{position:relative;display:flex;flex-direction:column;min-width:0}
+header{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:10px 14px;
+  border-bottom:1px solid var(--border)}
+header h1{font-size:15px;margin:0}
+header .meta{color:var(--muted);font-size:12px}
+header .tools{margin-left:auto;display:flex;gap:6px}
+header button{background:var(--panel);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer}
+#chartwrap{position:relative;flex:1;min-height:420px}
+#chart{position:absolute;inset:0}
+#overlay{position:absolute;inset:0;pointer-events:none;z-index:3}
+#legend{position:absolute;left:10px;top:6px;z-index:4;font-size:12px;color:var(--muted);
+  pointer-events:none;font-variant-numeric:tabular-nums}
+#legend b{color:var(--text);font-weight:600}
+aside{border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:4px 16px 24px}
+aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  margin:18px 0 6px}
+.text h3{font-size:14px;margin:14px 0 4px}
+.text p,.text li{margin:4px 0}
+.text ul{padding-left:18px;margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:var(--muted);font-weight:500;padding:4px 4px;border-bottom:1px solid var(--border)}
+td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:top}
+tr.row{cursor:pointer}
+tr.row:hover, tr.row.on{background:var(--hl)}
+td.num{text-align:right;white-space:nowrap}
+td.why{color:var(--muted);font-size:12px}
+details{font-size:12px;color:var(--muted);margin-top:3px}
+summary{cursor:pointer}
+.ref{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--c);
+  background:color-mix(in srgb,var(--c) 12%,transparent);color:var(--text);border-radius:5px;
+  padding:0 6px;margin:0 1px;font:600 12.5px/1.6 inherit;cursor:pointer;white-space:nowrap}
+.ref i{display:inline-block;width:8px;height:8px;background:var(--c)}
+.ref.dot i{border-radius:50%}
+.ref.zn i{width:12px;height:6px;opacity:.6}
+.ref:hover,.ref.on{background:color-mix(in srgb,var(--c) 30%,transparent)}
+.hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+@media (max-width: 900px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto;height:auto}
+  .chartcol{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--border)}
+  header{padding:6px 10px;gap:6px}
+  header h1{font-size:13px}
+  header .meta{display:none}
+  #chartwrap{flex:none;min-height:0;height:48vh}
+  #legend{font-size:10.5px;right:60px}
+  aside{border-left:0;border-top:1px solid var(--border);padding:4px 16px 24px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="chartcol">
+    <header>
+      <h1 id="ttl"></h1><span class="meta" id="meta"></span>
+      <div class="tools">
+        <button id="fit" title="Revenir à la vue initiale">Vue initiale</button>
+        <button id="all" title="Tout l'historique chargé">Tout</button>
+        <button id="theme" title="Thème clair / sombre">◐</button>
+      </div>
+    </header>
+    <div id="chartwrap"><div id="chart"></div><canvas id="overlay"></canvas><div id="legend"></div></div>
+  </div>
+  <aside>
+    <h2>Analyse</h2>
+    <div class="text" id="text"></div>
+    <p class="hint">Clic sur une pastille → le graphe s'y place. Survol d'une bougie
+      d'événement → sa ligne s'allume.</p>
+    <h2>Niveaux</h2>
+    <table id="levels"><thead><tr><th>Niveau</th><th class="num">Prix</th><th>Pourquoi ce niveau</th></tr></thead><tbody></tbody></table>
+    <h2 id="zh">Mouvements</h2>
+    <table id="zones"><thead><tr><th>Zone</th><th>Période</th><th>Lecture</th></tr></thead><tbody></tbody></table>
+    <h2>Événements</h2>
+    <table id="events"><thead><tr><th>Évt</th><th>Heure</th><th class="num">Prix</th><th class="num">vol×</th><th class="num">spr ATR</th><th class="num">ΔOI%</th></tr></thead><tbody></tbody></table>
+  </aside>
+</div>
+<script>__LIB__</script>
+<script>
+const D = __DATA__;
+const LW = LightweightCharts;
+const $ = s => document.querySelector(s);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (v, p) => v == null ? '—' : Number(v).toLocaleString('fr-FR', {maximumFractionDigits: p ?? D.precision});
+
+$('#ttl').textContent = D.title;
+$('#meta').textContent = `${D.seq} · bougies ${D.timeframe} (${D.tz}) · dernier ${D.last_txt} @ ${D.last_time}`;
+$('#text').innerHTML = D.text_html;
+
+// ---------------- Graphe ----------------
+const el = $('#chart');
+const chart = LW.createChart(el, {
+  autoSize: true,
+  layout: {attributionLogo: false, panes: {separatorColor: css('--border')}},
+  rightPriceScale: {borderVisible: false},
+  timeScale: {timeVisible: true, secondsVisible: false, borderVisible: false, rightOffset: 6},
+  crosshair: {mode: LW.CrosshairMode.Normal},
+});
+const priceFormat = {type: 'price', precision: D.precision, minMove: Math.pow(10, -D.precision)};
+const candles = chart.addSeries(LW.CandlestickSeries, {
+  upColor: css('--up'), downColor: css('--down'), wickUpColor: css('--up'), wickDownColor: css('--down'),
+  borderVisible: false, priceFormat,
+}, 0);
+candles.setData(D.candles);
+
+const vol = chart.addSeries(LW.HistogramSeries, {priceFormat: {type: 'volume'}, priceLineVisible: false, lastValueVisible: false}, 1);
+const volMa = chart.addSeries(LW.LineSeries, {lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false}, 1);
+volMa.setData(D.vol_ma);
+let oiSeries = null;
+if (D.oi.length) {
+  oiSeries = chart.addSeries(LW.CandlestickSeries, {borderVisible: false, priceLineVisible: false,
+    priceFormat: {type: 'price', precision: 3, minMove: 0.001}, title: 'OI ' + D.oi_unit}, 2);
+  oiSeries.setData(D.oi);
+}
+function paneHeights() {
+  // cours / volume / OI ≈ 60 / 18 / 22 %
+  const ps = chart.panes(), f = [3.4, 1, 1.25];
+  ps.forEach((p, i) => p.setStretchFactor(f[i] ?? 1));
+}
+
+// Niveaux = price lines (carré de couleur = niveau) ; titre = ID.
+const plines = {};
+for (const lv of D.levels) {
+  plines[lv.id] = candles.createPriceLine({price: lv.price, color: lv.color, lineWidth: 1,
+    lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: lv.id});
+}
+// Événements = marqueurs ronds sur l'extrême réel de la barre.
+let focusId = null;
+const markersApi = LW.createSeriesMarkers(candles, []);
+function drawMarkers() {
+  markersApi.setMarkers(D.events.map(e => ({
+    time: e.time, position: e.where === 'high' ? 'aboveBar' : 'belowBar', color: e.color,
+    shape: 'circle', text: e.id + (e.vol_ratio != null ? ' ×' + e.vol_ratio.toFixed(1) : ''),
+    size: focusId === e.id ? 2 : 1,
+  })));
+}
+
+function applyTheme() {
+  const t = css('--text'), g = css('--grid');
+  chart.applyOptions({layout: {background: {color: css('--bg')}, textColor: css('--muted'),
+    panes: {separatorColor: css('--border')}}, grid: {vertLines: {color: g}, horzLines: {color: g}}});
+  candles.applyOptions({upColor: css('--up'), downColor: css('--down'), wickUpColor: css('--up'), wickDownColor: css('--down')});
+  if (oiSeries) oiSeries.applyOptions({upColor: css('--up'), downColor: css('--down'), wickUpColor: css('--up'), wickDownColor: css('--down')});
+  volMa.applyOptions({color: css('--volma')});
+  const up = css('--up') + '99', dn = css('--down') + '99';
+  vol.setData(D.volume.map(v => ({time: v.time, value: v.value, color: v.ev || (v.up ? up : dn)})));
+  drawOverlay();
+}
+
+// ---------------- Overlay : zones + traits d'événements + surbrillance ----------------
+const cv = $('#overlay'), ctx = cv.getContext('2d');
+function drawOverlay() {
+  const dpr = window.devicePixelRatio || 1, w = el.clientWidth, h = el.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const ts = chart.timeScale(), plotW = w - chart.priceScale('right').width();
+  const bottom = h - ts.height();
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, plotW, bottom); ctx.clip();
+  const bw = Math.max(ts.options().barSpacing, 2);
+  // zones (mouvements cités dans l'analyse)
+  for (const z of D.zones) {
+    const x0 = ts.timeToCoordinate(z.t0), x1 = ts.timeToCoordinate(z.t1);
+    if (x0 == null || x1 == null) continue;
+    const y0 = candles.priceToCoordinate(z.hi), y1 = candles.priceToCoordinate(z.lo);
+    const on = focusId === z.id;
+    ctx.fillStyle = z.color + (on ? '40' : '1c'); ctx.strokeStyle = z.color + (on ? 'ff' : '88');
+    ctx.lineWidth = on ? 2 : 1;
+    const X = x0 - bw / 2, W = x1 - x0 + bw, Y = y0 - 4, H = y1 - y0 + 8;
+    ctx.fillRect(X, Y, W, H); ctx.strokeRect(X, Y, W, H);
+    ctx.fillStyle = z.color; ctx.font = '600 11px sans-serif'; ctx.fillText(z.id, X + 3, Y - 4);
+  }
+  // traits verticaux d'événement sur les 3 panneaux
+  for (const e of D.events) {
+    const x = ts.timeToCoordinate(e.time); if (x == null) continue;
+    const on = focusId === e.id;
+    ctx.strokeStyle = e.color + (on ? 'ff' : '66'); ctx.lineWidth = on ? 2 : 1;
+    ctx.setLineDash(on ? [] : [2, 3]); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bottom); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // niveau focalisé : bandeau
+  const lv = D.levels.find(l => l.id === focusId);
+  if (lv) { const y = candles.priceToCoordinate(lv.price);
+    if (y != null) { ctx.fillStyle = lv.color + '2a'; ctx.fillRect(0, y - 5, plotW, 10); } }
+  ctx.restore();
+}
+chart.timeScale().subscribeVisibleLogicalRangeChange(() => requestAnimationFrame(drawOverlay));
+new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe(el);
+
+// ---------------- Navigation ----------------
+const N = D.candles.length;
+function initialView() { chart.timeScale().setVisibleLogicalRange({from: D.first, to: N + 5}); }
+function idxOf(t) { let lo = 0, hi = N - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (D.candles[m].time <= t) lo = m; else hi = m - 1; } return lo; }
+function showPrice(p) {
+  // s'assurer que le niveau est dans l'échelle : élargit l'autoscale si besoin
+  candles.applyOptions({autoscaleInfoProvider: orig => { const r = orig(); if (!r) return r;
+    return {priceRange: {minValue: Math.min(r.priceRange.minValue, p), maxValue: Math.max(r.priceRange.maxValue, p)}, margins: r.margins}; }});
+}
+function setFocus(id, move) {
+  focusId = id;
+  document.querySelectorAll('[data-ref]').forEach(n => n.classList.toggle('on', n.dataset.ref === id));
+  for (const [k, pl] of Object.entries(plines)) pl.applyOptions({lineWidth: k === id ? 3 : 1,
+    lineStyle: k === id ? LW.LineStyle.Solid : LW.LineStyle.Dashed});
+  drawMarkers();
+  if (move) {
+    const e = D.events.find(x => x.id === id), z = D.zones.find(x => x.id === id), lv = D.levels.find(x => x.id === id);
+    const r = chart.timeScale().getVisibleLogicalRange(), span = r ? Math.max(40, r.to - r.from) : 80;
+    if (e) { const i = idxOf(e.time); chart.timeScale().setVisibleLogicalRange({from: i - span / 2, to: i + span / 2}); }
+    if (z) { const pad = Math.max(25, (z.i1 - z.i0)); chart.timeScale().setVisibleLogicalRange({from: z.i0 - pad, to: z.i1 + pad}); }
+    if (lv) showPrice(lv.price);
+  }
+  requestAnimationFrame(drawOverlay);
+}
+document.addEventListener('click', ev => {
+  const n = ev.target.closest('[data-ref]'); if (n) setFocus(n.dataset.ref, true);
+});
+document.addEventListener('mouseover', ev => {
+  const n = ev.target.closest('[data-ref]'); if (n && focusId !== n.dataset.ref) { focusId = n.dataset.ref; drawMarkers(); requestAnimationFrame(drawOverlay); }
+});
+$('#fit').onclick = () => { candles.applyOptions({autoscaleInfoProvider: undefined}); setFocus(null, false); initialView(); };
+$('#all').onclick = () => chart.timeScale().fitContent();
+$('#theme').onclick = () => {
+  const r = document.documentElement, dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const cur = r.dataset.theme || (dark ? 'dark' : 'light');
+  r.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('wy-theme', r.dataset.theme); } catch (e) {}
+  applyTheme();
+};
+try { const t = localStorage.getItem('wy-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+// ---------------- Légende (crosshair) + lien bougie → ligne ----------------
+const evByTime = Object.fromEntries(D.events.map(e => [e.time, e]));
+const volByTime = Object.fromEntries(D.volume.map(v => [v.time, v.value]));
+const maByTime = Object.fromEntries(D.vol_ma.map(v => [v.time, v.value]));
+const oiByTime = Object.fromEntries(D.oi.map(o => [o.time, o]));
+function legend(t) {
+  const c = t != null ? D.candles[idxOf(t)] : D.candles[N - 1];
+  const v = volByTime[c.time], ma = maByTime[c.time], o = oiByTime[c.time];
+  const chg = ((c.close - c.open) / c.open * 100);
+  let s = `<b>${D.symbol} ${D.timeframe}</b> O <b>${fmt(c.open)}</b> H <b>${fmt(c.high)}</b> L <b>${fmt(c.low)}</b> C <b>${fmt(c.close)}</b> `
+        + `<span style="color:${chg >= 0 ? css('--up') : css('--down')}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
+  if (v != null) s += ` · vol <b>${fmt(v, 0)}</b>${ma ? ` (×${(v / ma).toFixed(2)})` : ''}`;
+  if (o) s += ` · OI Δ <b>${((o.close - o.open) / o.open * 100).toFixed(2)}%</b>`;
+  const e = evByTime[c.time];
+  if (e) s += ` · <b style="color:${e.color}">● ${esc(e.id)}</b>`;
+  $('#legend').innerHTML = s;
+  document.querySelectorAll('tr.row[data-ref]').forEach(n => n.classList.toggle('on', !!e && n.dataset.ref === e.id));
+}
+chart.subscribeCrosshairMove(p => legend(p && p.time != null ? p.time : null));
+
+// ---------------- Tables ----------------
+$('#levels tbody').innerHTML = D.levels.map(l => `<tr class="row" data-ref="${esc(l.id)}">
+  <td><button class="ref sq" data-ref="${esc(l.id)}" style="--c:${l.color}"><i></i>${esc(l.id)}</button> ${esc(l.label)}</td>
+  <td class="num"><b>${esc(l.price_txt)}</b></td><td class="why">${esc(l.reason)}</td></tr>`).join('')
+  || '<tr><td colspan="3" class="why">—</td></tr>';
+if (D.zones.length) {
+  $('#zones tbody').innerHTML = D.zones.map(z => `<tr class="row" data-ref="${esc(z.id)}">
+    <td><button class="ref zn" data-ref="${esc(z.id)}" style="--c:${z.color}"><i></i>${esc(z.id)}</button></td>
+    <td class="why">${esc(z.span)}</td><td>${esc(z.label)}${z.reason ? `<div class="why">${esc(z.reason)}</div>` : ''}</td></tr>`).join('');
+} else { $('#zones').style.display = 'none'; $('#zh').style.display = 'none'; }
+$('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${esc(e.id)}">
+  <td><button class="ref dot" data-ref="${esc(e.id)}" style="--c:${e.color}"><i></i>${esc(e.id)}</button></td>
+  <td>${esc(e.label)}</td><td class="num">${esc(e.price_txt)}</td>
+  <td class="num">${e.vol_ratio != null ? e.vol_ratio.toFixed(2) : '—'}</td>
+  <td class="num">${e.spread_atr != null ? e.spread_atr.toFixed(2) : '—'}</td>
+  <td class="num">${e.oi_chg != null ? e.oi_chg.toFixed(2) : '—'}</td></tr>
+  ${(e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="6" class="why">${esc(e.why)}
+    ${e.theory ? `<details><summary>Théorie</summary>${esc(e.theory)}</details>` : ''}</td></tr>` : ''}`).join('')
+  || '<tr><td colspan="6" class="why">—</td></tr>';
+
+applyTheme(); drawMarkers(); paneHeights(); initialView(); legend(null);
+</script>
+</body>
+</html>
+"""
+
+
+# --------------------------------------------------------------------------- #
+# CLI
+# --------------------------------------------------------------------------- #
+def main(argv: list[str] | None = None) -> None:
+    from . import data as data_mod
+    from .events import Thresholds
+    from .features import add_features
+    from .window import detect_window_structure
+
+    p = argparse.ArgumentParser(description="Graphe interactif HTML (analyse ↔ graphe)")
+    p.add_argument("--symbol", default="BTC/USDT")
+    p.add_argument("--timeframe", default="1h")
+    p.add_argument("--limit", type=int, default=300)
+    p.add_argument("--window", type=int, default=60, help="fenêtre de détection (barres)")
+    p.add_argument("--notes", help="JSON d'annotations (niveaux, zones, événements, texte)")
+    p.add_argument("--no-detect", action="store_true", help="n'afficher que les notes")
+    p.add_argument("--oi-source", default="binance", choices=["binance", "okx", "agg3"])
+    p.add_argument("--out", help="chemin du HTML (défaut : chart_<sym>_<tf>.html)")
+    a = p.parse_args(argv)
+
+    ex = data_mod.get_exchange("binance")
+    df = add_features(data_mod.fetch_ohlcv(ex, a.symbol, a.timeframe, a.limit, use_cache=False))
+    oi = data_mod.fetch_open_interest(a.symbol, a.timeframe, a.limit, source=a.oi_source)
+    struct = None if a.no_detect else detect_window_structure(df, lookback=a.window, th=Thresholds(), oi=oi)
+    oi_ohlc = data_mod.fetch_open_interest_ohlc(a.symbol, a.timeframe, a.limit, source=a.oi_source,
+                                                start=df.index[0], end=df.index[-1])
+    notes = json.loads(Path(a.notes).read_text(encoding="utf-8")) if a.notes else None
+    out = a.out or f"chart_{a.symbol.replace('/', '').lower()}_{a.timeframe}.html"
+    build_interactive_html(a.symbol, a.timeframe, df, out, struct=struct, notes=notes, oi_ohlc=oi_ohlc)
+    print(f"→ graphe interactif : {out}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

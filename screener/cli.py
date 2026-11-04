@@ -141,6 +141,20 @@ def run_window(cfg: dict) -> pd.DataFrame:
                 plot_window_structure(sym, cfg["timeframe"], struct, out, ex=ex,
                                       oi_source=cfg.get("oi_source", "binance"))
                 print(f"→ graphique : {out}", file=sys.stderr)
+            if cfg.get("html"):
+                import json
+                from .interactive import build_interactive_html
+                notes = None
+                if cfg.get("notes"):
+                    with open(cfg["notes"], encoding="utf-8") as f:
+                        notes = json.load(f)
+                oi_ohlc = data_mod.fetch_open_interest_ohlc(
+                    sym, cfg["timeframe"], cfg["limit"], source=cfg.get("oi_source", "binance"),
+                    start=df.index[0], end=df.index[-1]) if cfg.get("oi", True) else None
+                out = f"chart_{sym.replace('/', '').lower()}_{cfg['timeframe']}.html"
+                build_interactive_html(sym, cfg["timeframe"], df, out, struct=struct,
+                                       notes=notes, oi_ohlc=oi_ohlc)
+                print(f"→ graphe interactif : {out}", file=sys.stderr)
         except Exception as e:
             print(f"  [skip] {sym}: {e}", file=sys.stderr)
     return pd.DataFrame(rows)
@@ -174,6 +188,9 @@ def main() -> None:
     p.add_argument("--window", nargs="?", type=int, const=60, default=None,
                    help="mode séquence Wyckoff sur fenêtre glissante (défaut 60 barres)")
     p.add_argument("--chart", action="store_true", help="génère un graphique (bougies TF inférieure)")
+    p.add_argument("--html", action="store_true",
+                   help="graphe interactif HTML (texte ↔ graphe, pastilles cliquables)")
+    p.add_argument("--notes", help="JSON d'annotations pour --html (niveaux, zones, texte)")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("--no-oi", action="store_true", help="désactive l'Open Interest (confirmation AR + ΔOI)")
     p.add_argument("--oi-source", choices=["binance", "okx", "agg3"], default=cfg["oi_source"],
@@ -183,7 +200,7 @@ def main() -> None:
 
     cfg.update(exchange=args.exchange, timeframe=args.timeframe, top=args.top,
                symbols=args.symbols, bias=args.bias, max_results=args.max_results,
-               use_cache=not args.no_cache, chart=args.chart, oi=not args.no_oi,
+               use_cache=not args.no_cache, chart=args.chart, html=args.html, notes=args.notes, oi=not args.no_oi,
                oi_source=args.oi_source)
     if args.window is not None:
         cfg["window"] = args.window
