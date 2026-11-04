@@ -158,8 +158,11 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4,
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
             df = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])))
-            return pd.Series(df["sum_open_interest_value"].astype(float).values,
-                             index=pd.to_datetime(df["create_time"], utc=True))
+            s = pd.Series(df["sum_open_interest_value"].astype(float).values,
+                          index=pd.to_datetime(df["create_time"], utc=True))
+            # L'archive contient des trous codés à 0 (ex. 15/10/2026 13:40) : un OI nul
+            # est impossible → on les retire, sinon fausse mèche à 0 et Δ aberrants.
+            return s[s > 0]
         except Exception:
             return None
 
