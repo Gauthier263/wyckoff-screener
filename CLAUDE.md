@@ -75,7 +75,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   cours / volume (+ vol MA) / OI en 3 panneaux synchronisés, **même TF**, heure CEST, zoom/pan ;
   à côté, le **texte de l'analyse** + tables niveaux / mouvements / événements. Les références
   `{ID}` du texte deviennent des **pastilles cliquables** (clic → le graphe s'y recentre et
-  surligne ; survol d'une bougie d'événement → sa ligne s'allume). Contenu = structure détectée
+  surligne ; survol d'une bougie d'événement → sa ligne s'allume). Sous la 1ʳᵉ phrase qui cite une zone
+  `{M…}`, une **vignette zoomée** (bougies du mouvement + rectangle + niveaux proches) est insérée
+  dans le texte : le mouvement évoqué se voit sans quitter la lecture. Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
   `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
   CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive

@@ -120,7 +120,18 @@ _REF = re.compile(r"\{([A-Za-z][A-Za-z0-9_+\-?]*)\}")
 
 def render_text(text: str, refs: dict[str, dict]) -> str:
     """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; `{ID}` → pastille
-    cliquable si l'ID est connu (niveau, zone ou événement), sinon laissé tel quel."""
+    cliquable si l'ID est connu (niveau, zone ou événement), sinon laissé tel quel.
+    Sous le **premier** bloc (paragraphe / puce) qui cite une zone `{M…}`, insère une
+    **vignette zoomée** (`<div class="thumb">`) dessinée côté page : le mouvement évoqué
+    est visible juste sous la phrase, sans aller le chercher sur le graphe."""
+    thumbed: set[str] = set()
+    found: list[str] = []
+
+    def thumbs() -> str:
+        new = [z for z in found if z not in thumbed]
+        thumbed.update(new)
+        found.clear()
+        return "".join(f'<div class="thumb" data-zone="{html.escape(z)}"></div>' for z in new)
 
     def inline(s: str) -> str:
         s = html.escape(s, quote=False)
@@ -132,6 +143,8 @@ def render_text(text: str, refs: dict[str, dict]) -> str:
             r = refs.get(rid)
             if r is None:
                 return m.group(0)
+            if r["type"] == "zone":
+                found.append(rid)
             shape = "sq" if r["type"] == "level" else "zn" if r["type"] == "zone" else "dot"
             return (f'<button class="ref {shape}" data-ref="{html.escape(rid)}" '
                     f'style="--c:{r["color"]}"><i></i>{html.escape(r["chip"])}</button>')
@@ -141,10 +154,10 @@ def render_text(text: str, refs: dict[str, dict]) -> str:
 
     def flush():
         if para:
-            out.append(f"<p>{inline(' '.join(para))}</p>")
+            out.append(f"<p>{inline(' '.join(para))}</p>{thumbs()}")
             para.clear()
         if items:
-            out.append("<ul>" + "".join(f"<li>{inline(i)}</li>" for i in items) + "</ul>")
+            out.append("<ul>" + "".join(f"<li>{inline(i)}{thumbs()}</li>" for i in items) + "</ul>")
             items.clear()
 
     for raw in (text or "").splitlines():
@@ -154,9 +167,10 @@ def render_text(text: str, refs: dict[str, dict]) -> str:
         elif line.startswith("#"):
             flush()
             out.append(f"<h3>{inline(line.lstrip('#').strip())}</h3>")
+            found.clear()                                  # pas de vignette sous un titre
         elif line[:2] in ("- ", "* ", "• "):
             if para:
-                out.append(f"<p>{inline(' '.join(para))}</p>")
+                out.append(f"<p>{inline(' '.join(para))}</p>{thumbs()}")
                 para.clear()
             items.append(line[2:])
         else:
@@ -418,6 +432,14 @@ summary{cursor:pointer}
 .ref.zn i{width:12px;height:6px;opacity:.6}
 .ref:hover,.ref.on{background:color-mix(in srgb,var(--c) 30%,transparent)}
 .hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+.thumb{position:relative;height:150px;margin:6px 0 10px;border:1px solid var(--border);
+  border-radius:6px;background:var(--bg);overflow:hidden;cursor:pointer}
+.thumb .tc{position:absolute;inset:18px 0 0 0}
+.thumb canvas.ov{position:absolute;inset:18px 0 0 0;pointer-events:none;z-index:3}
+.thumb .cap{position:absolute;left:6px;top:2px;right:6px;font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thumb .cap b{color:var(--c)}
+.thumb.on{outline:2px solid var(--c)}
 @media (max-width: 900px){
   .app{grid-template-columns:1fr;grid-template-rows:auto auto;height:auto}
   .chartcol{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--border)}
@@ -649,6 +671,59 @@ $('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${es
   ${(e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="6" class="why">${esc(e.why)}
     ${e.theory ? `<details><summary>Théorie</summary>${esc(e.theory)}</details>` : ''}</td></tr>` : ''}`).join('')
   || '<tr><td colspan="6" class="why">—</td></tr>';
+
+// ---------------- Vignettes zoomées (une par mouvement cité) ----------------
+const thumbs = [];
+document.querySelectorAll('.thumb[data-zone]').forEach(box => {
+  const z = D.zones.find(x => x.id === box.dataset.zone); if (!z) return;
+  box.dataset.ref = z.id; box.style.setProperty('--c', z.color);
+  box.innerHTML = `<div class="cap"><b>${esc(z.id)}</b> ${esc(z.label)} · ${esc(z.span)}${z.reason ? ' — ' + esc(z.reason) : ''}</div><div class="tc"></div><canvas class="ov"></canvas>`;
+  const pad = Math.max(8, Math.round((z.i1 - z.i0) * 1.2));
+  const a = Math.max(0, z.i0 - pad), b = Math.min(N - 1, z.i1 + pad), lack = z.i1 + pad - b;
+  const sub = D.candles.slice(a, b + 1);
+  const lo = Math.min(...sub.map(c => c.low)), hi = Math.max(...sub.map(c => c.high)), m = (hi - lo) * 0.35;
+  const tc = LW.createChart(box.querySelector('.tc'), {autoSize: true, handleScroll: false, handleScale: false,
+    layout: {attributionLogo: false}, rightPriceScale: {visible: false}, leftPriceScale: {visible: false},
+    timeScale: {visible: false}, crosshair: {mode: LW.CrosshairMode.Hidden}});
+  // échelle figée sur le mouvement : sinon les marqueurs (grosse taille relative) écrasent les bougies
+  const s = tc.addSeries(LW.CandlestickSeries, {borderVisible: false, priceLineVisible: false, lastValueVisible: false, priceFormat,
+    autoscaleInfoProvider: () => ({priceRange: {minValue: lo - (hi - lo) * 0.08, maxValue: hi + (hi - lo) * 0.08}, margins: {above: 4, below: 4}})});
+  s.setData(sub);
+  // niveaux proches du mouvement (dans la plage visible ± 35 %) : même ligne que le grand graphe
+  for (const lv of D.levels) if (lv.price >= lo - m && lv.price <= hi + m)
+    s.createPriceLine({price: lv.price, color: lv.color, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: false, title: lv.id});
+  const ev = D.events.filter(e => e.time >= sub[0].time && e.time <= sub[sub.length - 1].time);
+  LW.createSeriesMarkers(s, ev.map(e => ({time: e.time, position: e.where === 'high' ? 'aboveBar' : 'belowBar',
+    color: e.color, shape: 'circle', text: e.id})));
+  // mouvement en bord droit (dernières bougies) : on garde de l'air à droite pour le voir entier
+  if (lack > 0) { tc.timeScale().applyOptions({rightOffset: lack}); tc.timeScale().setVisibleLogicalRange({from: -1, to: sub.length - 1 + lack}); }
+  else tc.timeScale().fitContent();
+  const cvs = box.querySelector('canvas.ov'), g = cvs.getContext('2d');
+  const draw = () => {
+    const w = cvs.clientWidth, h = cvs.clientHeight, dpr = window.devicePixelRatio || 1;
+    cvs.width = w * dpr; cvs.height = h * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    const x0 = tc.timeScale().timeToCoordinate(z.t0), x1 = tc.timeScale().timeToCoordinate(z.t1);
+    const y0 = s.priceToCoordinate(z.hi), y1 = s.priceToCoordinate(z.lo);
+    if (x0 == null || x1 == null || y0 == null || y1 == null) return;
+    const bw = Math.max(tc.timeScale().options().barSpacing, 3);
+    g.fillStyle = z.color + '26'; g.strokeStyle = z.color; g.lineWidth = 1.5;
+    g.fillRect(x0 - bw / 2, y0 - 3, x1 - x0 + bw, y1 - y0 + 6); g.strokeRect(x0 - bw / 2, y0 - 3, x1 - x0 + bw, y1 - y0 + 6);
+  };
+  new ResizeObserver(() => requestAnimationFrame(draw)).observe(box);
+  tc.timeScale().subscribeVisibleLogicalRangeChange(() => requestAnimationFrame(draw));
+  tc.timeScale().subscribeSizeChange(() => requestAnimationFrame(draw));
+  setTimeout(draw, 150);
+  thumbs.push({tc, s});
+});
+function themeThumbs() {
+  for (const {tc, s} of thumbs) {
+    tc.applyOptions({layout: {background: {color: css('--bg')}, textColor: css('--muted')},
+      grid: {vertLines: {visible: false}, horzLines: {color: css('--grid')}}});
+    s.applyOptions({upColor: css('--up'), downColor: css('--down'), wickUpColor: css('--up'), wickDownColor: css('--down')});
+  }
+}
+const _applyTheme = applyTheme;
+applyTheme = function () { _applyTheme(); themeThumbs(); };
 
 applyTheme(); drawMarkers(); paneHeights(); initialView(); legend(null);
 </script>
