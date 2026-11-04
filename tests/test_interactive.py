@@ -101,3 +101,10 @@ def test_html_is_self_contained(tmp_path):
     assert "<script src=" not in page
     data = page.split("const D = ", 1)[1].split(";\nconst LW", 1)[0]
     assert json.loads(data)["title"] == "Démo"
+
+
+def test_thumbnail_under_first_mention_only():
+    refs = {"M1": dict(type="zone", color="#000", chip="M1 rebond")}
+    h = render_text("### Titre {M1}\n- rebond {M1}\n- encore {M1}\n\nParagraphe {M1}", refs)
+    assert h.count('class="thumb"') == 1                    # une seule vignette par zone
+    assert '<li>rebond <button' in h and 'data-zone="M1"></div></li>' in h
