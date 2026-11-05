@@ -6,8 +6,8 @@ But : supprimer l'aller-retour analyse ↔ TradingView. La page embarque :
     zoom/pan à la souris) en 3 panneaux synchronisés : cours / volume (+ vol MA) / OI ;
     bougies **dans la même TF que l'analyse**, horodatage CEST ;
   * un **panneau latéral** : texte de l'analyse + table des niveaux + table des événements.
-    Chaque référence du texte (`{BH}`, `{SC}`, `{N1}`, `{M1}`…) devient une **pastille
-    cliquable** : clic → le graphe se recentre et met l'élément en surbrillance ; survol →
+    Chaque référence du texte (`{BH}`, `{SC}`, `{N1}`, `{M1}`…) devient une **référence
+    cliquable** (étiquette neutre, sans pastille de couleur) : clic → le graphe se recentre et met l'élément en surbrillance ; survol →
     surbrillance seule. Inversement, survoler une bougie d'événement surligne sa ligne.
 
 La librairie est **inlinée** (screener/vendor, Apache-2.0) : le fichier marche hors-ligne,
@@ -119,7 +119,7 @@ _REF = re.compile(r"\{([A-Za-z][A-Za-z0-9_+\-?]*)\}")
 
 
 def render_text(text: str, refs: dict[str, dict]) -> str:
-    """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; `{ID}` → pastille
+    """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; `{ID}` → référence
     cliquable si l'ID est connu (niveau, zone ou événement), sinon laissé tel quel.
     Sous le **premier** bloc (paragraphe / puce) qui cite une zone `{M…}`, insère une
     **vignette zoomée** (`<div class="thumb">`) dessinée côté page : le mouvement évoqué
@@ -145,9 +145,9 @@ def render_text(text: str, refs: dict[str, dict]) -> str:
                 return m.group(0)
             if r["type"] == "zone":
                 found.append(rid)
-            shape = "sq" if r["type"] == "level" else "zn" if r["type"] == "zone" else "dot"
-            return (f'<button class="ref {shape}" data-ref="{html.escape(rid)}" '
-                    f'style="--c:{r["color"]}"><i></i>{html.escape(r["chip"])}</button>')
+            # référence neutre : aucune pastille de couleur (la couleur vit sur le graphe)
+            return (f'<button class="ref" data-ref="{html.escape(rid)}">'
+                    f'{html.escape(r["chip"])}</button>')
         return _REF.sub(chip, s)
 
     out, para, items = [], [], []
@@ -424,13 +424,10 @@ td.num{text-align:right;white-space:nowrap}
 td.why{color:var(--muted);font-size:12px}
 details{font-size:12px;color:var(--muted);margin-top:3px}
 summary{cursor:pointer}
-.ref{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--c);
-  background:color-mix(in srgb,var(--c) 12%,transparent);color:var(--text);border-radius:5px;
+.ref{display:inline-flex;align-items:center;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);border-radius:5px;text-decoration:underline dotted;
   padding:0 6px;margin:0 1px;font:600 12.5px/1.6 inherit;cursor:pointer;white-space:nowrap}
-.ref i{display:inline-block;width:8px;height:8px;background:var(--c)}
-.ref.dot i{border-radius:50%}
-.ref.zn i{width:12px;height:6px;opacity:.6}
-.ref:hover,.ref.on{background:color-mix(in srgb,var(--c) 30%,transparent)}
+.ref:hover,.ref.on{background:var(--hl);border-color:var(--muted)}
 .hint{color:var(--muted);font-size:12px;margin:8px 0 0}
 .thumb{position:relative;height:150px;margin:6px 0 10px;border:1px solid var(--border);
   border-radius:6px;background:var(--bg);overflow:hidden;cursor:pointer}
@@ -438,8 +435,8 @@ summary{cursor:pointer}
 .thumb canvas.ov{position:absolute;inset:18px 0 0 0;pointer-events:none;z-index:3}
 .thumb .cap{position:absolute;left:6px;top:2px;right:6px;font-size:11px;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.thumb .cap b{color:var(--c)}
-.thumb.on{outline:2px solid var(--c)}
+.thumb .cap b{color:var(--text)}
+.thumb.on{outline:2px solid var(--muted)}
 @media (max-width: 900px){
   .app{grid-template-columns:1fr;grid-template-rows:auto auto;height:auto}
   .chartcol{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--border)}
@@ -468,7 +465,7 @@ summary{cursor:pointer}
   <aside>
     <h2>Analyse</h2>
     <div class="text" id="text"></div>
-    <p class="hint">Clic sur une pastille → le graphe s'y place. Survol d'une bougie
+    <p class="hint">Clic sur une référence → le graphe s'y place. Survol d'une bougie
       d'événement → sa ligne s'allume.</p>
     <h2>Niveaux</h2>
     <table id="levels"><thead><tr><th>Niveau</th><th class="num">Prix</th><th>Pourquoi ce niveau</th></tr></thead><tbody></tbody></table>
@@ -646,7 +643,7 @@ function legend(t) {
   if (v != null) s += ` · vol <b>${fmt(v, 0)}</b>${ma ? ` (×${(v / ma).toFixed(2)})` : ''}`;
   if (o) s += ` · OI Δ <b>${((o.close - o.open) / o.open * 100).toFixed(2)}%</b>`;
   const e = evByTime[c.time];
-  if (e) s += ` · <b style="color:${e.color}">● ${esc(e.id)}</b>`;
+  if (e) s += ` · événement <b>${esc(e.id)}</b>`;
   $('#legend').innerHTML = s;
   document.querySelectorAll('tr.row[data-ref]').forEach(n => n.classList.toggle('on', !!e && n.dataset.ref === e.id));
 }
@@ -654,16 +651,16 @@ chart.subscribeCrosshairMove(p => legend(p && p.time != null ? p.time : null));
 
 // ---------------- Tables ----------------
 $('#levels tbody').innerHTML = D.levels.map(l => `<tr class="row" data-ref="${esc(l.id)}">
-  <td><button class="ref sq" data-ref="${esc(l.id)}" style="--c:${l.color}"><i></i>${esc(l.id)}</button> ${esc(l.label)}</td>
+  <td><button class="ref sq" data-ref="${esc(l.id)}">${esc(l.id)}</button> ${esc(l.label)}</td>
   <td class="num"><b>${esc(l.price_txt)}</b></td><td class="why">${esc(l.reason)}</td></tr>`).join('')
   || '<tr><td colspan="3" class="why">—</td></tr>';
 if (D.zones.length) {
   $('#zones tbody').innerHTML = D.zones.map(z => `<tr class="row" data-ref="${esc(z.id)}">
-    <td><button class="ref zn" data-ref="${esc(z.id)}" style="--c:${z.color}"><i></i>${esc(z.id)}</button></td>
+    <td><button class="ref zn" data-ref="${esc(z.id)}">${esc(z.id)}</button></td>
     <td class="why">${esc(z.span)}</td><td>${esc(z.label)}${z.reason ? `<div class="why">${esc(z.reason)}</div>` : ''}</td></tr>`).join('');
 } else { $('#zones').style.display = 'none'; $('#zh').style.display = 'none'; }
 $('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${esc(e.id)}">
-  <td><button class="ref dot" data-ref="${esc(e.id)}" style="--c:${e.color}"><i></i>${esc(e.id)}</button></td>
+  <td><button class="ref dot" data-ref="${esc(e.id)}">${esc(e.id)}</button></td>
   <td>${esc(e.label)}</td><td class="num">${esc(e.price_txt)}</td>
   <td class="num">${e.vol_ratio != null ? e.vol_ratio.toFixed(2) : '—'}</td>
   <td class="num">${e.spread_atr != null ? e.spread_atr.toFixed(2) : '—'}</td>
@@ -676,7 +673,7 @@ $('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${es
 const thumbs = [];
 document.querySelectorAll('.thumb[data-zone]').forEach(box => {
   const z = D.zones.find(x => x.id === box.dataset.zone); if (!z) return;
-  box.dataset.ref = z.id; box.style.setProperty('--c', z.color);
+  box.dataset.ref = z.id;
   box.innerHTML = `<div class="cap"><b>${esc(z.id)}</b> ${esc(z.label)} · ${esc(z.span)}${z.reason ? ' — ' + esc(z.reason) : ''}</div><div class="tc"></div><canvas class="ov"></canvas>`;
   const pad = Math.max(8, Math.round((z.i1 - z.i0) * 1.2));
   const a = Math.max(0, z.i0 - pad), b = Math.min(N - 1, z.i1 + pad), lack = z.i1 + pad - b;

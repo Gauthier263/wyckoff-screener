@@ -83,12 +83,13 @@ def test_notes_merge_zones_and_cest_shift():
     assert "<h3>Cadre</h3>" in h
 
 
-def test_render_text_escapes_and_shapes():
+def test_render_text_escapes_and_neutral_refs():
     refs = {"N1": dict(type="level", color="#000", chip="N1 1"),
             "SC": dict(type="event", color="#000", chip="SC")}
     h = render_text("<b>x</b> **gras** {N1} {SC}\n- item {SC}", refs)
     assert "&lt;b&gt;" in h and "<strong>gras</strong>" in h
-    assert 'class="ref sq"' in h and 'class="ref dot"' in h and "<li>" in h
+    assert h.count('class="ref"') == 3 and "<li>" in h
+    assert "<i></i>" not in h and "--c:" not in h          # aucune pastille de couleur
 
 
 def test_html_is_self_contained(tmp_path):

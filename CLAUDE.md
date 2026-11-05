@@ -85,7 +85,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   autonome (Lightweight Charts de TradingView **inliné**, `screener/vendor/`, hors-ligne) avec
   cours / volume (+ vol MA) / OI en 3 panneaux synchronisés, **même TF**, heure CEST, zoom/pan ;
   à côté, le **texte de l'analyse** + tables niveaux / mouvements / événements. Les références
-  `{ID}` du texte deviennent des **pastilles cliquables** (clic → le graphe s'y recentre et
+  `{ID}` du texte deviennent des **références cliquables** (étiquettes neutres, sans pastille de couleur) (clic → le graphe s'y recentre et
   surligne ; survol d'une bougie d'événement → sa ligne s'allume). Sous la 1ʳᵉ phrase qui cite une zone
   `{M…}`, une **vignette zoomée** (bougies du mouvement + rectangle + niveaux proches) est insérée
   dans le texte : le mouvement évoqué se voit sans quitter la lecture. Contenu = structure détectée
