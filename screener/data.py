@@ -23,6 +23,13 @@ def get_exchange(name: str = "binance"):
         # géo-bloqués) qui n'apportent rien ici.
         opts["options"] = {"fetchMarkets": ["spot"]}
     ex = klass(opts)
+    # ccxt met la session requests en trust_env=False : elle ignore alors HTTPS_PROXY /
+    # REQUESTS_CA_BUNDLE. On réactive trust_env pour que le screener fonctionne derrière un
+    # proxy d'entreprise / une CA d'inspection TLS (jamais de désactivation de la vérif).
+    try:
+        ex.session.trust_env = True
+    except Exception:
+        pass
     if name == "binance":
         # Route les endpoints publics vers le miroir officiel data-only de Binance :
         # mêmes données et mêmes volumes, sans clé API, et non géo-restreint —
@@ -71,6 +78,31 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
         except Exception:
             pass  # parquet optionnel ; le screener fonctionne sans cache disque
     return df
+
+
+def fetch_taker_delta(symbol: str = "BTC/USDT", timeframe: str = "1h",
+                      limit: int = 300, ex=None) -> "pd.Series | None":
+    """Delta agressif par barre (taker_buy − taker_sell), en **coin**, pour le CVD/absorption.
+
+    Source : klines Binance (`publicGetKlines`, col 9 = taker_buy_base_volume) via le miroir
+    `data-api.binance.vision` (le perp `fapi` est 451-bloqué → CVD spot, proxy du flux). Index
+    ts **UTC réel** (mêmes open times que `fetch_ohlcv` : appliquer le même décalage d'affichage
+    qu'au prix). Renvoie `None` si indisponible.
+    """
+    ex = ex or get_exchange("binance")
+    sym = symbol.replace("/", "").split(":")[0]
+    try:
+        raw = ex.publicGetKlines({"symbol": sym, "interval": timeframe, "limit": limit})
+    except Exception:
+        return None
+    if not raw:
+        return None
+    idx = pd.to_datetime([int(r[0]) for r in raw], unit="ms", utc=True)
+    vol = pd.Series([float(r[5]) for r in raw], index=idx, dtype=float)
+    tbuy = pd.Series([float(r[9]) for r in raw], index=idx, dtype=float)
+    delta = tbuy - (vol - tbuy)          # taker_buy − taker_sell
+    delta.name = "delta"
+    return delta
 
 
 # Venues d'OI atteignables (Binance fapi / Bybit géo-bloqués ; Gate retiré → OKX seul).
