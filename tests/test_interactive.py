@@ -109,3 +109,27 @@ def test_thumbnail_under_first_mention_only():
     h = render_text("### Titre {M1}\n- rebond {M1}\n- encore {M1}\n\nParagraphe {M1}", refs)
     assert h.count('class="thumb"') == 1                    # une seule vignette par zone
     assert '<li>rebond <button' in h and 'data-zone="M1"></div></li>' in h
+
+
+def test_canonical_format_slots_verdict_theory_view():
+    """Format canonique : tables placées dans le texte, verdict/sens, ΔOI calculé, théorie
+    auto depuis les Thresholds, vue initiale bornée par `view`."""
+    df = _df()
+    oi = pd.DataFrame({"open": 100.0, "high": 101.0, "low": 99.0,
+                       "close": np.linspace(100, 110, len(df))}, index=df.index)
+    notes = {
+        "bias": "accumulation", "page_title": "Démo 1h",
+        "view": {"from": "04/11 00:00", "to": "04/11 20:00"},
+        "events": [{"id": "S1", "name": "SOS ?", "theory_of": "SOS", "time": "04/11 12:00",
+                    "where": "high", "verdict": "tentative", "sense": "OI en baisse"}],
+        "text": "### 2. Lecture\n[[events]]\n### 5. Niveaux\n[[levels]]",
+    }
+    m = build_model("TEST/USDT", "1h", df, notes=notes, oi_ohlc=oi, min_bars=10)
+    assert '<div class="slot" data-slot="events"></div>' in m["text_html"]
+    assert '<div class="slot" data-slot="levels"></div>' in m["text_html"]
+    e = m["events"][0]
+    assert e["verdict"] == "tentative" and e["sense"] == "OI en baisse"
+    assert e["oi_chg"] is not None and e["oi_chg"] > 0          # calculé depuis oi_ohlc
+    assert "×1.3" in e["theory"] or "1.3" in e["theory"]       # seuil SOS issu des Thresholds
+    assert m["last_i"] < len(df) - 1 and m["first"] <= m["last_i"]
+    assert m["page_title"] == "Démo 1h"

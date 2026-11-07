@@ -119,7 +119,9 @@ _REF = re.compile(r"\{([A-Za-z][A-Za-z0-9_+\-?]*)\}")
 
 
 def render_text(text: str, refs: dict[str, dict]) -> str:
-    """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; `{ID}` → référence
+    """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; une ligne seule
+    `[[events]]` / `[[levels]]` / `[[zones]]` place la table correspondante à cet endroit du
+    texte (format canonique : tableau événement en section 2, niveaux en section 5) ; `{ID}` → référence
     cliquable si l'ID est connu (niveau, zone ou événement), sinon laissé tel quel.
     Sous le **premier** bloc (paragraphe / puce) qui cite une zone `{M…}`, insère une
     **vignette zoomée** (`<div class="thumb">`) dessinée côté page : le mouvement évoqué
@@ -164,6 +166,9 @@ def render_text(text: str, refs: dict[str, dict]) -> str:
         line = raw.strip()
         if not line:
             flush()
+        elif re.fullmatch(r"\[\[(events|levels|zones)\]\]", line):
+            flush()
+            out.append(f'<div class="slot" data-slot="{line[2:-2]}"></div>')
         elif line.startswith("#"):
             flush()
             out.append(f"<h3>{inline(line.lstrip('#').strip())}</h3>")
@@ -243,6 +248,10 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
     levels = list(by_id.values())
 
     ev_by_id = {e["id"]: e for e in events}
+    oi_pct = None
+    if oi_ohlc is not None and len(oi_ohlc):
+        oi_pct = oi_ohlc["close"].pct_change() * 100           # ΔOI coin % de la barre
+    bias_notes = notes.get("bias")                             # "accumulation" | "distribution"
     for e in notes.get("events", []):
         ts = _parse_local(e["time"], year, tz_hours)
         i = _bar_at(df, ts)
@@ -254,7 +263,9 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
             price=float(bar["high"] if where == "high" else bar["low"]),
             vol_ratio=float(bar.get("vol_ratio", np.nan)),
             spread_atr=float(bar.get("spread_atr", np.nan)), clv=float(bar.get("clv", np.nan)),
-            oi_chg=None, why=e.get("why", ""), theory=e.get("theory", ""), auto=False)
+            oi_chg=_note_oi(e, oi_pct, df.index[i]), why=e.get("why", ""),
+            theory=e.get("theory") or _note_theory(e, bias_notes),
+            verdict=e.get("verdict", ""), sense=e.get("sense", ""), auto=False)
     events = sorted(ev_by_id.values(), key=lambda e: e["ts"])
 
     zones = []
@@ -273,6 +284,13 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
     anchors = [_bar_at(df, e["ts"]) for e in events] + [z["i0"] for z in zones]
     first = min(anchors) - 12 if anchors else len(df) - min_bars
     first = max(0, min(first, len(df) - min_bars))
+    last_i = len(df) - 1
+    view = notes.get("view") or {}
+    if view.get("to"):
+        last_i = _bar_at(df, _parse_local(view["to"], year, tz_hours))
+    if view.get("from"):
+        first = _bar_at(df, _parse_local(view["from"], year, tz_hours))
+    first = max(0, min(first, last_i - min_bars + 1))
 
     pr = _precision(float(df["close"].iloc[-1]))
     candles, volume, vol_ma = [], [], []
@@ -306,8 +324,10 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
                     where=e["where"], price=e["price"], price_txt=_fmt_price(e["price"]),
                     vol_ratio=None if pd.isna(e["vol_ratio"]) else round(float(e["vol_ratio"]), 2),
                     spread_atr=None if pd.isna(e["spread_atr"]) else round(float(e["spread_atr"]), 2),
+                    clv=None if pd.isna(e.get("clv", np.nan)) else round(float(e["clv"]), 2),
                     oi_chg=None if e["oi_chg"] is None else round(e["oi_chg"], 2),
-                    why=_plain(e["why"]), theory=_plain(e["theory"]), auto=e["auto"])
+                    why=_plain(e["why"]), theory=_plain(e["theory"]),
+                    verdict=e.get("verdict", ""), sense=_plain(e.get("sense", "")), auto=e["auto"])
 
     lv_out = [dict(id=lv["id"], price=float(lv["price"]), price_txt=_fmt_price(float(lv["price"])),
                    label=lv.get("label", ""), reason=lv.get("reason", ""), kind=lv["kind"],
@@ -335,9 +355,38 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         last=last, last_txt=_fmt_price(last),
         last_time=(df.index[-1] + pd.Timedelta(hours=tz_hours)).strftime("%d/%m %H:%M"),
         precision=pr, candles=candles, volume=volume, vol_ma=vol_ma, oi=oi, oi_unit=oi_unit,
-        levels=lv_out, zones=zn_out, events=ev_list, first=first,
+        levels=lv_out, zones=zn_out, events=ev_list, first=first, last_i=last_i,
+        subtitle=notes.get("subtitle", ""), footer=notes.get("footer", ""),
+        page_title=notes.get("page_title", ""),
         text_html=render_text(text, refs),
     )
+
+
+def _note_oi(e: dict, oi_pct: "pd.Series | None", ts: pd.Timestamp) -> "float | None":
+    """ΔOI coin % de la barre de l'événement : valeur des notes si fournie, sinon calculée."""
+    if e.get("oi_chg") is not None:
+        return float(e["oi_chg"])
+    if oi_pct is None or ts not in oi_pct.index or pd.isna(oi_pct.loc[ts]):
+        return None
+    return float(oi_pct.loc[ts])
+
+
+_THEORY_ALIASES = {"SPRING?": "SPRING", "SOS?": "SOS", "UTAD?": "UTAD", "UT": "UTAD",
+                   "UPTHRUST": "UTAD", "LPS?": "LPS", "LPSY?": "LPSY", "BC?": "BC", "SC?": "SC"}
+
+
+def _note_theory(e: dict, bias: "str | None") -> str:
+    """Mémo théorie (rôle + seuils vol×/ATR/clôture) d'un événement des notes, via
+    `window._theory` et les `Thresholds` courants. Clé = `theory_of` (ex. « SOW ») ou le
+    nom de l'événement ; cadre = `bias` de l'événement sinon celui des notes. Vide si inconnu."""
+    from .events import Thresholds
+    from .window import _THEORY_DESC, _theory
+    key = (e.get("theory_of") or e.get("name") or "").upper().strip()
+    key = _THEORY_ALIASES.get(key, key.rstrip(" ?"))
+    b = e.get("bias") or bias
+    if not b or (b, key) not in _THEORY_DESC:
+        return ""
+    return _theory(b, key, Thresholds())
 
 
 def _auto_text(bias: str, levels: list[dict], events: list[dict]) -> str:
@@ -364,7 +413,7 @@ def build_interactive_html(symbol: str, timeframe: str, df: pd.DataFrame, out_pa
     model = build_model(symbol, timeframe, df, struct, notes, oi_ohlc, tz_hours, tz_label)
     payload = json.dumps(model, ensure_ascii=False).replace("</", "<\\/")
     lib = _VENDOR.read_text(encoding="utf-8")
-    page = (_TEMPLATE.replace("__TITLE__", html.escape(model["title"]))
+    page = (_TEMPLATE.replace("__TITLE__", html.escape(model.get("page_title") or model["title"]))
             .replace("__LIB__", lib).replace("__DATA__", payload))
     Path(out_path).write_text(page, encoding="utf-8")
     return out_path
@@ -384,17 +433,17 @@ _TEMPLATE = r"""<!doctype html>
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#131722; --panel:#1a1f2b; --text:#d8dbe2; --muted:#8b93a1; --border:#2a3040;
-    --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18);
+    --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18); color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#131722; --panel:#1a1f2b; --text:#d8dbe2; --muted:#8b93a1; --border:#2a3040;
-  --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18);
+  --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18); color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
   font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-.app{display:grid;grid-template-columns:minmax(0,1fr) 420px;height:100vh}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 500px;height:100vh}
 .chartcol{position:relative;display:flex;flex-direction:column;min-width:0}
 header{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:10px 14px;
   border-bottom:1px solid var(--border)}
@@ -429,6 +478,18 @@ summary{cursor:pointer}
   padding:0 6px;margin:0 1px;font:600 12.5px/1.6 inherit;cursor:pointer;white-space:nowrap}
 .ref:hover,.ref.on{background:var(--hl);border-color:var(--muted)}
 .hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+#nav{position:sticky;top:0;z-index:6;display:flex;flex-wrap:wrap;gap:4px;padding:8px 0;
+  background:var(--panel);border-bottom:1px solid var(--border)}
+#nav button{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;
+  padding:2px 8px;font-size:12px;cursor:pointer}
+#nav button.on{border-color:var(--muted);background:var(--hl)}
+#sub{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+.text h3{scroll-margin-top:48px}
+.slot{margin:6px 0 10px;overflow-x:auto}
+td.vd{font-weight:600}
+#events td:nth-child(2){white-space:nowrap}
+#foot{margin:14px 0 0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
+  background:var(--bg);font-size:12.5px}
 .thumb{position:relative;height:150px;margin:6px 0 10px;border:1px solid var(--border);
   border-radius:6px;background:var(--bg);overflow:hidden;cursor:pointer}
 .thumb .tc{position:absolute;inset:18px 0 0 0}
@@ -446,6 +507,7 @@ summary{cursor:pointer}
   #chartwrap{flex:none;min-height:0;height:48vh}
   #legend{font-size:10.5px;right:60px}
   aside{border-left:0;border-top:1px solid var(--border);padding:4px 16px 24px}
+  #nav{position:static}
 }
 </style>
 </head>
@@ -463,16 +525,19 @@ summary{cursor:pointer}
     <div id="chartwrap"><div id="chart"></div><canvas id="overlay"></canvas><div id="legend"></div></div>
   </div>
   <aside>
+    <nav id="nav"></nav>
+    <p id="sub"></p>
     <h2>Analyse</h2>
     <div class="text" id="text"></div>
+    <div id="foot" hidden></div>
     <p class="hint">Clic sur une référence → le graphe s'y place. Survol d'une bougie
       d'événement → sa ligne s'allume.</p>
-    <h2>Niveaux</h2>
+    <h2 id="lh">Niveaux</h2>
     <table id="levels"><thead><tr><th>Niveau</th><th class="num">Prix</th><th>Pourquoi ce niveau</th></tr></thead><tbody></tbody></table>
     <h2 id="zh">Mouvements</h2>
     <table id="zones"><thead><tr><th>Zone</th><th>Période</th><th>Lecture</th></tr></thead><tbody></tbody></table>
-    <h2>Événements</h2>
-    <table id="events"><thead><tr><th>Évt</th><th>Heure</th><th class="num">Prix</th><th class="num">vol×</th><th class="num">spr ATR</th><th class="num">ΔOI%</th></tr></thead><tbody></tbody></table>
+    <h2 id="eh">Événements</h2>
+    <table id="events"><thead><tr><th>Évt</th><th>Heure</th><th class="num">Prix</th><th class="num">vol×</th><th class="num">spr ATR</th><th class="num">CLV</th><th class="num">ΔOI%</th><th>Verdict</th></tr></thead><tbody></tbody></table>
   </aside>
 </div>
 <script>__LIB__</script>
@@ -487,6 +552,8 @@ const fmt = (v, p) => v == null ? '—' : Number(v).toLocaleString('fr-FR', {max
 $('#ttl').textContent = D.title;
 $('#meta').textContent = `${D.seq} · bougies ${D.timeframe} (${D.tz}) · dernier ${D.last_txt} @ ${D.last_time}`;
 $('#text').innerHTML = D.text_html;
+if (D.subtitle) $('#sub').textContent = D.subtitle; else $('#sub').hidden = true;
+if (D.footer) { $('#foot').textContent = D.footer; $('#foot').hidden = false; }
 
 // ---------------- Graphe ----------------
 const el = $('#chart');
@@ -589,7 +656,7 @@ new ResizeObserver(() => requestAnimationFrame(drawOverlay)).observe(el);
 
 // ---------------- Navigation ----------------
 const N = D.candles.length;
-function initialView() { chart.timeScale().setVisibleLogicalRange({from: D.first, to: N + 5}); }
+function initialView() { chart.timeScale().setVisibleLogicalRange({from: D.first, to: (D.last_i ?? N - 1) + 6}); }
 function idxOf(t) { let lo = 0, hi = N - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (D.candles[m].time <= t) lo = m; else hi = m - 1; } return lo; }
 function showPrice(p) {
   // s'assurer que le niveau est dans l'échelle : élargit l'autoscale si besoin
@@ -664,10 +731,30 @@ $('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${es
   <td>${esc(e.label)}</td><td class="num">${esc(e.price_txt)}</td>
   <td class="num">${e.vol_ratio != null ? e.vol_ratio.toFixed(2) : '—'}</td>
   <td class="num">${e.spread_atr != null ? e.spread_atr.toFixed(2) : '—'}</td>
-  <td class="num">${e.oi_chg != null ? e.oi_chg.toFixed(2) : '—'}</td></tr>
-  ${(e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="6" class="why">${esc(e.why)}
+  <td class="num">${e.clv != null ? e.clv.toFixed(2) : '—'}</td>
+  <td class="num">${e.oi_chg != null ? (e.oi_chg > 0 ? '+' : '') + e.oi_chg.toFixed(2) : '—'}</td>
+  <td class="vd">${esc(e.verdict || '')}</td></tr>
+  ${(e.sense || e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="8" class="why">${esc(e.sense || e.why)}
     ${e.theory ? `<details><summary>Théorie</summary>${esc(e.theory)}</details>` : ''}</td></tr>` : ''}`).join('')
-  || '<tr><td colspan="6" class="why">—</td></tr>';
+  || '<tr><td colspan="8" class="why">—</td></tr>';
+// Tables placées dans le texte ([[events]] / [[levels]] / [[zones]]) : on les déplace.
+for (const [slot, tid, hid] of [['events', '#events', '#eh'], ['levels', '#levels', '#lh'], ['zones', '#zones', '#zh']]) {
+  const box = document.querySelector(`.slot[data-slot="${slot}"]`);
+  if (box) { box.appendChild($(tid)); $(hid).style.display = 'none'; }
+}
+// Navigation par section (une entrée par titre ### du texte).
+const heads = [...document.querySelectorAll('.text h3')];
+heads.forEach((h, i) => { h.id = 'sec' + i; });
+$('#nav').innerHTML = heads.map((h, i) => `<button data-sec="${i}">${esc(h.textContent.split('(')[0].trim().slice(0, 30))}</button>`).join('');
+if (!heads.length) $('#nav').hidden = true;
+$('#nav').addEventListener('click', ev => { const b = ev.target.closest('button[data-sec]'); if (!b) return;
+  document.getElementById('sec' + b.dataset.sec).scrollIntoView({behavior: 'smooth', block: 'start'}); });
+const aside = document.querySelector('aside');
+function navSpy() { let cur = 0; const top = aside.getBoundingClientRect().top + 56;
+  heads.forEach((h, i) => { if (h.getBoundingClientRect().top <= top) cur = i; });
+  document.querySelectorAll('#nav button').forEach((b, i) => b.classList.toggle('on', i === cur)); }
+aside.addEventListener('scroll', () => requestAnimationFrame(navSpy));
+window.addEventListener('scroll', () => requestAnimationFrame(navSpy)); navSpy();
 
 // ---------------- Vignettes zoomées (une par mouvement cité) ----------------
 const thumbs = [];

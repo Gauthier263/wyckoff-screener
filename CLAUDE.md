@@ -328,6 +328,29 @@ sur la dernière bougie », « le niveau X tient ? ») n'est PAS une analyse de 
 courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd est réservé aux
 **analyses de séquence**.
 
+### Variante interactive (« analyse … interactive » / « version interactive »)
+Même fond, mêmes 5 sections, mêmes interdits ; seule la forme change : une **page claude.ai**
+(graphe Lightweight Charts prix / volume / OI coin relié au texte) au lieu du PNG + markdown.
+Se déclenche quand Gauthier demande une analyse « interactive » (ou la version interactive
+d'une analyse déjà faite). Procédure :
+1. Faire l'analyse normalement (données, lecture volume → OI → tierces), puis écrire un
+   `notes.json` sur le gabarit **`examples/notes_btc_2h_canonique.json`** :
+   - `title` (en-tête canonique `ACTIF TF — séquence et dates`), `page_title` (nom court de
+     l'onglet, 2-4 mots), `subtitle` (sources + fenêtre), `bias` (cadre pour la théorie auto),
+     `view` (`from`/`to` en CEST : fenêtre initiale ≥ 80 bougies), `footer` (phrase mémo théorie) ;
+   - `levels` `N1…` (prix + `reason` obligatoire), `zones` `M1…` (mouvements cités, de/à CEST),
+     `events` (id, `name`, `time` CEST, `where`, `verdict` validé/ambigu/non validé/tentative,
+     `sense` = colonne « Volume + OI = sens », `theory_of`/`bias` pour le mémo théorie auto) ;
+   - `text` : sections `### 1. Contexte macro (top-down)`, `### 2. Lecture événement par
+     événement` (+ ligne `[[events]]` = le tableau), `### Tierces : CVD / absorption`,
+     `### Tierces : positionnement`, `### 3. Note fractale`, `### 4. Synthèse`,
+     `### 5. Niveaux (justifiés)` (+ ligne `[[levels]]`). Références `{N1}`, `{M2}`, `{SOW}`.
+2. Générer : `python -m screener.interactive --symbol BTC/USDT --timeframe 2h --no-detect
+   --notes notes.json --out <scratchpad>/page.html` (ΔOI coin par événement calculé auto,
+   CLV/vol×/spread lus sur la barre, théorie depuis `Thresholds`).
+3. **Publier en Artifact** (lien claude.ai) et livrer aussi `memo_theorie.html` (SendUserFile).
+   Le PNG n'est pas requis dans cette variante (le graphe interactif le remplace).
+
 ### Livrables dans le fil
 1. PNG du graphe (via SendUserFile — jamais un lien cliquable)
 2. HTML mémo théorie (via SendUserFile — `memo_theorie.html`)
