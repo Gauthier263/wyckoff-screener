@@ -485,6 +485,9 @@ th{text-align:left;color:var(--muted);font-weight:500;padding:4px 4px;border-bot
 td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:top}
 tr.row{cursor:pointer}
 tr.row:hover, tr.row.on{background:var(--hl)}
+#events tr.row{scroll-margin-top:52px}
+tr.row.flash td{background:var(--hl);box-shadow:inset 0 0 0 1px var(--muted)}
+#chart{cursor:crosshair}
 td.num{text-align:right;white-space:nowrap}
 td.why{color:var(--muted);font-size:12px}
 details{font-size:12px;color:var(--muted);margin-top:3px}
@@ -524,6 +527,7 @@ td.vd{font-weight:600}
   #legend{font-size:10.5px;right:60px}
   aside{border-left:0;border-top:1px solid var(--border);padding:4px 16px 24px}
   #nav{position:static}
+  #events tr.row{scroll-margin-top:calc(48vh + 60px)}
 }
 </style>
 </head>
@@ -624,7 +628,7 @@ const markersApi = LW.createSeriesMarkers(candles, []);
 function drawMarkers() {
   markersApi.setMarkers(D.events.map(e => ({
     time: e.time, position: e.where === 'high' ? 'aboveBar' : 'belowBar', color: e.color,
-    shape: 'circle', text: e.id + (e.vol_ratio != null ? ' ×' + e.vol_ratio.toFixed(1) : ''),
+    shape: 'circle', text: e.id,
     size: focusId === e.id ? 2 : 1,
   })));
 }
@@ -747,6 +751,18 @@ function legend(t) {
   document.querySelectorAll('tr.row[data-ref]').forEach(n => n.classList.toggle('on', !!e && n.dataset.ref === e.id));
 }
 chart.subscribeCrosshairMove(p => legend(p && p.time != null ? p.time : null));
+// Clic sur une bougie d'événement (± 1 bougie) → sa ligne du tableau, dans le texte.
+chart.subscribeClick(p => {
+  if (!p || p.time == null) return;
+  const i = idxOf(p.time);
+  let best = null;
+  for (const e of D.events) { const d = Math.abs(idxOf(e.time) - i); if (d <= 1 && (!best || d < best.d)) best = {e, d}; }
+  if (!best) return;
+  setFocus(best.e.id, false);
+  const row = document.querySelector(`#events tr.row[data-ref="${CSS.escape(best.e.id)}"]`);
+  if (row) { row.scrollIntoView({behavior: 'smooth', block: 'start'});
+    row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1600); }
+});
 
 // ---------------- Tables ----------------
 $('#levels tbody').innerHTML = D.levels.map(l => `<tr class="row" data-ref="${esc(l.id)}">

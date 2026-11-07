@@ -92,7 +92,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **désactivées par défaut** (Gauthier : le graphe principal suffit ; clic sur `{M…}` → le graphe
   s'y recentre) ; réactivables avec `"thumbs": true` dans les notes. Pas de traits verticaux d'événement
   au repos (seul l'événement cliqué/survolé en reçoit un) ; bouton « Masquer / Afficher zones M »
-  pour les rectangles des mouvements (zone cliquée toujours visible ; choix mémorisé par navigateur). Contenu = structure détectée
+  pour les rectangles des mouvements (zone cliquée toujours visible ; choix mémorisé par navigateur). Marqueurs d'événement = nom seul
+  (pas de ×vol, lu dans le tableau). **Clic sur une bougie d'événement du graphe (± 1 bougie) →
+  défile jusqu'à sa ligne du tableau** (verdict + sens + théorie), surlignée brièvement. Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
   `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
   CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
