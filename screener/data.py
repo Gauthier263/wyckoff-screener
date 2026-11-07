@@ -23,6 +23,13 @@ def get_exchange(name: str = "binance"):
         # géo-bloqués) qui n'apportent rien ici.
         opts["options"] = {"fetchMarkets": ["spot"]}
     ex = klass(opts)
+    # ccxt met la session requests en trust_env=False : elle ignore alors HTTPS_PROXY /
+    # REQUESTS_CA_BUNDLE. On réactive trust_env pour que le screener fonctionne derrière un
+    # proxy d'entreprise / une CA d'inspection TLS (jamais de désactivation de la vérif).
+    try:
+        ex.session.trust_env = True
+    except Exception:
+        pass
     if name == "binance":
         # Route les endpoints publics vers le miroir officiel data-only de Binance :
         # mêmes données et mêmes volumes, sans clé API, et non géo-restreint —
@@ -73,11 +80,37 @@ def fetch_ohlcv(ex, symbol: str, timeframe: str = "1h", limit: int = 300,
     return df
 
 
+def fetch_taker_delta(symbol: str = "BTC/USDT", timeframe: str = "1h",
+                      limit: int = 300, ex=None) -> "pd.Series | None":
+    """Delta agressif par barre (taker_buy − taker_sell), en **coin**, pour le CVD/absorption.
+
+    Source : klines Binance (`publicGetKlines`, col 9 = taker_buy_base_volume) via le miroir
+    `data-api.binance.vision` (le perp `fapi` est 451-bloqué → CVD spot, proxy du flux). Index
+    ts **UTC réel** (mêmes open times que `fetch_ohlcv` : appliquer le même décalage d'affichage
+    qu'au prix). Renvoie `None` si indisponible.
+    """
+    ex = ex or get_exchange("binance")
+    sym = symbol.replace("/", "").split(":")[0]
+    try:
+        raw = ex.publicGetKlines({"symbol": sym, "interval": timeframe, "limit": limit})
+    except Exception:
+        return None
+    if not raw:
+        return None
+    idx = pd.to_datetime([int(r[0]) for r in raw], unit="ms", utc=True)
+    vol = pd.Series([float(r[5]) for r in raw], index=idx, dtype=float)
+    tbuy = pd.Series([float(r[9]) for r in raw], index=idx, dtype=float)
+    delta = tbuy - (vol - tbuy)          # taker_buy − taker_sell
+    delta.name = "delta"
+    return delta
+
+
 # Venues d'OI atteignables (Binance fapi / Bybit géo-bloqués ; Gate retiré → OKX seul).
 OI_VENUES = ("okx",)
 
 # Minutes par timeframe (planification des limites de téléchargement / du resampling).
-_TF_MIN = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+_TF_MIN = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "2h": 120, "4h": 240,
+           "6h": 360, "12h": 720, "1d": 1440}
 
 # TF réellement acceptées par chaque venue pour l'**historique d'OI**. OKX ne sert que
 # 5m/1h/1d : demander 15m/30m lève une erreur côté ccxt → la venue était jusqu'ici
@@ -158,8 +191,11 @@ def fetch_binance_oi_archive(symbol: str = "BTC/USDT", days: int = 4,
         try:
             zf = zipfile.ZipFile(io.BytesIO(content))
             df = pd.read_csv(io.BytesIO(zf.read(zf.namelist()[0])))
-            return pd.Series(df["sum_open_interest_value"].astype(float).values,
-                             index=pd.to_datetime(df["create_time"], utc=True))
+            s = pd.Series(df["sum_open_interest_value"].astype(float).values,
+                          index=pd.to_datetime(df["create_time"], utc=True))
+            # L'archive contient des trous codés à 0 (ex. 15/10/2026 13:40) : un OI nul
+            # est impossible → on les retire, sinon fausse mèche à 0 et Δ aberrants.
+            return s[s > 0]
         except Exception:
             return None
 
@@ -297,21 +333,37 @@ def _binance_oi_series(symbol: str, timeframe: str, limit: int,
 # ── OI Binance live via Coinalyze (agrégateur tiers non géo-bloqué) ───────────────
 # Binance `fapi` renvoie 451 ici ; Coinalyze sert le **même OI Binance** en OHLC, sans
 # géo-block, via une clé API gratuite (read-only). Lue depuis l'env `COINALYZE_API_KEY`
-# ou le fichier `.cache/coinalyze_key` (gitignoré, jamais commité).
+# ou le fichier `.cache/coinalyze_key` (gitignoré, jamais commité) ; en session cloud, secret
+# injecté par le proxy HTTPS (cf. `_coinalyze_key`).
 _COINALYZE_BASE = "https://api.coinalyze.net/v1"
 _COINALYZE_INTERVAL = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
-                       "1h": "1hour", "4h": "4hour", "1d": "daily"}
+                       "1h": "1hour", "2h": "2hour", "4h": "4hour", "6h": "6hour",
+                       "12h": "12hour", "1d": "daily"}
+
+
+# Session cloud (claude.ai/code) : la clé est un « network secret » de l'environnement, injecté
+# par le proxy HTTPS dans l'en-tête `api_key` — aucune variable ni fichier ne la porte. Le code
+# envoie alors ce placeholder, que le proxy remplace par la vraie clé. Sans secret côté proxy,
+# Coinalyze répond 401 → les fetchers renvoient None → repli OKX inchangé.
+_COINALYZE_PROXY_PLACEHOLDER = "proxy-injected"
 
 
 def _coinalyze_key() -> "str | None":
+    """Clé Coinalyze : env `COINALYZE_API_KEY` > fichier `.cache/coinalyze_key` > placeholder
+    si un proxy HTTPS est configuré (secret injecté par le proxy) > None (repli OKX)."""
     k = os.environ.get("COINALYZE_API_KEY")
     if k and k.strip():
         return k.strip()
     try:
         with open(os.path.join(CACHE_DIR, "coinalyze_key")) as f:
-            return f.read().strip() or None
+            k = f.read().strip()
+            if k:
+                return k
     except Exception:
-        return None
+        pass
+    if os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy"):
+        return _COINALYZE_PROXY_PLACEHOLDER
+    return None
 
 
 def _coinalyze_symbol(symbol: str, exch: str = "A") -> str:
@@ -493,7 +545,8 @@ def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
 
 # Conversion timeframe ccxt -> fréquence pandas pour le resampling des bougies d'OI.
 _TF_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
-            "1h": "1h", "4h": "4h", "1d": "1D"}
+            "1h": "1h", "2h": "2h", "4h": "4h", "6h": "6h",
+            "12h": "12h", "1d": "1D"}
 
 
 def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 300,
@@ -509,7 +562,8 @@ def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 30
     try:
         if source == "binance":
             fine_b = {"5m": "1m", "15m": "1m", "30m": "5m", "1h": "5m",
-                      "4h": "1h", "1d": "1h"}.get(timeframe, "5m")
+                      "2h": "15m", "4h": "1h", "6h": "1h",
+                      "12h": "1h", "1d": "1h"}.get(timeframe, "5m")
             fm = _TF_MIN.get(fine_b, 5); tm = _TF_MIN.get(timeframe, 60)
             flim = min(2000, max(int(limit * tm / fm), 200))
             s = fetch_coinalyze_oi(symbol, fine_b, flim, start, end, ohlc=False)

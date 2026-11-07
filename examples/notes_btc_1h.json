@@ -1,0 +1,27 @@
+{
+  "title": "BTC/USDT H1 — redistribution ou spring ? (démo)",
+  "levels": [
+    {"id": "N1", "price": 76388.88, "label": "borne basse",
+     "reason": "low du 03/11 08:00 : creux de Phase B, 3 rebonds y ont démarré (volume sec ×0.6-0.9)", "kind": "range"},
+    {"id": "N2", "price": 75736.38, "label": "invalidation",
+     "reason": "low de la mèche 04/11 05:00 (×3.1) : extrême du shakeout ; repasser dessous = SOW confirmé", "kind": "pivot"},
+    {"id": "N3", "price": 77886.86, "label": "creek",
+     "reason": "high du 03/11 15:00 (×1.76, clôture basse clv 0.15) : l'offre y a plafonné la Phase B", "kind": "supply"}
+  ],
+  "zones": [
+    {"id": "M1", "from": "03/11 05:00", "to": "03/11 10:00", "kind": "range",
+     "label": "rebonds sur la borne basse",
+     "reason": "4 bougies sous la moyenne de volume touchent N1 sans clôturer dessous : l'offre se tarit"},
+    {"id": "M2", "from": "04/11 04:00", "to": "04/11 06:00", "kind": "pivot",
+     "label": "cassure de N1 puis réintégration",
+     "reason": "pénétration de ~650 $ sous N1 sur ×3.1, clôture haute (clv 0.88) puis bougie large haussière"},
+    {"id": "M3", "from": "04/11 07:00", "to": "04/11 09:00", "kind": "trap",
+     "label": "retour vers la borne haute, volume en baisse",
+     "reason": "×1.44 → ×0.99 → ×0.77 : la hausse s'essouffle sous BH"}
+  ],
+  "events": [
+    {"id": "SP?", "name": "Spring ?", "time": "04/11 05:00", "kind": "pivot", "where": "low",
+     "why": "vol ×3.14 + spread 1.88 ATR + clôture haute (clv 0.88) : l'offre est absorbée sous la borne basse"}
+  ],
+  "text": "### Cadre (TF H1)\nPlage {BH} → {N1} ouverte par le {BC} du 02/11. Par défaut, plage après un climax acheteur = **distribution** jusqu'à preuve du contraire.\n\n### Ce qui s'est passé\n- {M1} : la borne {N1} tient sur volume sec, l'offre ne pousse plus.\n- {M2} : cassure de {N1} jusqu'à {N2}, puis rejet immédiat ; c'est le {SP?} candidat, ou une SOW si le prix y retourne.\n- {M3} : rallye jusque sous {N3}/{BH} avec un volume qui faiblit ; le détecteur y voit une {LPSY}.\n\n### Deux scénarios en parallèle\n- **Accumulation (spring)** : tenue au-dessus de {N3} puis back-up sec qui reste au-dessus de {N1}.\n- **Distribution** : rejet sous {BH}, retour sous {N1} ; perte de {N2} = SOW confirmé."
+}

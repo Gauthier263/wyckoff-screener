@@ -105,3 +105,36 @@ def test_rate_limit_retry_then_success(monkeypatch):
     monkeypatch.setattr(requests, "get", lambda *a, **k: seq.pop(0))
     s = D.fetch_coinalyze_oi("BTC/USDT", "5m", limit=3)
     assert s is not None and len(s) == 3                   # a réessayé après le 429
+
+
+def _no_key_sources(monkeypatch, tmp_path):
+    for v in ("COINALYZE_API_KEY", "HTTPS_PROXY", "https_proxy"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setattr(D, "CACHE_DIR", str(tmp_path))
+
+
+def test_key_none_without_env_file_or_proxy(monkeypatch, tmp_path):
+    _no_key_sources(monkeypatch, tmp_path)
+    assert D._coinalyze_key() is None
+
+
+def test_key_placeholder_when_proxy_injects(monkeypatch, tmp_path):
+    _no_key_sources(monkeypatch, tmp_path)
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    assert D._coinalyze_key() == D._COINALYZE_PROXY_PLACEHOLDER
+
+
+def test_key_priority_env_then_file_over_proxy(monkeypatch, tmp_path):
+    _no_key_sources(monkeypatch, tmp_path)
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+    (tmp_path / "coinalyze_key").write_text("FILEKEY\n")
+    assert D._coinalyze_key() == "FILEKEY"
+    monkeypatch.setenv("COINALYZE_API_KEY", "ENVKEY")
+    assert D._coinalyze_key() == "ENVKEY"
+
+
+def test_2h_maps_to_native_coinalyze_interval():
+    # avant : 2h absent des tables -> intervalle 5min et resample 1h (OI 2h faux/tronqué)
+    assert D._COINALYZE_INTERVAL["2h"] == "2hour"
+    assert D._TF_MIN["2h"] == 120
+    assert D._TF_FREQ["2h"] == "2h"
