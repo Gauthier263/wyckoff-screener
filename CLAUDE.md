@@ -83,6 +83,18 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   ×vol_ratio). Panneau **OI** : bougies d'OI agrégé (`fetch_open_interest_ohlc`, source
   `agg3`) **à la MÊME TF que le cours** (vert = OI↑, rouge = OI↓), omis si OI indispo. Traits
   verticaux d'événement (teintés) sur les 3 panneaux. Horodatage en CEST.
+- `screener/interactive.py` — **graphe interactif HTML** (`build_interactive_html`) : page
+  autonome (Lightweight Charts de TradingView **inliné**, `screener/vendor/`, hors-ligne) avec
+  cours / volume (+ vol MA) / OI en 3 panneaux synchronisés, **même TF**, heure CEST, zoom/pan ;
+  à côté, le **texte de l'analyse** + tables niveaux / mouvements / événements. Les références
+  `{ID}` du texte deviennent des **références cliquables** (étiquettes neutres, sans pastille de couleur) (clic → le graphe s'y recentre et
+  surligne ; survol d'une bougie d'événement → sa ligne s'allume). Sous la 1ʳᵉ phrase qui cite une zone
+  `{M…}`, une **vignette zoomée** (bougies du mouvement + rectangle + niveaux proches) est insérée
+  dans le texte : le mouvement évoqué se voit sans quitter la lecture. Contenu = structure détectée
+  (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
+  `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
+  CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
+  --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
@@ -232,6 +244,17 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   les seules bougies de trading ; (3) sur le graphe, **tracer en x entier** (index de barre) pour
   **écraser les gaps** week-end (rendu continu comme une plateforme or), ticks sur le 1ᵉʳ barre de
   chaque jour. Pas d'OI ni de CVD sur l'or (VSA pur).
+- **Analyse BTC = graphe interactif d'abord** (but : zéro aller-retour avec TradingView).
+  Pour toute analyse, écrire un `notes.json` (gabarit `examples/notes_btc_1h.json`) : chaque
+  **niveau** cité = un ID `N1…` avec prix + `reason` (justification obligatoire, cf. « Niveaux
+  toujours justifiés ») ; chaque **mouvement** évoqué (rebond, retour sur borne, cassure,
+  réintégration) = une zone `M1…` (de/à en CEST) ; le **texte** cite ces IDs entre accolades
+  (`{N1}`, `{M2}`, `{BC}`) pour qu'ils deviennent cliquables. Générer la page
+  (`python -m screener.interactive … --notes`) et la **publier en page** (lien claude.ai, lisible
+  sur téléphone ; un fichier HTML envoyé dans le fil s'affiche en code source). `kind` = couleur
+  **sur le graphe uniquement** (marqueurs, zones, lignes) : demand vert · supply rouge · trap
+  orange · range bleu · pivot violet. **Aucune pastille de couleur nulle part** : ni emoji dans
+  le texte, ni pastille colorée dans les références cliquables de la page (étiquettes neutres).
 - **Illustration d'une analyse** (préférences Gauthier) :
   - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
     distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
@@ -428,6 +451,7 @@ pour vérifier les seuils vol× qui distinguent un vrai SOS d'un covering »).
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
+python -m screener.interactive --symbol BTC/USDT --timeframe 1h --notes examples/notes_btc_1h.json  # graphe interactif
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
