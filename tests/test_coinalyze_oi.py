@@ -131,3 +131,10 @@ def test_key_priority_env_then_file_over_proxy(monkeypatch, tmp_path):
     assert D._coinalyze_key() == "FILEKEY"
     monkeypatch.setenv("COINALYZE_API_KEY", "ENVKEY")
     assert D._coinalyze_key() == "ENVKEY"
+
+
+def test_2h_maps_to_native_coinalyze_interval():
+    # avant : 2h absent des tables -> intervalle 5min et resample 1h (OI 2h faux/tronqué)
+    assert D._COINALYZE_INTERVAL["2h"] == "2hour"
+    assert D._TF_MIN["2h"] == 120
+    assert D._TF_FREQ["2h"] == "2h"

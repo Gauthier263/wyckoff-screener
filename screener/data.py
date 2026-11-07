@@ -109,7 +109,8 @@ def fetch_taker_delta(symbol: str = "BTC/USDT", timeframe: str = "1h",
 OI_VENUES = ("okx",)
 
 # Minutes par timeframe (planification des limites de téléchargement / du resampling).
-_TF_MIN = {"5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+_TF_MIN = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "2h": 120, "4h": 240,
+           "6h": 360, "12h": 720, "1d": 1440}
 
 # TF réellement acceptées par chaque venue pour l'**historique d'OI**. OKX ne sert que
 # 5m/1h/1d : demander 15m/30m lève une erreur côté ccxt → la venue était jusqu'ici
@@ -333,7 +334,8 @@ def _binance_oi_series(symbol: str, timeframe: str, limit: int,
 # injecté par le proxy HTTPS (cf. `_coinalyze_key`).
 _COINALYZE_BASE = "https://api.coinalyze.net/v1"
 _COINALYZE_INTERVAL = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
-                       "1h": "1hour", "4h": "4hour", "1d": "daily"}
+                       "1h": "1hour", "2h": "2hour", "4h": "4hour", "6h": "6hour",
+                       "12h": "12hour", "1d": "daily"}
 
 
 # Session cloud (claude.ai/code) : la clé est un « network secret » de l'environnement, injecté
@@ -540,7 +542,8 @@ def fetch_open_interest(symbol: str, timeframe: str = "1h", limit: int = 300,
 
 # Conversion timeframe ccxt -> fréquence pandas pour le resampling des bougies d'OI.
 _TF_FREQ = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
-            "1h": "1h", "4h": "4h", "1d": "1D"}
+            "1h": "1h", "2h": "2h", "4h": "4h", "6h": "6h",
+            "12h": "12h", "1d": "1D"}
 
 
 def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 300,
@@ -556,7 +559,8 @@ def fetch_open_interest_ohlc(symbol: str, timeframe: str = "1h", limit: int = 30
     try:
         if source == "binance":
             fine_b = {"5m": "1m", "15m": "1m", "30m": "5m", "1h": "5m",
-                      "4h": "1h", "1d": "1h"}.get(timeframe, "5m")
+                      "2h": "15m", "4h": "1h", "6h": "1h",
+                      "12h": "1h", "1d": "1h"}.get(timeframe, "5m")
             fm = _TF_MIN.get(fine_b, 5); tm = _TF_MIN.get(timeframe, 60)
             flim = min(2000, max(int(limit * tm / fm), 200))
             s = fetch_coinalyze_oi(symbol, fine_b, flim, start, end, ohlc=False)
