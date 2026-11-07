@@ -118,7 +118,7 @@ def _sec(ts: pd.Timestamp, tz_hours: int) -> int:
 _REF = re.compile(r"\{([A-Za-z][A-Za-z0-9_+\-?]*)\}")
 
 
-def render_text(text: str, refs: dict[str, dict]) -> str:
+def render_text(text: str, refs: dict[str, dict], thumbs_on: bool = False) -> str:
     """Mini-markdown (### titres, - listes, **gras**, paragraphes) ; une ligne seule
     `[[events]]` / `[[levels]]` / `[[zones]]` place la table correspondante à cet endroit du
     texte (format canonique : tableau événement en section 2, niveaux en section 5) ; `{ID}` → référence
@@ -130,6 +130,9 @@ def render_text(text: str, refs: dict[str, dict]) -> str:
     found: list[str] = []
 
     def thumbs() -> str:
+        if not thumbs_on:                                  # défaut : graphe principal seul
+            found.clear()
+            return ""
         new = [z for z in found if z not in thumbed]
         thumbed.update(new)
         found.clear()
@@ -370,7 +373,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         levels=lv_out, zones=zn_out, events=ev_list, first=first, last_i=last_i,
         subtitle=notes.get("subtitle", ""), footer=notes.get("footer", ""),
         page_title=notes.get("page_title", ""),
-        text_html=render_text(text, refs),
+        text_html=render_text(text, refs, thumbs_on=bool(notes.get("thumbs", False))),
     )
 
 

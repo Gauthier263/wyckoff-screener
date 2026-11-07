@@ -106,7 +106,7 @@ def test_html_is_self_contained(tmp_path):
 
 def test_thumbnail_under_first_mention_only():
     refs = {"M1": dict(type="zone", color="#000", chip="M1 rebond")}
-    h = render_text("### Titre {M1}\n- rebond {M1}\n- encore {M1}\n\nParagraphe {M1}", refs)
+    h = render_text("### Titre {M1}\n- rebond {M1}\n- encore {M1}\n\nParagraphe {M1}", refs, thumbs_on=True)
     assert h.count('class="thumb"') == 1                    # une seule vignette par zone
     assert '<li>rebond <button' in h and 'data-zone="M1"></div></li>' in h
 
@@ -148,3 +148,9 @@ def test_level_line_starts_at_its_origin_bar():
     assert lv["N1"]["t0"] == int(hi_ts.timestamp()) + 2 * 3600
     assert lv["N2"]["t0"] is None
     assert lv["N3"]["t0"] == int(pd.Timestamp("2026-11-04 03:00", tz="UTC").timestamp()) + 2 * 3600
+
+
+def test_no_thumbnail_by_default():
+    """Par défaut, aucune vignette sous les mouvements : le graphe principal suffit."""
+    m = build_model("TEST/USDT", "1h", _df(), notes=NOTES)
+    assert 'class="thumb"' not in m["text_html"]
