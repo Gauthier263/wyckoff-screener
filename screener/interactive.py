@@ -467,6 +467,7 @@ header .meta{color:var(--muted);font-size:12px}
 header .tools{margin-left:auto;display:flex;gap:6px}
 header button{background:var(--panel);color:var(--text);border:1px solid var(--border);
   border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer}
+header button:focus-visible,#nav button:focus-visible,.ref:focus-visible{outline:2px solid var(--muted);outline-offset:1px}
 #chartwrap{position:relative;flex:1;min-height:420px}
 #chart{position:absolute;inset:0}
 #overlay{position:absolute;inset:0;pointer-events:none;z-index:3}
@@ -532,6 +533,7 @@ td.vd{font-weight:600}
     <header>
       <h1 id="ttl"></h1><span class="meta" id="meta"></span>
       <div class="tools">
+        <button id="zonesbtn" title="Afficher / masquer les rectangles des mouvements M1, M2…" aria-pressed="true">Zones M</button>
         <button id="fit" title="Revenir à la vue initiale">Vue initiale</button>
         <button id="all" title="Tout l'historique chargé">Tout</button>
         <button id="theme" title="Thème clair / sombre">◐</button>
@@ -641,6 +643,8 @@ function applyTheme() {
 
 // ---------------- Overlay : zones + traits d'événements + surbrillance ----------------
 const cv = $('#overlay'), ctx = cv.getContext('2d');
+let showZones = true;
+try { showZones = localStorage.getItem('wy-zones') !== '0'; } catch (e) {}
 function drawOverlay() {
   const dpr = window.devicePixelRatio || 1, w = el.clientWidth, h = el.clientHeight;
   cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px';
@@ -651,6 +655,7 @@ function drawOverlay() {
   const bw = Math.max(ts.options().barSpacing, 2);
   // zones (mouvements cités dans l'analyse)
   for (const z of D.zones) {
+    if (!showZones && focusId !== z.id) continue;          // masquées : seule la zone cliquée reste
     const x0 = ts.timeToCoordinate(z.t0), x1 = ts.timeToCoordinate(z.t1);
     if (x0 == null || x1 == null) continue;
     const y0 = candles.priceToCoordinate(z.hi), y1 = candles.priceToCoordinate(z.lo);
@@ -661,14 +666,10 @@ function drawOverlay() {
     ctx.fillRect(X, Y, W, H); ctx.strokeRect(X, Y, W, H);
     ctx.fillStyle = z.color; ctx.font = '600 11px sans-serif'; ctx.fillText(z.id, X + 3, Y - 4);
   }
-  // traits verticaux d'événement sur les 3 panneaux
-  for (const e of D.events) {
-    const x = ts.timeToCoordinate(e.time); if (x == null) continue;
-    const on = focusId === e.id;
-    ctx.strokeStyle = e.color + (on ? 'ff' : '66'); ctx.lineWidth = on ? 2 : 1;
-    ctx.setLineDash(on ? [] : [2, 3]); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bottom); ctx.stroke();
-  }
-  ctx.setLineDash([]);
+  // trait vertical uniquement pour l'événement cliqué / survolé (graphe allégé au repos)
+  const fe = D.events.find(e => e.id === focusId);
+  if (fe) { const x = ts.timeToCoordinate(fe.time);
+    if (x != null) { ctx.strokeStyle = fe.color; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bottom); ctx.stroke(); } }
   // niveau focalisé : bandeau
   const lv = D.levels.find(l => l.id === focusId);
   if (lv) { const y = candles.priceToCoordinate(lv.price);
@@ -710,6 +711,13 @@ document.addEventListener('mouseover', ev => {
 });
 $('#fit').onclick = () => { candles.applyOptions({autoscaleInfoProvider: undefined}); setFocus(null, false); initialView(); };
 $('#all').onclick = () => chart.timeScale().fitContent();
+function syncZonesBtn() { const b = $('#zonesbtn'); b.setAttribute('aria-pressed', String(showZones));
+  b.textContent = showZones ? 'Masquer zones M' : 'Afficher zones M'; }
+$('#zonesbtn').onclick = () => { showZones = !showZones; syncZonesBtn();
+  try { localStorage.setItem('wy-zones', showZones ? '1' : '0'); } catch (e) {}
+  requestAnimationFrame(drawOverlay); };
+if (!D.zones.length) $('#zonesbtn').hidden = true;
+syncZonesBtn();
 $('#theme').onclick = () => {
   const r = document.documentElement, dark = matchMedia('(prefers-color-scheme: dark)').matches;
   const cur = r.dataset.theme || (dark ? 'dark' : 'light');

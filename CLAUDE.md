@@ -90,7 +90,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `{ID}` du texte deviennent des **références cliquables** (étiquettes neutres, sans pastille de couleur) (clic → le graphe s'y recentre et
   surligne ; survol d'une bougie d'événement → sa ligne s'allume). Vignettes zoomées sous les zones `{M…}`
   **désactivées par défaut** (Gauthier : le graphe principal suffit ; clic sur `{M…}` → le graphe
-  s'y recentre) ; réactivables avec `"thumbs": true` dans les notes. Contenu = structure détectée
+  s'y recentre) ; réactivables avec `"thumbs": true` dans les notes. Pas de traits verticaux d'événement
+  au repos (seul l'événement cliqué/survolé en reçoit un) ; bouton « Masquer / Afficher zones M »
+  pour les rectangles des mouvements (zone cliquée toujours visible ; choix mémorisé par navigateur). Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
   `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
   CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
