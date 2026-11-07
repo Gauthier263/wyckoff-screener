@@ -485,7 +485,7 @@ th{text-align:left;color:var(--muted);font-weight:500;padding:4px 4px;border-bot
 td{padding:5px 4px;border-bottom:1px solid var(--border);vertical-align:top}
 tr.row{cursor:pointer}
 tr.row:hover, tr.row.on{background:var(--hl)}
-#events tr.row{scroll-margin-top:52px}
+#events tr.row,#levels tr.row{scroll-margin-top:52px}
 tr.row.flash td{background:var(--hl);box-shadow:inset 0 0 0 1px var(--muted)}
 #chart{cursor:crosshair}
 td.num{text-align:right;white-space:nowrap}
@@ -527,7 +527,7 @@ td.vd{font-weight:600}
   #legend{font-size:10.5px;right:60px}
   aside{border-left:0;border-top:1px solid var(--border);padding:4px 16px 24px}
   #nav{position:static}
-  #events tr.row{scroll-margin-top:calc(48vh + 60px)}
+  #events tr.row,#levels tr.row{scroll-margin-top:calc(48vh + 60px)}
 }
 </style>
 </head>
@@ -751,17 +751,30 @@ function legend(t) {
   document.querySelectorAll('tr.row[data-ref]').forEach(n => n.classList.toggle('on', !!e && n.dataset.ref === e.id));
 }
 chart.subscribeCrosshairMove(p => legend(p && p.time != null ? p.time : null));
-// Clic sur une bougie d'événement (± 1 bougie) → sa ligne du tableau, dans le texte.
+// Clic sur le graphe → la ligne correspondante du panneau :
+//  1) un pointillé de niveau (à ± 6 px, sur sa portion tracée) → sa ligne du tableau Niveaux ;
+//  2) sinon une bougie d'événement (± 1 bougie) → sa ligne du tableau Événements.
+function goRow(table, id) {
+  setFocus(id, false);
+  const row = document.querySelector(`${table} tr.row[data-ref="${CSS.escape(id)}"]`);
+  if (row) { row.scrollIntoView({behavior: 'smooth', block: 'start'});
+    row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1600); }
+}
 chart.subscribeClick(p => {
   if (!p || p.time == null) return;
+  if (p.point && p.paneIndex === 0) {
+    let lvBest = null;
+    for (const lv of D.levels) {
+      if (lv.t0 != null && p.time < lv.t0) continue;
+      const y = candles.priceToCoordinate(lv.price); if (y == null) continue;
+      const d = Math.abs(y - p.point.y); if (d <= 6 && (!lvBest || d < lvBest.d)) lvBest = {lv, d};
+    }
+    if (lvBest) { goRow('#levels', lvBest.lv.id); return; }
+  }
   const i = idxOf(p.time);
   let best = null;
   for (const e of D.events) { const d = Math.abs(idxOf(e.time) - i); if (d <= 1 && (!best || d < best.d)) best = {e, d}; }
-  if (!best) return;
-  setFocus(best.e.id, false);
-  const row = document.querySelector(`#events tr.row[data-ref="${CSS.escape(best.e.id)}"]`);
-  if (row) { row.scrollIntoView({behavior: 'smooth', block: 'start'});
-    row.classList.add('flash'); setTimeout(() => row.classList.remove('flash'), 1600); }
+  if (best) goRow('#events', best.e.id);
 });
 
 // ---------------- Tables ----------------

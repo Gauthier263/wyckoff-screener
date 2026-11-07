@@ -94,7 +94,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   au repos (seul l'événement cliqué/survolé en reçoit un) ; bouton « Masquer / Afficher zones M »
   pour les rectangles des mouvements (zone cliquée toujours visible ; choix mémorisé par navigateur). Marqueurs d'événement = nom seul
   (pas de ×vol, lu dans le tableau). **Clic sur une bougie d'événement du graphe (± 1 bougie) →
-  défile jusqu'à sa ligne du tableau** (verdict + sens + théorie), surlignée brièvement. Contenu = structure détectée
+  défile jusqu'à sa ligne du tableau** (verdict + sens + théorie), surlignée brièvement. Idem **clic sur
+  un pointillé de niveau** (± 6 px, sur sa portion tracée ; prioritaire sur l'événement) → sa ligne
+  du tableau Niveaux. Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
   `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
   CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
