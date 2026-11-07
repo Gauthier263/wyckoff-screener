@@ -329,21 +329,36 @@ def _binance_oi_series(symbol: str, timeframe: str, limit: int,
 # ── OI Binance live via Coinalyze (agrégateur tiers non géo-bloqué) ───────────────
 # Binance `fapi` renvoie 451 ici ; Coinalyze sert le **même OI Binance** en OHLC, sans
 # géo-block, via une clé API gratuite (read-only). Lue depuis l'env `COINALYZE_API_KEY`
-# ou le fichier `.cache/coinalyze_key` (gitignoré, jamais commité).
+# ou le fichier `.cache/coinalyze_key` (gitignoré, jamais commité) ; en session cloud, secret
+# injecté par le proxy HTTPS (cf. `_coinalyze_key`).
 _COINALYZE_BASE = "https://api.coinalyze.net/v1"
 _COINALYZE_INTERVAL = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min",
                        "1h": "1hour", "4h": "4hour", "1d": "daily"}
 
 
+# Session cloud (claude.ai/code) : la clé est un « network secret » de l'environnement, injecté
+# par le proxy HTTPS dans l'en-tête `api_key` — aucune variable ni fichier ne la porte. Le code
+# envoie alors ce placeholder, que le proxy remplace par la vraie clé. Sans secret côté proxy,
+# Coinalyze répond 401 → les fetchers renvoient None → repli OKX inchangé.
+_COINALYZE_PROXY_PLACEHOLDER = "proxy-injected"
+
+
 def _coinalyze_key() -> "str | None":
+    """Clé Coinalyze : env `COINALYZE_API_KEY` > fichier `.cache/coinalyze_key` > placeholder
+    si un proxy HTTPS est configuré (secret injecté par le proxy) > None (repli OKX)."""
     k = os.environ.get("COINALYZE_API_KEY")
     if k and k.strip():
         return k.strip()
     try:
         with open(os.path.join(CACHE_DIR, "coinalyze_key")) as f:
-            return f.read().strip() or None
+            k = f.read().strip()
+            if k:
+                return k
     except Exception:
-        return None
+        pass
+    if os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy"):
+        return _COINALYZE_PROXY_PLACEHOLDER
+    return None
 
 
 def _coinalyze_symbol(symbol: str, exch: str = "A") -> str:

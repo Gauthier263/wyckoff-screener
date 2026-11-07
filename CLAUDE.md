@@ -11,7 +11,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **`binance`** (défaut) = **OI Binance live via Coinalyze** (`fetch_coinalyze_oi`, agrégateur
   tiers non géo-bloqué) — **la donnée qui colle à TradingView `BTCUSDT.P`** ; `fapi` Binance
   renvoie 451 ici. Clé gratuite read-only lue depuis l'env `COINALYZE_API_KEY` **ou** le fichier
-  `.cache/coinalyze_key` (gitignoré, jamais commité) ; **repli auto sur OKX** si pas de clé/API
+  `.cache/coinalyze_key` (gitignoré, jamais commité) **ou**, en session cloud, *network secret* de
+  l'environnement injecté par le proxy HTTPS (placeholder `proxy-injected` envoyé si `HTTPS_PROXY`
+  est défini) ; **repli auto sur OKX** si pas de clé/API
   HS. Coinalyze renvoie nativement des **bougies d'OI** (OHLC) et supporte 5m→1d (dont 15m/30m).
   **`okx`** = venue unique (Gate retiré) ; **`agg3`** ajoute l'**OI Binance** via l'archive
   `data.binance.vision` (metrics 5m) + un point **CoinGecko**, **pour la profondeur historique**
