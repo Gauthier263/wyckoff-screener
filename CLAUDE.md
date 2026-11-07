@@ -98,7 +98,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   un pointillé de niveau** (± 6 px, sur sa portion tracée ; prioritaire sur l'événement) → sa ligne
   du tableau Niveaux. Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
-  `M1…`, événements discrétionnaires, texte ; gabarit `examples/notes_btc_1h.json`, heures en
+  `M1…`, événements discrétionnaires, texte ; gabarit **`examples/notes_btc_2h_canonique.json`**, heures en
   CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
   --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
@@ -250,18 +250,15 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   les seules bougies de trading ; (3) sur le graphe, **tracer en x entier** (index de barre) pour
   **écraser les gaps** week-end (rendu continu comme une plateforme or), ticks sur le 1ᵉʳ barre de
   chaque jour. Pas d'OI ni de CVD sur l'or (VSA pur).
-- **Analyse BTC = graphe interactif d'abord** (but : zéro aller-retour avec TradingView).
-  Pour toute analyse, écrire un `notes.json` (gabarit `examples/notes_btc_1h.json`) : chaque
-  **niveau** cité = un ID `N1…` avec prix + `reason` (justification obligatoire, cf. « Niveaux
-  toujours justifiés ») ; chaque **mouvement** évoqué (rebond, retour sur borne, cassure,
-  réintégration) = une zone `M1…` (de/à en CEST) ; le **texte** cite ces IDs entre accolades
-  (`{N1}`, `{M2}`, `{BC}`) pour qu'ils deviennent cliquables. Générer la page
-  (`python -m screener.interactive … --notes`) et la **publier en page** (lien claude.ai, lisible
-  sur téléphone ; un fichier HTML envoyé dans le fil s'affiche en code source). `kind` = couleur
-  **sur le graphe uniquement** (marqueurs, zones, lignes) : demand vert · supply rouge · trap
-  orange · range bleu · pivot violet. **Aucune pastille de couleur nulle part** : ni emoji dans
-  le texte, ni pastille colorée dans les références cliquables de la page (étiquettes neutres).
-- **Illustration d'une analyse** (préférences Gauthier) :
+- **Analyse = VERSION INTERACTIVE D'ABORD (défaut, tous actifs)** — but : zéro aller-retour avec
+  TradingView. Toute analyse Wyckoff (séquence, format canonique) se livre en **page claude.ai
+  interactive** selon la procédure « Format interactif (défaut) » plus bas, **sans que Gauthier ait
+  à le demander**. Le PNG statique + texte markdown n'est produit **que sur demande explicite**
+  (« version PNG », « version statique », « image »). `kind` = couleur **sur le graphe
+  uniquement** : demand vert · supply rouge · trap orange · range bleu · pivot violet. **Aucune
+  pastille de couleur nulle part** (ni emoji dans le texte, ni pastille dans les références).
+- **Illustration d'une analyse** (préférences Gauthier ; règles PNG = format statique, sur demande —
+  les règles de fond (80 bougies, même TF, OI en bougies coin, vol MA, mémo théorie) valent aussi pour la page) :
   - **TOUJOURS afficher le graphe via l'outil Read sur le PNG — sans exception.** En session
     distante/web, c'est l'**ouverture du PNG avec Read** qui l'affiche **en GRAND directement
     dans le fil** ; `SendUserFile` ne le livre qu'en **pièce jointe plus petite**. Donc pour
@@ -317,10 +314,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 ## Format canonique des analyses Wyckoff texte
 
 Structure imposée pour toute analyse Wyckoff manuelle (ad hoc ou sur demande).
-**Gauthier valide ce format** — ne jamais en dévier sans raison explicite.
+**Gauthier valide ce format** — ne jamais en dévier sans raison explicite. Ce format est le
+**fond** ; sa forme par défaut est la page interactive (cf. « Format interactif »).
 
 ### Mots-clés déclencheurs
-Le format complet (graphe bougies OI + mémo théorie + 5 sections) se déclenche dès que la
+Le format complet (page interactive + mémo théorie + 5 sections) se déclenche dès que la
 demande contient **« analyse wyckoff » / « analyse de la séquence »** sur un actif. Forme
 canonique : **`analyse wyckoff [ACTIF] [TF] [depuis quand]`** (ex. « analyse wyckoff BTCUSDT
 H8 depuis 02/06 »). Les 3 paramètres utiles :
@@ -334,11 +332,13 @@ sur la dernière bougie », « le niveau X tient ? ») n'est PAS une analyse de 
 courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd est réservé aux
 **analyses de séquence**.
 
-### Variante interactive (« analyse … interactive » / « version interactive »)
-Même fond, mêmes 5 sections, mêmes interdits ; seule la forme change : une **page claude.ai**
-(graphe Lightweight Charts prix / volume / OI coin relié au texte) au lieu du PNG + markdown.
-Se déclenche quand Gauthier demande une analyse « interactive » (ou la version interactive
-d'une analyse déjà faite). Procédure :
+### Format interactif (DÉFAUT de toute analyse de séquence)
+Même fond, mêmes 5 sections, mêmes interdits que le format canonique ci-dessous ; la forme est
+une **page claude.ai** (graphe Lightweight Charts prix / volume / OI coin relié au texte). C'est
+le livrable **par défaut** dès qu'une analyse de séquence est demandée (« analyse wyckoff … »,
+« fais analyse BTC 2h … »), même sans le mot « interactif ». Format statique (PNG + markdown dans
+le fil) **uniquement** si Gauthier le demande. Suivi rapide (question d'état) : réponse courte,
+pas de page. Procédure :
 1. Faire l'analyse normalement (données, lecture volume → OI → tierces), puis écrire un
    `notes.json` sur le gabarit **`examples/notes_btc_2h_canonique.json`** :
    - `title` (en-tête canonique `ACTIF TF — séquence et dates`), `page_title` (nom court de
@@ -356,11 +356,19 @@ d'une analyse déjà faite). Procédure :
    --notes notes.json --out <scratchpad>/page.html` (ΔOI coin par événement calculé auto,
    CLV/vol×/spread lus sur la barre, théorie depuis `Thresholds`).
 3. **Publier en Artifact** (lien claude.ai) et livrer aussi `memo_theorie.html` (SendUserFile).
-   Le PNG n'est pas requis dans cette variante (le graphe interactif le remplace).
+   Le PNG n'est pas requis (le graphe interactif le remplace). Dans le fil, répondre court :
+   le lien de la page + 2-3 lignes (biais, signal attendu) + le mémo joint ; le détail est
+   dans la page. Une analyse suivante = **nouvelle page** (nouveau fichier) ; une correction
+   de la même analyse = republier le même fichier (même lien).
+   Comportements déjà codés dans `interactive.py` (rien à refaire à la main) : pointillés de
+   niveau partant de leur bougie d'origine, pas de vignettes ni de verticales au repos, marqueurs
+   = nom seul, bouton « Masquer zones M », clic graphe → ligne du tableau (événement ou niveau),
+   navigation par section, vue initiale = `view`.
 
 ### Livrables dans le fil
-1. PNG du graphe (via SendUserFile — jamais un lien cliquable)
-2. HTML mémo théorie (via SendUserFile — `memo_theorie.html`)
+- **Par défaut (interactif)** : lien de la page claude.ai (Artifact) + mémo théorie HTML
+  (SendUserFile — `memo_theorie.html`).
+- **Format statique (sur demande)** : PNG du graphe (Read inline + SendUserFile) + mémo théorie.
 
 ### Corps de l'analyse — sections numérotées dans cet ordre
 
@@ -481,7 +489,7 @@ pour vérifier les seuils vol× qui distinguent un vrai SOS d'un covering »).
 pip install -r requirements.txt
 python -m screener.cli --timeframe 4h --bias both
 python -m screener.cli --timeframe 1h --symbols BTC/USDT --window --chart   # séquence + PNG (fenêtre défaut 60)
-python -m screener.interactive --symbol BTC/USDT --timeframe 1h --notes examples/notes_btc_1h.json  # graphe interactif
+python -m screener.interactive --symbol BTC/USDT --timeframe 2h --no-detect --notes examples/notes_btc_2h_canonique.json --out page.html  # analyse interactive (défaut)
 python -m screener.optimize --timeframe 1h --metric robust   # ou --walk 4
 pytest -q
 ```
