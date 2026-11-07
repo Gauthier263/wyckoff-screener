@@ -329,7 +329,19 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
                     why=_plain(e["why"]), theory=_plain(e["theory"]),
                     verdict=e.get("verdict", ""), sense=_plain(e.get("sense", "")), auto=e["auto"])
 
+    def lv_anchor(lv):
+        """Bougie d'origine du niveau : `from` des notes (CEST), sinon la bougie dont le
+        high ou le low vaut le prix (± 0.02 %). None → ligne sur toute la largeur."""
+        if lv.get("from"):
+            return _sec(df.index[_bar_at(df, _parse_local(lv["from"], year, tz_hours))], tz_hours)
+        p = float(lv["price"])
+        d = np.minimum((df["high"] - p).abs(), (df["low"] - p).abs())
+        if len(d) and float(d.min()) <= p * 2e-4:
+            return _sec(d.idxmin(), tz_hours)
+        return None
+
     lv_out = [dict(id=lv["id"], price=float(lv["price"]), price_txt=_fmt_price(float(lv["price"])),
+                   t0=lv_anchor(lv),
                    label=lv.get("label", ""), reason=lv.get("reason", ""), kind=lv["kind"],
                    color=KIND_COLOR.get(lv["kind"], KIND_COLOR["neutral"]))
               for lv in sorted(levels, key=lambda x: -float(x["price"]))]
@@ -586,11 +598,20 @@ function paneHeights() {
   ps.forEach((p, i) => p.setStretchFactor(f[i] ?? 1));
 }
 
-// Niveaux = price lines (carré de couleur = niveau) ; titre = ID.
+// Niveaux = segments pointillés qui partent de la bougie d'origine (sommet / creux qui
+// définit le niveau, `t0`) jusqu'à la dernière bougie ; sans origine connue → toute la largeur.
+// Hors autoscale (comme une price line) : un niveau lointain n'écrase pas les bougies.
 const plines = {};
+function levelData(lv, a, b) {
+  const t0 = Math.max(lv.t0 ?? a, a);
+  return t0 <= b ? (t0 === b ? [{time: b, value: lv.price}] : [{time: t0, value: lv.price}, {time: b, value: lv.price}]) : [];
+}
 for (const lv of D.levels) {
-  plines[lv.id] = candles.createPriceLine({price: lv.price, color: lv.color, lineWidth: 1,
-    lineStyle: LW.LineStyle.Dashed, axisLabelVisible: true, title: lv.id});
+  const ls = chart.addSeries(LW.LineSeries, {color: lv.color, lineWidth: 1, lineStyle: LW.LineStyle.Dashed,
+    priceLineVisible: false, lastValueVisible: true, title: lv.id, crosshairMarkerVisible: false,
+    pointMarkersVisible: false, autoscaleInfoProvider: () => null, priceFormat}, 0);
+  ls.setData(levelData(lv, D.candles[0].time, D.candles[D.candles.length - 1].time));
+  plines[lv.id] = ls;
 }
 // Événements = marqueurs ronds sur l'extrême réel de la barre.
 let focusId = null;
@@ -774,8 +795,12 @@ document.querySelectorAll('.thumb[data-zone]').forEach(box => {
     autoscaleInfoProvider: () => ({priceRange: {minValue: lo - (hi - lo) * 0.08, maxValue: hi + (hi - lo) * 0.08}, margins: {above: 4, below: 4}})});
   s.setData(sub);
   // niveaux proches du mouvement (dans la plage visible ± 35 %) : même ligne que le grand graphe
-  for (const lv of D.levels) if (lv.price >= lo - m && lv.price <= hi + m)
-    s.createPriceLine({price: lv.price, color: lv.color, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, axisLabelVisible: false, title: lv.id});
+  for (const lv of D.levels) if (lv.price >= lo - m && lv.price <= hi + m) {
+    const d = levelData(lv, sub[0].time, sub[sub.length - 1].time); if (!d.length) continue;
+    tc.addSeries(LW.LineSeries, {color: lv.color, lineWidth: 1, lineStyle: LW.LineStyle.Dashed, priceLineVisible: false,
+      lastValueVisible: false, crosshairMarkerVisible: false, pointMarkersVisible: false, title: lv.id,
+      autoscaleInfoProvider: () => null}).setData(d);
+  }
   const ev = D.events.filter(e => e.time >= sub[0].time && e.time <= sub[sub.length - 1].time);
   LW.createSeriesMarkers(s, ev.map(e => ({time: e.time, position: e.where === 'high' ? 'aboveBar' : 'belowBar',
     color: e.color, shape: 'circle', text: e.id})));

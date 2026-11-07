@@ -338,7 +338,8 @@ d'une analyse déjà faite). Procédure :
    - `title` (en-tête canonique `ACTIF TF — séquence et dates`), `page_title` (nom court de
      l'onglet, 2-4 mots), `subtitle` (sources + fenêtre), `bias` (cadre pour la théorie auto),
      `view` (`from`/`to` en CEST : fenêtre initiale ≥ 80 bougies), `footer` (phrase mémo théorie) ;
-   - `levels` `N1…` (prix + `reason` obligatoire), `zones` `M1…` (mouvements cités, de/à CEST),
+   - `levels` `N1…` (prix + `reason` obligatoire ; le pointillé part de la bougie d'origine :
+     auto = bougie dont le high/low vaut le prix, sinon `from` en CEST ; aucune → toute la largeur), `zones` `M1…` (mouvements cités, de/à CEST),
      `events` (id, `name`, `time` CEST, `where`, `verdict` validé/ambigu/non validé/tentative,
      `sense` = colonne « Volume + OI = sens », `theory_of`/`bias` pour le mémo théorie auto) ;
    - `text` : sections `### 1. Contexte macro (top-down)`, `### 2. Lecture événement par

@@ -133,3 +133,18 @@ def test_canonical_format_slots_verdict_theory_view():
     assert "×1.3" in e["theory"] or "1.3" in e["theory"]       # seuil SOS issu des Thresholds
     assert m["last_i"] < len(df) - 1 and m["first"] <= m["last_i"]
     assert m["page_title"] == "Démo 1h"
+
+
+def test_level_line_starts_at_its_origin_bar():
+    """Le pointillé d'un niveau part du sommet/creux qui le définit (auto ou `from`)."""
+    df = _df()
+    hi_ts = df["high"].idxmax()
+    notes = {"levels": [
+        {"id": "N1", "price": float(df["high"].max()), "label": "sommet"},      # auto
+        {"id": "N2", "price": 1.0, "label": "lointain"},                        # aucun match
+        {"id": "N3", "price": 100.0, "label": "forcé", "from": "04/11 05:00"}]}
+    m = build_model("TEST/USDT", "1h", df, notes=notes, min_bars=10)
+    lv = {l["id"]: l for l in m["levels"]}
+    assert lv["N1"]["t0"] == int(hi_ts.timestamp()) + 2 * 3600
+    assert lv["N2"]["t0"] is None
+    assert lv["N3"]["t0"] == int(pd.Timestamp("2026-11-04 03:00", tz="UTC").timestamp()) + 2 * 3600
