@@ -333,9 +333,10 @@ courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd e
 **analyses de séquence**.
 
 ### Format interactif (DÉFAUT de toute analyse de séquence)
-**Avant toute analyse, lire `memos/memo_analyse_interactive.md`** : procédure complète (données,
-lecture, `notes.json`, plan du texte, publication, comportements du rendu, pièges). Toute nouvelle
-convention validée sur la page s'y ajoute (et dans le code).
+**Avant toute analyse, lire `memos/memo_analyse_interactive.md`** pour la **forme** (données à
+charger, `notes.json`, plan du texte, publication, comportements du rendu, pièges). Le **fond**
+reste défini par ce fichier, le mémo théorie et `memos/doctrine_nuances.md`. Préférence de forme
+validée → ce mémo + le code ; règle de fond → ce fichier ou `doctrine_nuances.md`.
 Même fond, mêmes 5 sections, mêmes interdits que le format canonique ci-dessous ; la forme est
 une **page claude.ai** (graphe Lightweight Charts prix / volume / OI coin relié au texte). C'est
 le livrable **par défaut** dès qu'une analyse de séquence est demandée (« analyse wyckoff … »,

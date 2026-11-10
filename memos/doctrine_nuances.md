@@ -61,6 +61,17 @@ dans la conversation.
   agrégés (ex. VELVET : `VELVETUSDT_PERP.A`, `.6`, `.4`, `.S`) → OI dispo pour des alts où le prix
   vient de gate/mexc. Sommer les perps pour un OI agrégé.
 
+- **Prix↓ + OI↑ = des positions s'ouvrent des DEUX côtés** (chaque contrat a un long et un short).
+  Ne jamais écrire seulement « longs piégés » ni seulement « shorts qui ouvrent » : la question est
+  *qui agresse et qui perd*, à trancher avec CVD + ratio L/S + liquidations. Ex. BTC 2h 02/11 06h →
+  03/11 08h : prix −2,3 %, OI coin +4,6 %, CVD plat (−158), delta_z +2.54 sur le SOW, comptes 68 → 73 %
+  long, 442 BTC de longs liquidés → **shorts posés (offre passive) face à des longs qui achètent la
+  baisse et perdent** (liquidés ensuite : 250 BTC le 04/11, 1 216 le 05/11). Limites : le ratio compte
+  des comptes, pas des montants ; le CVD est spot.
+- **Squeeze ≠ SOS.** Volume et spread hors norme au-dessus d'une borne avec OI coin↓ + gros short liq
+  = débouclage forcé, pas de demande neuve → « tentative », possible upthrust. Ex. BTC 2h 04/11 16h :
+  ×4.00, 3.42 ATR, OI −1.86 %, 976 BTC de shorts liquidés → upthrust / LPSY 3D confirmé le 05/11.
+
 ## 4 · Tierces (CVD, funding, L/S, liquidations)
 
 - **Lire ensemble `absorption` + `delta_z` + `clv` quand ils se contredisent** : le signe d'`absorption`
