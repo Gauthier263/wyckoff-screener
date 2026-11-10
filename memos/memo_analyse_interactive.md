@@ -161,6 +161,7 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 | Clé Coinalyze absente (401) | `request_credential` sur `api.coinalyze.net`, en-tête `api_key` |
 | Niveau hors des données chargées (ex. 74 968 du 14/09 en 2h) | Le pointillé part de la gauche : normal ; le dire si utile |
 | Niveau dont le prix n'est pas un high/low exact | Mettre `from` (heure CEST de la bougie d'origine) |
+| Niveau d'une TF supérieure dont l'origine est hors des données (ex. 74 968 du 14/09 en 1h) : l'ancrage auto peut accrocher une bougie récente qui frôle le prix (± 0.02 %) | Mettre un `from` antérieur au début des données : le pointillé part du bord gauche |
 | Titre d'onglet trop long | `page_title` court ; le long va dans `title` |
 | Tableau qui déborde | Verdicts courts (« validé, OI ambigu ») |
 | Chiffres d'une bougie en cours qui changent avant publication | Écrire « provisoire » et des valeurs arrondies (« ≈ +1.8 % ») dans `sense`, pas la valeur exacte du moment |
