@@ -1,9 +1,18 @@
-# Mémo — produire une analyse Wyckoff interactive
+# Mémo — FORME d'une analyse Wyckoff interactive
 
-Référence complète pour refaire une analyse comme la page « BTC 2h Wyckoff »
-(BTCUSDT 2h, 02/11 05h → 05/11 01h, https://claude.ai/artifact/FcRBFmWwwv7DgygydMKwrR).
-**À lire avant toute analyse.** `CLAUDE.md` fixe les règles ; ce mémo les regroupe dans l'ordre
-du travail, avec les commandes, le gabarit et les pièges déjà rencontrés.
+Ce mémo ne traite que de la **forme** : comment livrer une analyse en page interactive comme
+« BTC 2h Wyckoff » (BTCUSDT 2h, 02/11 05h → 05/11 01h, https://claude.ai/artifact/FcRBFmWwwv7DgygydMKwrR).
+**À lire avant toute analyse**, en plus des documents de fond.
+
+**Le fond ne vient pas d'ici.** La lecture Wyckoff (top-down, fractal, grammaire AR/ST, ordre
+volume → OI → tierces, OI en coin, CVD, tierces à froid, niveaux justifiés, verdicts) reste
+définie par :
+- `CLAUDE.md` (conventions + format canonique en 5 sections + interdits) ;
+- le mémo théorie (`memos/memo_theorie.html`, seuils et OI attendu par événement) ;
+- `memos/doctrine_nuances.md` (nuances apprises en séance) ;
+- les analyses précédentes.
+
+La page met ce fond en forme ; elle n'en change rien.
 
 Modèle à recopier : `examples/notes_btc_2h_canonique.json`.
 
@@ -38,7 +47,7 @@ théorie joint. Le détail est dans la page. Pas d'emoji, pas de pastille de cou
 
 ---
 
-## 3. Données (même TF que l'analyse, heures CEST)
+## 3. Données à charger pour la page (même TF que l'analyse, heures CEST)
 
 | Donnée | Fonction | Remarques |
 |---|---|---|
@@ -53,48 +62,12 @@ théorie joint. Le détail est dans la page. Pas d'emoji, pas de pastille de cou
   Toutes les heures des notes sont dans cette convention ; le générateur fait le décalage.
 - **Vérifier la fraîcheur** : relire la date de la dernière bougie à chaque fetch ; la dernière
   bougie est souvent incomplète (ne pas la lire comme un événement).
-- **TF ≥ 3D** : VSA pur (OI/CVD non attribuables bougie par bougie). Pour lire l'OI d'un
-  mouvement 3D, descendre en Daily sur les journées directionnelles franches.
-
-Seuils (`Thresholds`, config.yaml) : climax ≥ ×2.0 · test ≤ ×0.85 · SOS/SOW ≥ ×1.3 ·
-spread large ≥ 1.3 ATR. Les citer, ne jamais les coder en dur dans le texte sans les relire.
+- Quelles données lire et comment les interpréter (TF ≥ 3D en VSA pur, seuils `Thresholds`…) :
+  voir `CLAUDE.md` et `doctrine_nuances.md`. Ici, seulement ce qu'il faut pour remplir la page.
 
 ---
 
-## 4. Lecture (le fond ne change jamais)
-
-1. **Top-down d'abord.** Tendance primaire + TF supérieure avant toute étiquette. Plage dans un
-   downtrend = **redistribution par défaut** ; plage dans un uptrend = re-accumulation par défaut.
-   L'accumulation se **gagne** ; étiquettes conditionnelles (« SOS ? », « Spring ? ») tant que
-   la plage n'est pas cassée et retestée.
-2. **Fractal.** Déclarer la TF ; étiqueter par rapport à la plage de CETTE structure ; dire en
-   section 3 quel événement unique elle représente sur la TF supérieure.
-3. **Grammaire cohérente.** En distribution : BC → AR **bas** → ST **haut**. Jamais « SC puis AR »
-   dans un cadre distribution. Un passage au-dessus d'une borne n'est un SOS qu'après tenue +
-   back-up ; sinon « tentative ».
-4. **Ordre volume → OI → tierces.** Chaque événement : seuil attendu, observé, verdict
-   (validé / ambigu / non validé / tentative).
-5. **OI en coin, lu avec le lieu** :
-   - prix↑ + OI↓ = rachat de shorts (covering) → ambigu, ne confirme pas la distribution ;
-   - prix↑ + OI↑ = positions neuves → au test d'une résistance en downtrend, demande piégée ;
-   - **prix↓ + OI↑ = des positions s'ouvrent des DEUX côtés** (chaque contrat a un long et un
-     short). La question est *qui agresse et qui perd*. Trancher avec CVD + ratio L/S +
-     liquidations. Exemple M2 : CVD plat (−158) sur −2,3 %, delta_z +2.54 sur le SOW, comptes
-     68 → 73 % long, 442 BTC de longs liquidés → **shorts posés (passifs) face à des longs qui
-     achètent la baisse et perdent**. Écrire les deux côtés, ne jamais dire seulement « longs
-     piégés » quand l'OI monte sur une baisse.
-   - Une liquidation de shorts fait **baisser** l'OI (fermeture forcée) : si l'OI monte pendant
-     un squeeze, ce sont des positions neuves par-dessus.
-6. **Tierces à froid.** CVD en mini-liste par événement (confirme distrib / confirme accu /
-   affaiblit / rien d'exploitable) ; positionnement en une synthèse « sens commun ». Toute tierce
-   qui affaiblit la thèse est écrite comme risque (ex. foule à 58 % long = carburant haussier).
-7. **Niveaux justifiés** : chaque prix avec la raison (événement, borne, comportement vol/OI).
-8. **Hors fenêtre** : si la fenêtre demandée est passée, ajouter « Ce qui a suivi » (zone M
-   dédiée) qui valide ou invalide les scénarios, séparé du verdict « à l'heure de fin ».
-
----
-
-## 5. Le fichier `notes.json`
+## 4. Le fichier `notes.json`
 
 Partir de `examples/notes_btc_2h_canonique.json` (copie dans le scratchpad, pas dans le repo).
 
@@ -107,8 +80,8 @@ Partir de `examples/notes_btc_2h_canonique.json` (copie dans le scratchpad, pas 
 | `view` | `{"from": "JJ/MM HH:MM", "to": "JJ/MM HH:MM"}` | Vue initiale ≥ 80 bougies |
 | `levels[]` | `id` N1…, `price`, `label`, `reason`, `kind`, `from` (optionnel) | `reason` obligatoire. Le pointillé part de la bougie dont le high/low vaut le prix (± 0.02 %) ; sinon `from` ; sinon toute la largeur |
 | `zones[]` | `id` M1…, `from`, `to`, `label`, `reason`, `kind` | Un mouvement cité = une zone. `reason` chiffrée (prix %, OI %, liq, foule) |
-| `events[]` | `id`, `name`, `time`, `where` (high/low), `kind`, `verdict`, `sense`, `theory_of`, `bias` | `sense` = colonne « Volume + OI = sens » (attendu → observé → interprétation). vol×/spread/CLV/ΔOI sont lus automatiquement sur la barre |
-| `text` | Les sections, en mini-markdown | Voir §6 |
+| `events[]` | `id`, `name`, `time`, `where` (high/low), `kind`, `verdict`, `sense`, `theory_of`, `bias` | `sense` = colonne « Volume + OI = sens » du format canonique (contenu : cf. `CLAUDE.md`). vol×/spread/CLV/ΔOI sont lus automatiquement sur la barre |
+| `text` | Les sections, en mini-markdown | Voir §5 |
 | `footer` | La phrase « mémo théorie » propre à cette structure | Obligatoire |
 
 - **`kind`** (couleur sur le graphe uniquement) : `demand` vert · `supply` rouge · `trap` orange ·
@@ -117,11 +90,14 @@ Partir de `examples/notes_btc_2h_canonique.json` (copie dans le scratchpad, pas 
   `bias` sur l'événement si son cadre diffère des notes (ex. Spring ? → `accumulation`).
   Événement hors liste (ex. « Absorption ») → écrire `theory` à la main.
 - **IDs** : `SP?`, `SOS?` acceptés. Références dans le texte : `{N1}`, `{M2}`, `{SOW}`.
-- Vérifier chaque chiffre du `sense` et des zones contre les données (pas de valeur de tête).
+- Vérifier que chaque chiffre recopié dans `sense` et les zones correspond aux données.
 
 ---
 
-## 6. Plan du texte (sections `###`, dans cet ordre)
+## 5. Plan du texte (sections `###`, dans cet ordre)
+
+Le contenu de chaque section suit le format canonique de `CLAUDE.md` ; ce plan fixe seulement
+la mise en page (titres, emplacement des tableaux, navigation).
 
 ```
 ### 1. Contexte macro (top-down)        bullets : TF sup., tendance primaire, position, cadre par défaut, conséquence
@@ -138,7 +114,7 @@ barre de navigation : garder des titres courts avant la parenthèse.
 
 ---
 
-## 7. Générer, vérifier, publier
+## 6. Générer, vérifier, publier
 
 ```bash
 SP=<scratchpad>
@@ -158,7 +134,7 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 
 ---
 
-## 8. Ce que le générateur fait déjà (ne pas le refaire à la main)
+## 7. Ce que le générateur fait déjà (ne pas le refaire à la main)
 
 - Graphe Lightweight Charts : prix / volume + vol MA / **OI coin en bougies**, même TF, zoom/pan,
   boutons « Vue initiale », « Tout », thème clair/sombre.
@@ -177,7 +153,7 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 
 ---
 
-## 9. Pièges déjà rencontrés
+## 8. Pièges de forme déjà rencontrés
 
 | Piège | Parade |
 |---|---|
@@ -185,21 +161,21 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 | Clé Coinalyze absente (401) | `request_credential` sur `api.coinalyze.net`, en-tête `api_key` |
 | Niveau hors des données chargées (ex. 74 968 du 14/09 en 2h) | Le pointillé part de la gauche : normal ; le dire si utile |
 | Niveau dont le prix n'est pas un high/low exact | Mettre `from` (heure CEST de la bougie d'origine) |
-| « Longs piégés » quand l'OI monte sur une baisse | Écrire les deux côtés : shorts neufs (passifs ou agressifs selon CVD) face à des longs neufs ; attribuer avec CVD + L/S + liquidations |
-| Liquidations de shorts + OI qui monte | Positions neuves par-dessus, pas les liquidations |
-| Dernière bougie incomplète | Ne pas l'étiqueter ; signaler la clôture attendue |
-| Squeeze lu comme SOS | SOS exige OI coin↑ (longs neufs) + tenue + back-up ; sinon « tentative » |
 | Titre d'onglet trop long | `page_title` court ; le long va dans `title` |
 | Tableau qui déborde | Verdicts courts (« validé, OI ambigu ») |
 
 ---
 
-## 10. Où sont les règles
+## 9. Où sont les règles
 
-- `CLAUDE.md` : règles de fond (top-down, fractal, grammaire AR/ST, OI coin, tierces à froid,
-  CVD, niveaux justifiés), format canonique en 5 sections, interdits, « Format interactif (défaut) ».
-- `memos/doctrine_nuances.md` : nuances de lecture apprises en séance.
-- `memos/memo_theorie.html` (généré) : seuils et OI attendu par événement.
-- `screener/interactive.py` + `tests/test_interactive.py` : le rendu et ses tests.
-- Ce mémo : la procédure complète et les pièges. **Toute nouvelle convention validée par
-  Gauthier sur la page s'ajoute ici et dans le code** (sinon une prochaine session l'oubliera).
+| Sujet | Document |
+|---|---|
+| **Fond** : lecture Wyckoff, format canonique, interdits | `CLAUDE.md` |
+| **Fond** : seuils et OI attendu par événement | `memos/memo_theorie.html` |
+| **Fond** : nuances apprises en séance | `memos/doctrine_nuances.md` |
+| **Forme** : livraison en page interactive | ce mémo |
+| **Forme** : le rendu et ses tests | `screener/interactive.py`, `tests/test_interactive.py` |
+
+Règle de rangement : une nouvelle préférence **de forme** validée par Gauthier (rendu, mise en
+page, interaction) s'ajoute ici et dans le code ; une nouvelle règle **de fond** (lecture,
+interprétation) va dans `CLAUDE.md` ou `doctrine_nuances.md`, jamais ici.
