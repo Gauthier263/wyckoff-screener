@@ -333,6 +333,9 @@ courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd e
 **analyses de séquence**.
 
 ### Format interactif (DÉFAUT de toute analyse de séquence)
+**Avant toute analyse, lire `memos/memo_analyse_interactive.md`** : procédure complète (données,
+lecture, `notes.json`, plan du texte, publication, comportements du rendu, pièges). Toute nouvelle
+convention validée sur la page s'y ajoute (et dans le code).
 Même fond, mêmes 5 sections, mêmes interdits que le format canonique ci-dessous ; la forme est
 une **page claude.ai** (graphe Lightweight Charts prix / volume / OI coin relié au texte). C'est
 le livrable **par défaut** dès qu'une analyse de séquence est demandée (« analyse wyckoff … »,
