@@ -163,6 +163,8 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 | Niveau dont le prix n'est pas un high/low exact | Mettre `from` (heure CEST de la bougie d'origine) |
 | Titre d'onglet trop long | `page_title` court ; le long va dans `title` |
 | Tableau qui déborde | Verdicts courts (« validé, OI ambigu ») |
+| Chiffres d'une bougie en cours qui changent avant publication | Écrire « provisoire » et des valeurs arrondies (« ≈ +1.8 % ») dans `sense`, pas la valeur exacte du moment |
+| `{M2}` dans `sense` / `reason` | Les tableaux n'ont pas de références cliquables : les accolades sont retirées automatiquement (seul le texte les rend cliquables) |
 
 ---
 

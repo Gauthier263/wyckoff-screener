@@ -82,8 +82,10 @@ def _fmt_price(v: float) -> str:
 
 
 def _plain(s: str) -> str:
-    """Retire l'emphase markdown (*x*, **x**) des textes affichés tels quels en table."""
-    return re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", s or "")
+    """Texte affiché tel quel en table : retire l'emphase markdown (*x*, **x**) et les
+    accolades de référence ({M2} → M2), qui ne sont cliquables que dans le texte."""
+    s = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", s or "")
+    return re.sub(r"\{([A-Za-z][A-Za-z0-9_+\-?]*)\}", r"\1", s)
 
 
 def _precision(v: float) -> int:
