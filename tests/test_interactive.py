@@ -154,3 +154,8 @@ def test_no_thumbnail_by_default():
     """Par défaut, aucune vignette sous les mouvements : le graphe principal suffit."""
     m = build_model("TEST/USDT", "1h", _df(), notes=NOTES)
     assert 'class="thumb"' not in m["text_html"]
+
+
+def test_table_text_drops_reference_braces():
+    from screener.interactive import _plain
+    assert _plain("entre dans la plage {M2} puis **{SOW}**") == "entre dans la plage M2 puis SOW"
