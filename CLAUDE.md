@@ -369,6 +369,8 @@ pas de page. Procédure :
    = nom seul, bouton « Masquer zones M », clic graphe → ligne du tableau (événement ou niveau),
    navigation par section, vue initiale = `view`, thème clair par défaut, en-tête sur une ligne,
    pas de ligne du dernier prix, schéma macro `[[macro]]` + schéma de phase `[[phase]]` en section 1,
+   échelle du schéma de phase choisie à chaque fois (3D / Daily / 4h : celle qui montre l'épisode
+   complet le plus lisiblement, cf. mémo de forme),
    pas de titre, tableau événements formaté (×Rvol, ATR, CLV, sans heure, acronymes développés),
    `sense` sans « attendu » (l'attendu est dans « Théorie »), clic sur une zone M → son texte.
 
