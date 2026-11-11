@@ -371,7 +371,8 @@ pas de page. Procédure :
    pas de ligne du dernier prix, schéma macro `[[macro]]` + schéma de phase `[[phase]]` en section 1,
    échelle du schéma de phase choisie à chaque fois (3D / Daily / 4h : celle qui montre l'épisode
    complet le plus lisiblement, cf. mémo de forme),
-   pas de titre, tableau événements formaté (×Rvol, ATR, CLV, sans heure, acronymes développés),
+   pas de titre, tableau événements formaté (×Rvol, ATR, CLV, sans heure ; acronymes Wyckoff non
+   développés, libellés maison avec `full` + onglet « Pourquoi ce nom »), prix sur le schéma de phase,
    `sense` sans « attendu » (l'attendu est dans « Théorie »), clic sur une zone M → son texte.
 
 ### Livrables dans le fil

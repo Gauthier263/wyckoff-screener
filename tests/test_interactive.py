@@ -190,3 +190,14 @@ def test_phase_sketch_and_acronyms():
     assert _full_name({"theory_of": "SOW"}).startswith("Sign of Weakness")
     assert _full_name({"name": "ST-haut"}).startswith("Secondary Test")
     assert _full_name({"name": "Plancher"}) == ""
+
+
+def test_custom_label_gets_full_and_naming_known_does_not():
+    """Libellé maison (BB) : nom développé + « Pourquoi ce nom » ; acronyme Wyckoff (SOW) : rien."""
+    notes = {"events": [
+        {"id": "SOW", "name": "SOW", "theory_of": "SOW", "time": "04/11 12:00", "where": "low"},
+        {"id": "BB", "name": "Borne basse", "time": "04/11 13:00", "where": "low",
+         "full": "borne basse", "naming": "Pas « SC » : pas de climax."}]}
+    ev = {e["id"]: e for e in build_model("TEST/USDT", "1h", _df(), notes=notes, min_bars=10)["events"]}
+    assert ev["SOW"]["full"] == "" and ev["SOW"]["naming"] == ""
+    assert ev["BB"]["full"] == "borne basse" and ev["BB"]["naming"].startswith("Pas")

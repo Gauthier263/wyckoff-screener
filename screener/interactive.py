@@ -270,7 +270,8 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
             spread_atr=float(bar.get("spread_atr", np.nan)), clv=float(bar.get("clv", np.nan)),
             oi_chg=_note_oi(e, oi_pct, df.index[i]), why=e.get("why", ""),
             theory=e.get("theory") or _note_theory(e, bias_notes),
-            verdict=e.get("verdict", ""), sense=e.get("sense", ""), full=_full_name(e), auto=False)
+            verdict=e.get("verdict", ""), sense=e.get("sense", ""), full=e.get("full", ""),
+            naming=e.get("naming", ""), auto=False)
     events = sorted(ev_by_id.values(), key=lambda e: e["ts"])
 
     zones = []
@@ -333,7 +334,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
                     oi_chg=None if e["oi_chg"] is None else round(e["oi_chg"], 2),
                     why=_plain(e["why"]), theory=_plain(e["theory"]),
                     verdict=e.get("verdict", ""), sense=_plain(e.get("sense", "")),
-                    full=e.get("full") or _full_name(e), auto=e["auto"])
+                    full=e.get("full", ""), naming=_plain(e.get("naming", "")), auto=e["auto"])
 
     def lv_anchor(lv):
         """Bougie d'origine du niveau : `from` des notes (CEST), sinon la bougie dont le
@@ -472,7 +473,7 @@ def phase_svg(phase: dict | None) -> str:
     if not phase or len(phase.get("points", [])) < 2:
         return ""
     pts = phase["points"]
-    W, H, L, R, T, B = 480, 230, 26, 26, 40, 34
+    W, H, L, R, T, B = 480, 252, 26, 26, 52, 48
     rng = phase.get("range") or {}
     prices = [float(p["price"]) for p in pts] + [float(v) for v in (rng.get("hi"), rng.get("lo")) if v]
     lo, hi = min(prices), max(prices)
@@ -506,8 +507,10 @@ def phase_svg(phase: dict | None) -> str:
         anc = "start" if i == 0 else ("end" if last else "middle")
         ty = y - 8 if top else y + 15
         out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{4.5 if last else 3}" class="{"mnow" if last else "mpt"}"/>')
+        py = ty - 11 if top else ty + 11           # prix sur une 2e ligne (au-dessus d'un sommet)
         out.append(f'<text x="{x:.1f}" y="{ty:.1f}" class="mtxt" text-anchor="{anc}">'
-                   f'{html.escape(p.get("label", ""))}</text>')
+                   f'{html.escape(p.get("label", ""))}</text>'
+                   f'<text x="{x:.1f}" y="{py:.1f}" class="mprice" text-anchor="{anc}">{html.escape(k(v))}</text>')
         if p.get("date"):
             out.append(f'<text x="{x:.1f}" y="{H - 8}" class="mdate" text-anchor="{anc}">'
                        f'{html.escape(p["date"])}</text>')
@@ -520,7 +523,9 @@ def phase_svg(phase: dict | None) -> str:
             + (f"<figcaption>{html.escape(cap)}</figcaption>" if cap else "") + "</figure>")
 
 
-# Acronymes Wyckoff → nom complet (affiché en tête de la ligne détail de l'événement).
+# Acronymes Wyckoff connus : ils ne sont PAS développés sur la page (Gauthier les connaît).
+# Seuls les libellés maison (BB, T1, ABS…) reçoivent un `full` + un `naming` dans les notes.
+# Table gardée pour `_full_name` (utilitaire, ex. vérifier qu'un id est un événement Wyckoff).
 ACRONYMS = {
     "SC": "Selling Climax (climax de vente)", "BC": "Buying Climax (climax d'achat)",
     "AR": "Automatic Rally / Reaction (réaction automatique)", "ST": "Secondary Test (test secondaire)",
@@ -669,6 +674,7 @@ svg.phase .mpt{fill:var(--text)}
 svg.phase .mnow{fill:var(--bg);stroke:var(--text);stroke-width:2}
 svg.phase .mtxt{fill:var(--text);font-size:10px;font-weight:600}
 svg.phase .mdate{fill:var(--muted);font-size:9px}
+svg.phase .mprice{fill:var(--muted);font-size:9.5px;font-variant-numeric:tabular-nums}
 #events td:nth-child(2){white-space:nowrap}
 #foot{margin:14px 0 0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
   background:var(--bg);font-size:12.5px}
@@ -986,7 +992,8 @@ $('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${es
   <td class="num">${e.clv != null ? 'CLV ' + e.clv.toFixed(2) : '—'}</td>
   <td class="num">${e.oi_chg != null ? (e.oi_chg > 0 ? '+' : '') + e.oi_chg.toFixed(2) + ' %' : '—'}</td>
   <td class="vd">${esc(e.verdict || '')}</td></tr>
-  ${(e.full || e.sense || e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="7" class="why">${e.verdict ? `<span class="vd-m">Verdict : ${esc(e.verdict)}</span>` : ''}${e.full ? `<span class="full">${esc(e.name)} : ${esc(e.full)}</span>` : ''}${esc(e.sense || e.why)}
+  ${(e.full || e.sense || e.why || e.theory || e.naming) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="7" class="why">${e.verdict ? `<span class="vd-m">Verdict : ${esc(e.verdict)}</span>` : ''}${e.full ? `<span class="full">${esc(e.id)} : ${esc(e.full)}</span>` : ''}${esc(e.sense || e.why)}
+    ${e.naming ? `<details><summary>Pourquoi ce nom</summary>${esc(e.naming)}</details>` : ''}
     ${e.theory ? `<details><summary>Théorie</summary>${esc(e.theory)}</details>` : ''}</td></tr>` : ''}`).join('')
   || '<tr><td colspan="7" class="why">—</td></tr>';
 // Tables placées dans le texte ([[events]] / [[levels]] / [[zones]]) : on les déplace.
