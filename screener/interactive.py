@@ -171,7 +171,7 @@ def render_text(text: str, refs: dict[str, dict], thumbs_on: bool = False) -> st
         line = raw.strip()
         if not line:
             flush()
-        elif re.fullmatch(r"\[\[(events|levels|zones|macro)\]\]", line):
+        elif re.fullmatch(r"\[\[(events|levels|zones|macro|phase)\]\]", line):
             flush()
             out.append(f'<div class="slot" data-slot="{line[2:-2]}"></div>')
         elif line.startswith("#"):
@@ -270,7 +270,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
             spread_atr=float(bar.get("spread_atr", np.nan)), clv=float(bar.get("clv", np.nan)),
             oi_chg=_note_oi(e, oi_pct, df.index[i]), why=e.get("why", ""),
             theory=e.get("theory") or _note_theory(e, bias_notes),
-            verdict=e.get("verdict", ""), sense=e.get("sense", ""), auto=False)
+            verdict=e.get("verdict", ""), sense=e.get("sense", ""), full=_full_name(e), auto=False)
     events = sorted(ev_by_id.values(), key=lambda e: e["ts"])
 
     zones = []
@@ -332,7 +332,8 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
                     clv=None if pd.isna(e.get("clv", np.nan)) else round(float(e["clv"]), 2),
                     oi_chg=None if e["oi_chg"] is None else round(e["oi_chg"], 2),
                     why=_plain(e["why"]), theory=_plain(e["theory"]),
-                    verdict=e.get("verdict", ""), sense=_plain(e.get("sense", "")), auto=e["auto"])
+                    verdict=e.get("verdict", ""), sense=_plain(e.get("sense", "")),
+                    full=e.get("full") or _full_name(e), auto=e["auto"])
 
     def lv_anchor(lv):
         """Bougie d'origine du niveau : `from` des notes (CEST), sinon la bougie dont le
@@ -376,7 +377,8 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         subtitle=notes.get("subtitle", ""), footer=notes.get("footer", ""),
         page_title=notes.get("page_title", ""),
         text_html=render_text(text, refs, thumbs_on=bool(notes.get("thumbs", False))).replace(
-            '<div class="slot" data-slot="macro"></div>', macro_svg(notes.get("macro"))),
+            '<div class="slot" data-slot="macro"></div>', macro_svg(notes.get("macro"))).replace(
+            '<div class="slot" data-slot="phase"></div>', phase_svg(notes.get("phase"))),
     )
 
 
@@ -458,6 +460,92 @@ def macro_svg(macro: dict | None) -> str:
             + (f"<figcaption>{html.escape(cap)}</figcaption>" if cap else "") + "</figure>")
 
 
+def phase_svg(phase: dict | None) -> str:
+    """Schéma de l'épisode Wyckoff à l'échelle intermédiaire (ligne `[[phase]]`).
+
+    `phase` = {"tf": "Daily", "title": "Distribution", "caption": "…",
+               "points": [{"label": "BC", "price": 87396, "date": "21/09"}, …],   # dernier = ici
+               "range": {"hi": 87396, "lo": 79800},                               # plage (optionnel)
+               "phases": [{"from": 1, "to": 3, "label": "A"}, …]}                 # indices de points
+    Schéma : points équidistants ; bandes de phases A-E ; plage en pointillé ; segments verts
+    (hausse) / rouges (baisse) ; dernier point = « ici »."""
+    if not phase or len(phase.get("points", [])) < 2:
+        return ""
+    pts = phase["points"]
+    W, H, L, R, T, B = 480, 230, 26, 26, 40, 34
+    rng = phase.get("range") or {}
+    prices = [float(p["price"]) for p in pts] + [float(v) for v in (rng.get("hi"), rng.get("lo")) if v]
+    lo, hi = min(prices), max(prices)
+    pad = (hi - lo) * 0.10 or 1.0
+    lo, hi = lo - pad, hi + pad
+    X = lambda i: L + i * (W - L - R) / (len(pts) - 1)
+    Y = lambda v: T + (hi - v) * (H - T - B) / (hi - lo)
+    k = lambda v: f"{v / 1000:.1f}k".replace(".0k", "k")
+    out = [f'<svg class="phase" viewBox="0 0 {W} {H}" role="img" '
+           f'aria-label="{html.escape(phase.get("caption", "Phase Wyckoff"))}">']
+    for j, ph in enumerate(phase.get("phases", [])):
+        x0, x1 = X(int(ph["from"])), X(int(ph["to"]))
+        out.append(f'<rect x="{x0:.1f}" y="{T - 22}" width="{max(x1 - x0, 2):.1f}" height="{H - T - B + 22}" '
+                   f'class="pband{j % 2}"/>'
+                   f'<text x="{(x0 + x1) / 2:.1f}" y="{T - 9}" class="ptag" text-anchor="middle">'
+                   f'{html.escape(ph.get("label", ""))}</text>')
+    if rng.get("hi") and rng.get("lo"):
+        for v in (rng["hi"], rng["lo"]):
+            y = Y(float(v))
+            out.append(f'<line x1="{L}" x2="{W - R}" y1="{y:.1f}" y2="{y:.1f}" class="mline"/>')
+    for i in range(len(pts) - 1):
+        a, b = float(pts[i]["price"]), float(pts[i + 1]["price"])
+        out.append(f'<line x1="{X(i):.1f}" y1="{Y(a):.1f}" x2="{X(i + 1):.1f}" y2="{Y(b):.1f}" '
+                   f'class="{"mup" if b >= a else "mdn"}"/>')
+    for i, p in enumerate(pts):
+        v = float(p["price"]); x, y = X(i), Y(v)
+        prev = float(pts[i - 1]["price"]) if i else None
+        nxt = float(pts[i + 1]["price"]) if i < len(pts) - 1 else None
+        top = (prev is None or v >= prev) and (nxt is None or v >= nxt)
+        last = i == len(pts) - 1
+        anc = "start" if i == 0 else ("end" if last else "middle")
+        ty = y - 8 if top else y + 15
+        out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{4.5 if last else 3}" class="{"mnow" if last else "mpt"}"/>')
+        out.append(f'<text x="{x:.1f}" y="{ty:.1f}" class="mtxt" text-anchor="{anc}">'
+                   f'{html.escape(p.get("label", ""))}</text>')
+        if p.get("date"):
+            out.append(f'<text x="{x:.1f}" y="{H - 8}" class="mdate" text-anchor="{anc}">'
+                       f'{html.escape(p["date"])}</text>')
+    out.append("</svg>")
+    head = " · ".join(x for x in (phase.get("tf"), phase.get("title")) if x)
+    cap = phase.get("caption")
+    return (f'<figure class="macrofig">'
+            + (f'<div class="figttl">{html.escape(head)}</div>' if head else "")
+            + "".join(out)
+            + (f"<figcaption>{html.escape(cap)}</figcaption>" if cap else "") + "</figure>")
+
+
+# Acronymes Wyckoff → nom complet (affiché en tête de la ligne détail de l'événement).
+ACRONYMS = {
+    "SC": "Selling Climax (climax de vente)", "BC": "Buying Climax (climax d'achat)",
+    "AR": "Automatic Rally / Reaction (réaction automatique)", "ST": "Secondary Test (test secondaire)",
+    "SOS": "Sign of Strength (signe de force)", "SOW": "Sign of Weakness (signe de faiblesse)",
+    "LPS": "Last Point of Support (dernier point de support)",
+    "LPSY": "Last Point of Supply (dernier point d'offre)",
+    "UTAD": "Upthrust After Distribution (fausse cassure haussière de fin de distribution)",
+    "UT": "Upthrust (fausse cassure haussière)", "SPRING": "Spring (fausse cassure baissière)",
+    "PS": "Preliminary Support (support préliminaire)", "PSY": "Preliminary Supply (offre préliminaire)",
+    "JAC": "Jump Across the Creek (saut au-dessus de la résistance)",
+    "BUEC": "Back-Up to the Edge of the Creek (retour sur la résistance franchie)",
+}
+
+
+def _full_name(e: dict) -> str:
+    """Nom complet d'un événement : `full` des notes, sinon via `theory_of` ou le nom."""
+    if e.get("full"):
+        return e["full"]
+    for key in (e.get("theory_of"), e.get("name"), e.get("id")):
+        k = re.sub(r"[^A-Z]", "", (key or "").upper().split("(")[0].split("/")[0])
+        if k in ACRONYMS:
+            return ACRONYMS[k]
+    return ""
+
+
 def _auto_text(bias: str, levels: list[dict], events: list[dict]) -> str:
     if not events:
         return "Aucune structure détectée sur la fenêtre — ajoute des `notes` pour annoter."
@@ -537,6 +625,7 @@ tr.row{cursor:pointer}
 tr.row:hover, tr.row.on{background:var(--hl)}
 #events tr.row,#levels tr.row{scroll-margin-top:52px}
 tr.row.flash td{background:var(--hl);box-shadow:inset 0 0 0 1px var(--muted)}
+.text li.flash,.text p.flash{background:var(--hl);box-shadow:0 0 0 4px var(--hl);border-radius:4px}
 #chart{cursor:crosshair}
 td.num{text-align:right;white-space:nowrap}
 td.why{color:var(--muted);font-size:12px}
@@ -566,6 +655,20 @@ svg.macro .mnow{fill:var(--bg);stroke:var(--text);stroke-width:2}
 svg.macro .mtxt{fill:var(--text);font-size:10.5px;font-weight:600}
 svg.macro .mdate,svg.macro .mlab{fill:var(--muted);font-size:9.5px}
 td.vd{font-weight:600}
+td.why .full{display:block;color:var(--text);font-weight:600;margin-bottom:2px}
+td.why .vd-m{display:none}
+.figttl{font-size:12px;font-weight:600;color:var(--text);margin:0 0 2px}
+svg.phase{width:100%;height:auto;display:block}
+svg.phase .pband0{fill:var(--hl)}
+svg.phase .pband1{fill:var(--grid)}
+svg.phase .ptag{fill:var(--muted);font-size:10.5px;font-weight:700}
+svg.phase .mup{stroke:var(--up);stroke-width:2.2}
+svg.phase .mdn{stroke:var(--down);stroke-width:2.2}
+svg.phase .mline{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+svg.phase .mpt{fill:var(--text)}
+svg.phase .mnow{fill:var(--bg);stroke:var(--text);stroke-width:2}
+svg.phase .mtxt{fill:var(--text);font-size:10px;font-weight:600}
+svg.phase .mdate{fill:var(--muted);font-size:9px}
 #events td:nth-child(2){white-space:nowrap}
 #foot{margin:14px 0 0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
   background:var(--bg);font-size:12.5px}
@@ -587,6 +690,11 @@ td.vd{font-weight:600}
   #legend{font-size:10.5px;right:60px}
   aside{border-left:0;border-top:1px solid var(--border);padding:4px 16px 24px}
   #nav{position:static}
+  /* tableau événements : le verdict passe dans la ligne de détail pour tenir en largeur */
+  #events th:last-child, #events td.vd{display:none}
+  td.why .vd-m{display:block;color:var(--text);font-weight:700;margin-bottom:2px}
+  #events{font-size:11.5px}
+  #events td, #events th{padding:4px 2px}
   #events tr.row,#levels tr.row{scroll-margin-top:calc(48vh + 60px)}
 }
 </style>
@@ -595,7 +703,7 @@ td.vd{font-weight:600}
 <div class="app">
   <div class="chartcol">
     <header>
-      <h1 id="ttl"></h1><span class="meta" id="meta"></span>
+      <span class="meta" id="meta"></span>
       <div class="tools">
         <button id="zonesbtn" title="Afficher / masquer les rectangles des mouvements M1, M2…" aria-pressed="true">Zones M</button>
         <button id="fit" title="Revenir à la vue initiale">Vue initiale</button>
@@ -618,7 +726,7 @@ td.vd{font-weight:600}
     <h2 id="zh">Mouvements</h2>
     <table id="zones"><thead><tr><th>Zone</th><th>Période</th><th>Lecture</th></tr></thead><tbody></tbody></table>
     <h2 id="eh">Événements</h2>
-    <table id="events"><thead><tr><th>Évt</th><th>Heure</th><th class="num">Prix</th><th class="num">vol×</th><th class="num">spr ATR</th><th class="num">CLV</th><th class="num">ΔOI%</th><th>Verdict</th></tr></thead><tbody></tbody></table>
+    <table id="events"><thead><tr><th>Évt</th><th class="num">Prix</th><th class="num">Rvol</th><th class="num">Spread</th><th class="num">Clôture</th><th class="num">ΔOI</th><th>Verdict</th></tr></thead><tbody></tbody></table>
   </aside>
 </div>
 <script>__LIB__</script>
@@ -631,7 +739,6 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const fmt = (v, p) => v == null ? '—' : Number(v).toLocaleString('fr-FR', {maximumFractionDigits: p ?? D.precision});
 
 // En-tête sur une seule ligne : actif + TF, puis dernier prix (le titre long n'est pas affiché).
-$('#ttl').textContent = `${D.symbol} ${D.timeframe}`;
 $('#meta').textContent = `dernier ${D.last_txt} @ ${D.last_time} (${D.tz})`;
 $('#text').innerHTML = D.text_html;
 if (D.subtitle) $('#sub').textContent = D.subtitle; else $('#sub').hidden = true;
@@ -665,7 +772,7 @@ if (D.oi.length) {
 }
 function paneHeights() {
   // cours / volume / OI ≈ 60 / 18 / 22 %
-  const ps = chart.panes(), f = [3.4, 1, 1.25];
+  const ps = chart.panes(), f = [4.6, 0.8, 1.0];          // plus de place au cours
   ps.forEach((p, i) => p.setStretchFactor(f[i] ?? 1));
 }
 
@@ -815,7 +922,16 @@ function legend(t) {
 chart.subscribeCrosshairMove(p => legend(p && p.time != null ? p.time : null));
 // Clic sur le graphe → la ligne correspondante du panneau :
 //  1) un pointillé de niveau (à ± 6 px, sur sa portion tracée) → sa ligne du tableau Niveaux ;
-//  2) sinon une bougie d'événement (± 1 bougie) → sa ligne du tableau Événements.
+//  2) sinon une bougie d'événement (± 1 bougie, clic près de son marqueur) → sa ligne Événements ;
+//  3) sinon un rectangle de zone M (visible) → le passage du texte qui la cite.
+function goText(id) {
+  setFocus(id, false);
+  const ref = document.querySelector(`.text [data-ref="${CSS.escape(id)}"]`);
+  if (!ref) return;
+  const block = ref.closest('li, p') || ref;
+  block.scrollIntoView({behavior: 'smooth', block: 'center'});
+  block.classList.add('flash'); setTimeout(() => block.classList.remove('flash'), 1600);
+}
 function goRow(table, id) {
   setFocus(id, false);
   const row = document.querySelector(`${table} tr.row[data-ref="${CSS.escape(id)}"]`);
@@ -835,8 +951,21 @@ chart.subscribeClick(p => {
   }
   const i = idxOf(p.time);
   let best = null;
-  for (const e of D.events) { const d = Math.abs(idxOf(e.time) - i); if (d <= 1 && (!best || d < best.d)) best = {e, d}; }
-  if (best) goRow('#events', best.e.id);
+  for (const e of D.events) {
+    const d = Math.abs(idxOf(e.time) - i); if (d > 1) continue;
+    if (p.point && p.paneIndex === 0) {          // en zone de prix : seulement près du marqueur
+      const y = candles.priceToCoordinate(e.price);
+      if (y != null && Math.abs(y - p.point.y) > 40) continue;
+    }
+    if (!best || d < best.d) best = {e, d};
+  }
+  if (best) { goRow('#events', best.e.id); return; }
+  if (p.point && p.paneIndex === 0) {
+    const pr = candles.coordinateToPrice(p.point.y);
+    const z = D.zones.find(z => (showZones || focusId === z.id) && p.time >= z.t0 && p.time <= z.t1
+                                && pr != null && pr >= z.lo && pr <= z.hi);
+    if (z) goText(z.id);
+  }
 });
 
 // ---------------- Tables ----------------
@@ -851,15 +980,15 @@ if (D.zones.length) {
 } else { $('#zones').style.display = 'none'; $('#zh').style.display = 'none'; }
 $('#events tbody').innerHTML = D.events.map(e => `<tr class="row" data-ref="${esc(e.id)}">
   <td><button class="ref dot" data-ref="${esc(e.id)}">${esc(e.id)}</button></td>
-  <td>${esc(e.label)}</td><td class="num">${esc(e.price_txt)}</td>
-  <td class="num">${e.vol_ratio != null ? e.vol_ratio.toFixed(2) : '—'}</td>
-  <td class="num">${e.spread_atr != null ? e.spread_atr.toFixed(2) : '—'}</td>
-  <td class="num">${e.clv != null ? e.clv.toFixed(2) : '—'}</td>
-  <td class="num">${e.oi_chg != null ? (e.oi_chg > 0 ? '+' : '') + e.oi_chg.toFixed(2) : '—'}</td>
+  <td class="num">${esc(e.price_txt)}</td>
+  <td class="num">${e.vol_ratio != null ? '×' + e.vol_ratio.toFixed(2) : '—'}</td>
+  <td class="num">${e.spread_atr != null ? e.spread_atr.toFixed(2) + ' ATR' : '—'}</td>
+  <td class="num">${e.clv != null ? 'CLV ' + e.clv.toFixed(2) : '—'}</td>
+  <td class="num">${e.oi_chg != null ? (e.oi_chg > 0 ? '+' : '') + e.oi_chg.toFixed(2) + ' %' : '—'}</td>
   <td class="vd">${esc(e.verdict || '')}</td></tr>
-  ${(e.sense || e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="8" class="why">${esc(e.sense || e.why)}
+  ${(e.full || e.sense || e.why || e.theory) ? `<tr data-ref="${esc(e.id)}" class="row"><td colspan="7" class="why">${e.verdict ? `<span class="vd-m">Verdict : ${esc(e.verdict)}</span>` : ''}${e.full ? `<span class="full">${esc(e.name)} : ${esc(e.full)}</span>` : ''}${esc(e.sense || e.why)}
     ${e.theory ? `<details><summary>Théorie</summary>${esc(e.theory)}</details>` : ''}</td></tr>` : ''}`).join('')
-  || '<tr><td colspan="8" class="why">—</td></tr>';
+  || '<tr><td colspan="7" class="why">—</td></tr>';
 // Tables placées dans le texte ([[events]] / [[levels]] / [[zones]]) : on les déplace.
 for (const [slot, tid, hid] of [['events', '#events', '#eh'], ['levels', '#levels', '#lh'], ['zones', '#zones', '#zh']]) {
   const box = document.querySelector(`.slot[data-slot="${slot}"]`);

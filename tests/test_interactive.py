@@ -174,3 +174,19 @@ def test_macro_sketch_rendered_in_place():
     assert '<svg class="macro"' in h and 'data-slot="macro"' not in h
     assert h.count('class="mdn"') == 2 and h.count('class="mup"') == 1
     assert "Primaire baissière" in h and "75k pivot" in h
+
+
+def test_phase_sketch_and_acronyms():
+    """`[[phase]]` → schéma de l'épisode Wyckoff (bandes de phases, plage) ; noms complets."""
+    from screener.interactive import _full_name
+    notes = {"text": "### 1. Contexte\n[[phase]]",
+             "phase": {"tf": "Daily", "title": "Distribution",
+                       "points": [{"label": "BC", "price": 87000}, {"label": "AR", "price": 82000},
+                                  {"label": "ST", "price": 86800}, {"label": "ici", "price": 74000}],
+                       "range": {"hi": 87000, "lo": 80000},
+                       "phases": [{"from": 0, "to": 2, "label": "A"}, {"from": 2, "to": 3, "label": "E"}]}}
+    h = build_model("TEST/USDT", "1h", _df(), notes=notes, min_bars=10)["text_html"]
+    assert '<svg class="phase"' in h and h.count('class="pband') == 2 and "Daily · Distribution" in h
+    assert _full_name({"theory_of": "SOW"}).startswith("Sign of Weakness")
+    assert _full_name({"name": "ST-haut"}).startswith("Secondary Test")
+    assert _full_name({"name": "Plancher"}) == ""

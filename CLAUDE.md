@@ -368,7 +368,9 @@ pas de page. Procédure :
    niveau partant de leur bougie d'origine, pas de vignettes ni de verticales au repos, marqueurs
    = nom seul, bouton « Masquer zones M », clic graphe → ligne du tableau (événement ou niveau),
    navigation par section, vue initiale = `view`, thème clair par défaut, en-tête sur une ligne,
-   pas de ligne du dernier prix, schéma macro `[[macro]]` en section 1.
+   pas de ligne du dernier prix, schéma macro `[[macro]]` + schéma de phase `[[phase]]` en section 1,
+   pas de titre, tableau événements formaté (×Rvol, ATR, CLV, sans heure, acronymes développés),
+   `sense` sans « attendu » (l'attendu est dans « Théorie »), clic sur une zone M → son texte.
 
 ### Livrables dans le fil
 - **Par défaut (interactif)** : lien de la page claude.ai (Artifact) + mémo théorie HTML
