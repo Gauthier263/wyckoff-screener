@@ -540,7 +540,7 @@ def _full_name(e: dict) -> str:
     if e.get("full"):
         return e["full"]
     for key in (e.get("theory_of"), e.get("name"), e.get("id")):
-        k = re.sub(r"[^A-Z]", "", (key or "").upper().split("(")[0].split("/")[0])
+        k = re.sub(r"[^A-Z]", "", re.split(r"[\s\-(/]", (key or "").upper().strip() or "_")[0])
         if k in ACRONYMS:
             return ACRONYMS[k]
     return ""
