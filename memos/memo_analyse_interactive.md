@@ -83,6 +83,7 @@ Partir de `examples/notes_btc_2h_canonique.json` (copie dans le scratchpad, pas 
 | `events[]` | `id`, `name`, `time`, `where` (high/low), `kind`, `verdict`, `sense`, `theory_of`, `bias` | `sense` = colonne « Volume + OI = sens » du format canonique (contenu : cf. `CLAUDE.md`). vol×/spread/CLV/ΔOI sont lus automatiquement sur la barre |
 | `text` | Les sections, en mini-markdown | Voir §5 |
 | `footer` | La phrase « mémo théorie » propre à cette structure | Obligatoire |
+| `macro` | `{"points": [{"date", "price", "label"}…], "lines": [{"price", "label"}], "caption"}` : sommets et creux de la tendance primaire jusqu'au prix actuel | Obligatoire ; placé par la ligne `[[macro]]` en tête de la section 1 |
 
 - **`kind`** (couleur sur le graphe uniquement) : `demand` vert · `supply` rouge · `trap` orange ·
   `range` bleu · `pivot` violet.
@@ -100,7 +101,7 @@ Le contenu de chaque section suit le format canonique de `CLAUDE.md` ; ce plan f
 la mise en page (titres, emplacement des tableaux, navigation).
 
 ```
-### 1. Contexte macro (top-down)        bullets : TF sup., tendance primaire, position, cadre par défaut, conséquence
+### 1. Contexte macro (top-down)        ligne [[macro]] (le schéma) puis bullets : TF sup., tendance primaire, position, cadre par défaut, conséquence
 ### 2. Lecture événement par événement   phrase des seuils + ligne [[events]] (le tableau) + bullets {M…}
 ### Tierces : CVD / absorption           un bullet par événement : attendu, observé (delta_z, absorption, absorption_w), verdict en gras
 ### Tierces : positionnement             synthèse en sens commun + « Lecture froide » (risque)
@@ -135,6 +136,11 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 ---
 
 ## 7. Ce que le générateur fait déjà (ne pas le refaire à la main)
+
+- **Thème clair (fond blanc) par défaut**, même si l'appareil est en sombre ; le sombre seulement via le bouton ◐.
+- **En-tête sur une seule ligne** : `ACTIF TF · dernier prix @ heure (CEST)`. Le `title` long des notes n'est pas affiché (il reste dans le fichier comme référence).
+- **Pas de ligne pointillée du dernier prix** sur le graphe (seule l'étiquette d'axe reste).
+- **Schéma de tendance macro** : ligne `[[macro]]` dans la section 1 + clé `macro` des notes (points sommets/creux, niveaux, légende). Segments verts en hausse, rouges en baisse, dernier point = prix actuel.
 
 - Graphe Lightweight Charts : prix / volume + vol MA / **OI coin en bougies**, même TF, zoom/pan,
   boutons « Vue initiale », « Tout », thème clair/sombre.
