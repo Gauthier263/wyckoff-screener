@@ -171,7 +171,7 @@ def render_text(text: str, refs: dict[str, dict], thumbs_on: bool = False) -> st
         line = raw.strip()
         if not line:
             flush()
-        elif re.fullmatch(r"\[\[(events|levels|zones)\]\]", line):
+        elif re.fullmatch(r"\[\[(events|levels|zones|macro)\]\]", line):
             flush()
             out.append(f'<div class="slot" data-slot="{line[2:-2]}"></div>')
         elif line.startswith("#"):
@@ -375,7 +375,8 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         levels=lv_out, zones=zn_out, events=ev_list, first=first, last_i=last_i,
         subtitle=notes.get("subtitle", ""), footer=notes.get("footer", ""),
         page_title=notes.get("page_title", ""),
-        text_html=render_text(text, refs, thumbs_on=bool(notes.get("thumbs", False))),
+        text_html=render_text(text, refs, thumbs_on=bool(notes.get("thumbs", False))).replace(
+            '<div class="slot" data-slot="macro"></div>', macro_svg(notes.get("macro"))),
     )
 
 
@@ -404,6 +405,57 @@ def _note_theory(e: dict, bias: "str | None") -> str:
     if not b or (b, key) not in _THEORY_DESC:
         return ""
     return _theory(b, key, Thresholds())
+
+
+def macro_svg(macro: dict | None) -> str:
+    """Petit schéma de la tendance macro (ligne `[[macro]]` du texte, section 1).
+
+    `macro` = {"points": [{"date": "04/10/25", "price": 126199, "label": "ATH"}, …],
+               "lines": [{"price": 74968, "label": "plus-bas montant 3D"}], "caption": "…"}.
+    Schéma, pas graphe : points équidistants, segments verts (hausse) / rouges (baisse),
+    dernier point = prix actuel. Couleurs via les variables du thème (clair et sombre)."""
+    if not macro or len(macro.get("points", [])) < 2:
+        return ""
+    pts = macro["points"]
+    W, H, L, R, T, B = 480, 190, 22, 150, 26, 30
+    prices = [float(p["price"]) for p in pts] + [float(x["price"]) for x in macro.get("lines", [])]
+    lo, hi = min(prices), max(prices)
+    pad = (hi - lo) * 0.08 or 1.0
+    lo, hi = lo - pad, hi + pad
+    X = lambda i: L + i * (W - L - R) / (len(pts) - 1)
+    Y = lambda v: T + (hi - v) * (H - T - B) / (hi - lo)
+    k = lambda v: f"{v / 1000:.1f}k".replace(".0k", "k")
+    out = [f'<svg class="macro" viewBox="0 0 {W} {H}" role="img" '
+           f'aria-label="{html.escape(macro.get("caption", "Tendance macro"))}">']
+    for ln in macro.get("lines", []):
+        y = Y(float(ln["price"]))
+        out.append(f'<line x1="{L}" x2="{W - R + 6}" y1="{y:.1f}" y2="{y:.1f}" class="mline"/>'
+                   f'<text x="{W - R + 9}" y="{y + 3:.1f}" class="mlab">{html.escape(k(float(ln["price"])))} '
+                   f'{html.escape(ln.get("label", ""))}</text>')
+    for i in range(len(pts) - 1):
+        a, b = float(pts[i]["price"]), float(pts[i + 1]["price"])
+        cls = "mup" if b >= a else "mdn"
+        out.append(f'<line x1="{X(i):.1f}" y1="{Y(a):.1f}" x2="{X(i + 1):.1f}" y2="{Y(b):.1f}" class="{cls}"/>')
+    for i, p in enumerate(pts):
+        v = float(p["price"]); x, y = X(i), Y(v)
+        prev = float(pts[i - 1]["price"]) if i else None
+        nxt = float(pts[i + 1]["price"]) if i < len(pts) - 1 else None
+        top = (prev is None or v >= prev) and (nxt is None or v >= nxt)
+        last = i == len(pts) - 1
+        ty = y - 8 if top else y + 16
+        out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{4 if last else 3}" class="{"mnow" if last else "mpt"}"/>')
+        anc = "start" if i == 0 else ("end" if last else "middle")
+        tx = x - 4 if i == 0 else (x + 4 if last else x)
+        if last:                                   # sous le point : ne pas chevaucher les niveaux
+            ty = y + 16
+        out.append(f'<text x="{tx:.1f}" y="{ty:.1f}" class="mtxt" text-anchor="{anc}">'
+                   f'{html.escape(p.get("label", ""))} {html.escape(k(v))}</text>')
+        out.append(f'<text x="{tx:.1f}" y="{H - 8}" class="mdate" text-anchor="{anc}">'
+                   f'{html.escape(p.get("date", ""))}</text>')
+    out.append("</svg>")
+    cap = macro.get("caption")
+    return (f'<figure class="macrofig">{"".join(out)}'
+            + (f"<figcaption>{html.escape(cap)}</figcaption>" if cap else "") + "</figure>")
 
 
 def _auto_text(bias: str, levels: list[dict], events: list[dict]) -> str:
@@ -447,12 +499,8 @@ _TEMPLATE = r"""<!doctype html>
   --bg:#ffffff; --panel:#f6f7f9; --text:#16181d; --muted:#626a76; --border:#dfe2e7;
   --grid:#eef0f3; --up:#26a69a; --down:#ef5350; --volma:#6b7280; --hl:rgba(59,130,246,.10);
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#131722; --panel:#1a1f2b; --text:#d8dbe2; --muted:#8b93a1; --border:#2a3040;
-    --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18); color-scheme:dark;
-  }
-}
+/* Clair (fond blanc) par défaut, même si l'OS est en sombre (préférence Gauthier) ;
+   le sombre n'est appliqué que via le bouton ◐ (data-theme="dark"). */
 :root[data-theme="dark"]{
   --bg:#131722; --panel:#1a1f2b; --text:#d8dbe2; --muted:#8b93a1; --border:#2a3040;
   --grid:#1f2533; --volma:#9aa3b2; --hl:rgba(59,130,246,.18); color-scheme:dark;
@@ -507,6 +555,16 @@ summary{cursor:pointer}
 #sub{color:var(--muted);font-size:12.5px;margin:10px 0 0}
 .text h3{scroll-margin-top:48px}
 .slot{margin:6px 0 10px;overflow-x:auto}
+.macrofig{margin:8px 0 12px;padding:6px 6px 4px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+.macrofig figcaption{font-size:11.5px;color:var(--muted);margin-top:2px}
+svg.macro{width:100%;height:auto;display:block}
+svg.macro .mup{stroke:var(--up);stroke-width:2.2}
+svg.macro .mdn{stroke:var(--down);stroke-width:2.2}
+svg.macro .mline{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+svg.macro .mpt{fill:var(--text)}
+svg.macro .mnow{fill:var(--bg);stroke:var(--text);stroke-width:2}
+svg.macro .mtxt{fill:var(--text);font-size:10.5px;font-weight:600}
+svg.macro .mdate,svg.macro .mlab{fill:var(--muted);font-size:9.5px}
 td.vd{font-weight:600}
 #events td:nth-child(2){white-space:nowrap}
 #foot{margin:14px 0 0;padding:8px 10px;border:1px solid var(--border);border-radius:6px;
@@ -572,8 +630,9 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt = (v, p) => v == null ? '—' : Number(v).toLocaleString('fr-FR', {maximumFractionDigits: p ?? D.precision});
 
-$('#ttl').textContent = D.title;
-$('#meta').textContent = `${D.seq} · bougies ${D.timeframe} (${D.tz}) · dernier ${D.last_txt} @ ${D.last_time}`;
+// En-tête sur une seule ligne : actif + TF, puis dernier prix (le titre long n'est pas affiché).
+$('#ttl').textContent = `${D.symbol} ${D.timeframe}`;
+$('#meta').textContent = `dernier ${D.last_txt} @ ${D.last_time} (${D.tz})`;
 $('#text').innerHTML = D.text_html;
 if (D.subtitle) $('#sub').textContent = D.subtitle; else $('#sub').hidden = true;
 if (D.footer) { $('#foot').textContent = D.footer; $('#foot').hidden = false; }
@@ -589,6 +648,7 @@ const chart = LW.createChart(el, {
 });
 const priceFormat = {type: 'price', precision: D.precision, minMove: Math.pow(10, -D.precision)};
 const candles = chart.addSeries(LW.CandlestickSeries, {
+  priceLineVisible: false,                       // pas de ligne pointillée du dernier prix
   upColor: css('--up'), downColor: css('--down'), wickUpColor: css('--up'), wickDownColor: css('--down'),
   borderVisible: false, priceFormat,
 }, 0);
@@ -725,14 +785,14 @@ $('#zonesbtn').onclick = () => { showZones = !showZones; syncZonesBtn();
 if (!D.zones.length) $('#zonesbtn').hidden = true;
 syncZonesBtn();
 $('#theme').onclick = () => {
-  const r = document.documentElement, dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const cur = r.dataset.theme || (dark ? 'dark' : 'light');
+  const r = document.documentElement;
+  const cur = r.dataset.theme || 'light';
   r.dataset.theme = cur === 'dark' ? 'light' : 'dark';
   try { localStorage.setItem('wy-theme', r.dataset.theme); } catch (e) {}
   applyTheme();
 };
 try { const t = localStorage.getItem('wy-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
 
 // ---------------- Légende (crosshair) + lien bougie → ligne ----------------
 const evByTime = Object.fromEntries(D.events.map(e => [e.time, e]));

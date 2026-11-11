@@ -159,3 +159,18 @@ def test_no_thumbnail_by_default():
 def test_table_text_drops_reference_braces():
     from screener.interactive import _plain
     assert _plain("entre dans la plage {M2} puis **{SOW}**") == "entre dans la plage M2 puis SOW"
+
+
+def test_macro_sketch_rendered_in_place():
+    """`[[macro]]` → petit schéma SVG de la tendance macro (segments hausse/baisse, niveaux)."""
+    notes = {"text": "### 1. Contexte macro\n[[macro]]\nTexte.",
+             "macro": {"points": [{"date": "10/25", "price": 126000, "label": "ATH"},
+                                  {"date": "07/26", "price": 57800, "label": "bas"},
+                                  {"date": "09/26", "price": 87400, "label": "LH"},
+                                  {"date": "11/26", "price": 73900, "label": "now"}],
+                       "lines": [{"price": 74968, "label": "pivot"}], "caption": "Primaire baissière"}}
+    m = build_model("TEST/USDT", "1h", _df(), notes=notes, min_bars=10)
+    h = m["text_html"]
+    assert '<svg class="macro"' in h and 'data-slot="macro"' not in h
+    assert h.count('class="mdn"') == 2 and h.count('class="mup"') == 1
+    assert "Primaire baissière" in h and "75k pivot" in h
