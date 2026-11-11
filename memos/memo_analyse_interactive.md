@@ -143,6 +143,7 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 - **Pas de ligne pointillée du dernier prix** sur le graphe (seule l'étiquette d'axe reste).
 - **Pas de titre** sur la page : l'en-tête ne garde que les boutons et « dernier prix @ heure ».
 - **Graphe** : panneau du cours agrandi, volume et OI réduits (rapport 4.6 / 0.8 / 1.0).
+- **Schéma de phase** : chaque événement porte son prix (2e ligne, en k).
 - **Schéma de phase Wyckoff** : ligne `[[phase]]` à la fin de la section 1 + clé `phase` des notes. Il montre l'épisode complet à l'échelle intermédiaire (3D / Daily / 4h selon le cas) : événements, plage, bandes de phases A-E, point « ici ». But : voir d'un coup d'œil dans quelle phase on est.
   **Choix de l'échelle (à décider à chaque analyse, avant de tracer)** : parmi 3D, Daily et 4h,
   prendre celle où l'épisode Wyckoff en cours forme une **structure complète et lisible** :
@@ -153,7 +154,7 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
   retenue dans `phase.tf` (affichée au-dessus du schéma). Ex. BTC 15m du 11/11 : Daily retenue
   (distribution 79 800–87 396 du 21/09 au 11/11 : BC, AR, ST, SOW, LPSY, SOW, UT, SOW lisibles ;
   en 3D l'épisode tenait en ~17 bougies peu détaillées, en 4h il était trop fragmenté).
-- **Tableau événements** : colonnes Évt / Prix / Rvol (×1.39) / Spread (1.05 ATR) / Clôture (CLV 0.76) / ΔOI (−0.48 %) / Verdict, sans date ni heure. Ligne de détail : nom complet de l'acronyme (auto via `ACRONYMS`, ou `full` dans les notes), puis `sense`, puis « Théorie » dépliable. Sur téléphone, le verdict passe dans la ligne de détail.
+- **Tableau événements** : colonnes Évt / Prix / Rvol (×1.39) / Spread (1.05 ATR) / Clôture (CLV 0.76) / ΔOI (−0.48 %) / Verdict, sans date ni heure. Ligne de détail : `sense`, puis « Théorie » dépliable. **Les acronymes Wyckoff connus (SC, BC, AR, ST, SOS, SOW, LPS, LPSY, UT, UTAD, spring…) ne sont jamais développés.** Seuls les **libellés maison** (BB, T1, T2, ABS…) reçoivent `full` (nom développé en tête de ligne) et `naming` : onglet dépliable « Pourquoi ce nom », qui explique pourquoi ce n'est pas un ST, un spring, un SC, un LPS, etc. Sur téléphone, le verdict passe dans la ligne de détail.
 - **`sense` = observation seulement** : les paramètres d'intérêt qui ne sont pas déjà dans les colonnes (liquidations, OI d'un mouvement, foule, contexte) et ce qui fait le verdict. **Jamais « Attendu : … »** : l'attendu est dans « Théorie » (auto via `theory_of`, ou `theory` écrit à la main avec les seuils). Pas de redondance entre les deux.
 - **Clic sur un rectangle de zone M** dans le graphe → défile jusqu'au passage du texte qui la cite (surligné).
 - **Schéma de tendance macro** : ligne `[[macro]]` dans la section 1 + clé `macro` des notes (points sommets/creux, niveaux, légende). Segments verts en hausse, rouges en baisse, dernier point = prix actuel.
@@ -183,6 +184,7 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 | Clé Coinalyze absente (401) | `request_credential` sur `api.coinalyze.net`, en-tête `api_key` |
 | Niveau hors des données chargées (ex. 74 968 du 14/09 en 2h) | Le pointillé part de la gauche : normal ; le dire si utile |
 | Niveau dont le prix n'est pas un high/low exact | Mettre `from` (heure CEST de la bougie d'origine) |
+| Événement qui ne correspond à aucune définition Wyckoff stricte | Libellé maison neutre (BB, T1…) + `full` + `naming` qui justifie le choix contre chaque étiquette Wyckoff plausible ; ne jamais forcer un ST / spring / LPS |
 | Niveau d'une TF supérieure dont l'origine est hors des données (ex. 74 968 du 14/09 en 1h) : l'ancrage auto peut accrocher une bougie récente qui frôle le prix (± 0.02 %) | Mettre un `from` antérieur au début des données : le pointillé part du bord gauche |
 | Titre d'onglet trop long | `page_title` court ; le long va dans `title` |
 | Tableau qui déborde | Verdicts courts (« validé, OI ambigu ») |

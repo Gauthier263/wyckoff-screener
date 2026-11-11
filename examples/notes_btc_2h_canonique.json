@@ -121,7 +121,9 @@
       "where": "low",
       "verdict": "validé",
       "theory": "Absorption au plancher : une vente agressive forte qui ne fait plus baisser le prix (gros volume, clôture haute). Signe que la demande prend l'offre à ce niveau ; à confirmer par un test à volume sec.",
-      "sense": "×2.37, clôture haute (clv 0.68), 133 BTC de longs liquidés, OI +0.31 %. Le bas à 76 389 (08h) reteste le bas 3D 76 326 et tient. Support défendu."
+      "sense": "×2.37, clôture haute (clv 0.68), 133 BTC de longs liquidés, OI +0.31 %. Le bas à 76 389 (08h) reteste le bas 3D 76 326 et tient. Support défendu.",
+      "full": "absorption au plancher",
+      "naming": "Pas « SC » : le volume (×2.37) dépasse le seuil mais la barre ne fait pas de nouveau plus-bas significatif et le cadre est distribution (pas de SC). Pas « ST » : elle précède le vrai bas de la plage (76 389 à 08h). « ABS » décrit ce qu'on observe : une vente agressive absorbée."
     },
     {
       "id": "ST",
