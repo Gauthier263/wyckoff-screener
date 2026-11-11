@@ -144,6 +144,15 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 - **Pas de titre** sur la page : l'en-tête ne garde que les boutons et « dernier prix @ heure ».
 - **Graphe** : panneau du cours agrandi, volume et OI réduits (rapport 4.6 / 0.8 / 1.0).
 - **Schéma de phase Wyckoff** : ligne `[[phase]]` à la fin de la section 1 + clé `phase` des notes. Il montre l'épisode complet à l'échelle intermédiaire (3D / Daily / 4h selon le cas) : événements, plage, bandes de phases A-E, point « ici ». But : voir d'un coup d'œil dans quelle phase on est.
+  **Choix de l'échelle (à décider à chaque analyse, avant de tracer)** : parmi 3D, Daily et 4h,
+  prendre celle où l'épisode Wyckoff en cours forme une **structure complète et lisible** :
+  le climax qui l'ouvre (BC ou SC) est visible, au moins 4 événements jalonnent les phases,
+  et le prix actuel s'y place clairement (« ici »). Écarter une échelle où l'épisode tient en
+  2-3 bougies (trop compressé, souvent la 3D sur un épisode court) ou où il est noyé dans le
+  bruit (trop d'événements mineurs, souvent la 4h sur un épisode long). Indiquer l'échelle
+  retenue dans `phase.tf` (affichée au-dessus du schéma). Ex. BTC 15m du 11/11 : Daily retenue
+  (distribution 79 800–87 396 du 21/09 au 11/11 : BC, AR, ST, SOW, LPSY, SOW, UT, SOW lisibles ;
+  en 3D l'épisode tenait en ~17 bougies peu détaillées, en 4h il était trop fragmenté).
 - **Tableau événements** : colonnes Évt / Prix / Rvol (×1.39) / Spread (1.05 ATR) / Clôture (CLV 0.76) / ΔOI (−0.48 %) / Verdict, sans date ni heure. Ligne de détail : nom complet de l'acronyme (auto via `ACRONYMS`, ou `full` dans les notes), puis `sense`, puis « Théorie » dépliable. Sur téléphone, le verdict passe dans la ligne de détail.
 - **`sense` = observation seulement** : les paramètres d'intérêt qui ne sont pas déjà dans les colonnes (liquidations, OI d'un mouvement, foule, contexte) et ce qui fait le verdict. **Jamais « Attendu : … »** : l'attendu est dans « Théorie » (auto via `theory_of`, ou `theory` écrit à la main avec les seuils). Pas de redondance entre les deux.
 - **Clic sur un rectangle de zone M** dans le graphe → défile jusqu'au passage du texte qui la cite (surligné).
