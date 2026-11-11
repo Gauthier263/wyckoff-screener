@@ -83,6 +83,7 @@ Partir de `examples/notes_btc_2h_canonique.json` (copie dans le scratchpad, pas 
 | `events[]` | `id`, `name`, `time`, `where` (high/low), `kind`, `verdict`, `sense`, `theory_of`, `bias` | `sense` = colonne « Volume + OI = sens » du format canonique (contenu : cf. `CLAUDE.md`). vol×/spread/CLV/ΔOI sont lus automatiquement sur la barre |
 | `text` | Les sections, en mini-markdown | Voir §5 |
 | `footer` | La phrase « mémo théorie » propre à cette structure | Obligatoire |
+| `phase` | `{"tf", "title", "points": [{"label", "price", "date"}…], "range": {"hi", "lo"}, "phases": [{"from", "to", "label"}], "caption"}` ; indices de points pour les bandes, dernier point = « ici » | Obligatoire ; ligne `[[phase]]` à la fin de la section 1 |
 | `macro` | `{"points": [{"date", "price", "label"}…], "lines": [{"price", "label"}], "caption"}` : sommets et creux de la tendance primaire jusqu'au prix actuel | Obligatoire ; placé par la ligne `[[macro]]` en tête de la section 1 |
 
 - **`kind`** (couleur sur le graphe uniquement) : `demand` vert · `supply` rouge · `trap` orange ·
@@ -140,6 +141,12 @@ python -m screener.theory_table $SP/memo_theorie.html   # ou build_theory_html(o
 - **Thème clair (fond blanc) par défaut**, même si l'appareil est en sombre ; le sombre seulement via le bouton ◐.
 - **En-tête sur une seule ligne** : `ACTIF TF · dernier prix @ heure (CEST)`. Le `title` long des notes n'est pas affiché (il reste dans le fichier comme référence).
 - **Pas de ligne pointillée du dernier prix** sur le graphe (seule l'étiquette d'axe reste).
+- **Pas de titre** sur la page : l'en-tête ne garde que les boutons et « dernier prix @ heure ».
+- **Graphe** : panneau du cours agrandi, volume et OI réduits (rapport 4.6 / 0.8 / 1.0).
+- **Schéma de phase Wyckoff** : ligne `[[phase]]` à la fin de la section 1 + clé `phase` des notes. Il montre l'épisode complet à l'échelle intermédiaire (3D / Daily / 4h selon le cas) : événements, plage, bandes de phases A-E, point « ici ». But : voir d'un coup d'œil dans quelle phase on est.
+- **Tableau événements** : colonnes Évt / Prix / Rvol (×1.39) / Spread (1.05 ATR) / Clôture (CLV 0.76) / ΔOI (−0.48 %) / Verdict, sans date ni heure. Ligne de détail : nom complet de l'acronyme (auto via `ACRONYMS`, ou `full` dans les notes), puis `sense`, puis « Théorie » dépliable. Sur téléphone, le verdict passe dans la ligne de détail.
+- **`sense` = observation seulement** : les paramètres d'intérêt qui ne sont pas déjà dans les colonnes (liquidations, OI d'un mouvement, foule, contexte) et ce qui fait le verdict. **Jamais « Attendu : … »** : l'attendu est dans « Théorie » (auto via `theory_of`, ou `theory` écrit à la main avec les seuils). Pas de redondance entre les deux.
+- **Clic sur un rectangle de zone M** dans le graphe → défile jusqu'au passage du texte qui la cite (surligné).
 - **Schéma de tendance macro** : ligne `[[macro]]` dans la section 1 + clé `macro` des notes (points sommets/creux, niveaux, légende). Segments verts en hausse, rouges en baisse, dernier point = prix actuel.
 
 - Graphe Lightweight Charts : prix / volume + vol MA / **OI coin en bougies**, même TF, zoom/pan,

@@ -102,7 +102,7 @@
       "kind": "supply",
       "where": "high",
       "verdict": "ambigu",
-      "sense": "Attendu : climax ≥ ×2.0, en distribution le haut d'une avance portée par des longs. Observé : ×1.65 (sous le seuil) ; le rallye de 00h à 04h se fait en covering (OI −0.38 %, 105 BTC de shorts liquidés). Climax faible, sommet en covering."
+      "sense": "×1.65 (sous le seuil) ; le rallye de 00h à 04h se fait en covering (OI −0.38 %, 105 BTC de shorts liquidés). Climax faible, sommet en covering."
     },
     {
       "id": "SOW",
@@ -111,7 +111,7 @@
       "kind": "supply",
       "where": "low",
       "verdict": "validé",
-      "sense": "Attendu : ≥ ×1.3, ≥ 1.3 ATR, clôture basse, OI en hausse (nouveaux shorts) ou longs liquidés. Observé : ×2.73 / 1.87 ATR / clv 0.26 à 16h, puis ×1.64 / 1.69 ATR à 18h ; OI +1.16 % puis +1.24 % ; 192 BTC de longs liquidés. Tous les seuils passés."
+      "sense": "×2.73 / 1.87 ATR / clv 0.26 à 16h, puis ×1.64 / 1.69 ATR à 18h ; OI +1.16 % puis +1.24 % ; 192 BTC de longs liquidés. Tous les seuils passés."
     },
     {
       "id": "ABS",
@@ -121,7 +121,7 @@
       "where": "low",
       "verdict": "validé",
       "theory": "Absorption au plancher : une vente agressive forte qui ne fait plus baisser le prix (gros volume, clôture haute). Signe que la demande prend l'offre à ce niveau ; à confirmer par un test à volume sec.",
-      "sense": "Attendu : vente forte qui ne fait plus baisser. Observé : ×2.37, clôture haute (clv 0.68), 133 BTC de longs liquidés, OI +0.31 %. Le bas à 76 389 (08h) reteste le bas 3D 76 326 et tient. Support défendu."
+      "sense": "×2.37, clôture haute (clv 0.68), 133 BTC de longs liquidés, OI +0.31 %. Le bas à 76 389 (08h) reteste le bas 3D 76 326 et tient. Support défendu."
     },
     {
       "id": "ST",
@@ -131,7 +131,7 @@
       "kind": "range",
       "where": "high",
       "verdict": "validé, OI ambigu",
-      "sense": "Attendu en distribution : retest du BC à volume sec (≤ ×0.85) qui cale dessous. Observé : plus-haut plus bas de 815 points, ×0.59. Mais le rebond de 10h à 22h est en covering (OI −1.18 %) : ce n'est pas une demande piégée."
+      "sense": "plus-haut plus bas de 815 points, ×0.59. Mais le rebond de 10h à 22h est en covering (OI −1.18 %) : ce n'est pas une demande piégée."
     },
     {
       "id": "SP?",
@@ -142,7 +142,7 @@
       "kind": "pivot",
       "where": "low",
       "verdict": "ambigu",
-      "sense": "Attendu : passage sous le plancher puis réintégration rapide, idéalement à volume sec. Observé : cassure de 76 389 et 76 326, ×2.18, 2.33 ATR, flush de 250 BTC de longs, OI −0.15 % ; la barre de 06h repart de 2.44 ATR et clôture à 77 748. Chasse de stops à volume élevé : il faut un test pour valider."
+      "sense": "cassure de 76 389 et 76 326, ×2.18, 2.33 ATR, flush de 250 BTC de longs, OI −0.15 % ; la barre de 06h repart de 2.44 ATR et clôture à 77 748. Chasse de stops à volume élevé : il faut un test pour valider."
     },
     {
       "id": "SOS?",
@@ -153,7 +153,7 @@
       "kind": "trap",
       "where": "high",
       "verdict": "tentative",
-      "sense": "Attendu pour un SOS : ≥ ×1.3, spread large, clôture haute, OI en hausse (longs neufs). Observé : ×4.00, 3.42 ATR, clv 0.70, mais OI −1.86 % et 976 BTC de shorts liquidés. Short squeeze, pas de demande neuve. Le prix repasse au-dessus de 79 800 : tentative, possible upthrust."
+      "sense": "×4.00, 3.42 ATR, clv 0.70, mais OI −1.86 % et 976 BTC de shorts liquidés. Short squeeze, pas de demande neuve. Le prix repasse au-dessus de 79 800 : tentative, possible upthrust."
     },
     {
       "id": "BU",
@@ -164,10 +164,10 @@
       "kind": "range",
       "where": "low",
       "verdict": "ambigu",
-      "sense": "Attendu pour un LPS : repli à volume sec qui tient au-dessus de la borne, sans OI en baisse. Observé : ×0.98 puis ×0.52, tenue au-dessus de 79 800, mais OI −0.91 % de 18h à 00h. La tenue existe, aucun long neuf ne la porte."
+      "sense": "×0.98 puis ×0.52, tenue au-dessus de 79 800, mais OI −0.91 % de 18h à 00h. La tenue existe, aucun long neuf ne la porte."
     }
   ],
-  "text": "### 1. Contexte macro (top-down)\n[[macro]]\n- **TF supérieure (3D)** : distribution en Phase D. Le plancher {N2} a cassé en clôture le 29/10, bas à 76 326 le 30/10.\n- **Tendance primaire** : baissière, 126 199 → 97 924 → 87 395.\n- **Position de la plage 2h** : sous le plancher 3D cassé, après un SOW 3D. C'est une plage dans un downtrend.\n- **Cadre par défaut** : **redistribution**. L'accumulation devra se gagner.\n- **Conséquence** : étiquettes conditionnelles. Le passage au-dessus de {N2} n'est un SOS qu'après tenue et back-up ; sinon, c'est un upthrust / LPSY 3D.\n\n### 2. Lecture événement par événement\nSeuils : climax ≥ ×2.0, test ≤ ×0.85, SOS/SOW ≥ ×1.3, spread large ≥ 1.3 ATR. Clic sur une ligne : le graphe s'y place ; « Théorie » rappelle le rôle et les seuils de l'événement.\n[[events]]\n- {M1} : le {BC} se construit en covering.\n- {M2} : la baisse ouvre des positions des deux côtés : des shorts posés (offre passive) face à des longs qui achètent la baisse et perdent, signature d'une redistribution.\n- {M3} : le rebond vers le {ST} est porté par les shorts qui sortent.\n- {M4} : le {SOS?} est un débouclage forcé, pas une demande neuve.\n\n### Tierces : CVD / absorption\n- {BC} : achats agressifs attendus qui s'essoufflent. Observé : delta_z +2.30, absorption −0.14, absorption_w −1.13 ; achats honnêtes en spot pendant que le perp se rachète. **Rien d'exploitable.**\n- {SOW} : baisse avec CVD en baisse attendue. Observé : delta_z positif (+2.54 à 16h, +1.46 à 22h), absorption +1.22, absorption_w de +1.11 à +1.94 sur plusieurs barres : l'offre absorbe les achats agressifs. **Confirme la distribution**, en accord avec OI +4.6 %.\n- {ABS} : vente agressive absorbée attendue. Observé : delta_z −3.53, absorption +1.28, clôture haute : la demande absorbe l'offre. **Affaiblit** la continuation baissière à court terme.\n- {ST} : CVD plat attendu. Observé : CVD +1 103 sur le rebond, absorption_w négatif (montée honnête) ; le spot achète, le perp se rachète. **Rien d'exploitable.**\n- {SP?} : delta_z −0.39, absorption +0.01. **Rien d'exploitable.**\n- {SOS?} : CVD en hausse franche attendu. Observé : delta_z +2.56, absorption −1.02 (achat honnête) ; à 18h delta_z +1.89, absorption +0.49, clôture 0.37 : première absorption de la demande après le pic. Demande spot réelle, perp qui se rachète. **Affaiblit** la lecture SOS.\n\n### Tierces : positionnement\nPendant {M2}, la foule s'est chargée en longs (68 % → 73 %), l'OI a pris +4.6 % et 442 BTC de longs ont été liquidés : des longs piégés. Pendant {M4}, 976 BTC de shorts liquidés, OI −2.8 %, la foule passe short (62.7 % → 58 % long), funding neutre (0.01 %) : **débouclage forcé de shorts, de nouveaux shorts ouvrent au sommet, aucun long neuf**.\n**Lecture froide** : une foule à 58 % long, le plus bas de la fenêtre, est un carburant haussier latent ; si {N2} avait tenu, un nouveau squeeze était possible. C'est le principal risque pour la thèse baissière.\n\n### 3. Note fractale\n- **À l'échelle 2h** : structure complète {BC} → {SOW} → {ABS} → {ST} → {SP?} → {SOS?} → {BU}.\n- **À l'échelle 3D** : toute cette structure n'est qu'un seul événement, le retest du plancher cassé {N2}–{N1}, c'est-à-dire le **LPSY de la Phase D**.\n- **À la fin de la fenêtre** : le local (spring + SOS ?) et le 3D (LPSY) divergent, pas encore de confluence.\n\n### 4. Synthèse\n- **Séquence** : {BC} → {SOW} → {ABS} → {ST} → {SP?} → {SOS?} → {BU}.\n- **Scénario A (accumulation locale)** : spring {N5}, SOS {N1}, LPS au-dessus de {N2}. Il faut que {N2} tienne en clôture 2h **et** que l'OI coin monte sur la prochaine poussée au-dessus de {N1}.\n- **Scénario B (redistribution / upthrust 3D)** : le squeeze n'a fait entrer aucun long neuf (OI −2.8 %), les shorts rouvrent au sommet, le cadre 3D est en Phase D.\n- **Biais** : penche B, conviction moyenne. L'OI et le CVD de la baisse pèsent ; le back-up à volume sec et une foule short limitent la conviction.\n- **Verdict au 05/11 01h** : trop tôt. Attendre la clôture 2h sous {N2} (B) ou une poussée au-dessus de {N1} avec OI en hausse (A).\n- **Ce qui a suivi (hors fenêtre)** : {M5}. **Le scénario B est validé** : le squeeze était un upthrust / LPSY 3D, et {N5} a été cassé ensuite (75 208 le 05/11, 74 888 le 06/11).\n\n### 5. Niveaux (justifiés)\n[[levels]]\n- **Stop d'un short sur échec** : au-dessus de {N1} (sommet de l'upthrust) ; le reprendre avec un OI en hausse invaliderait B.\n- **Cibles si {N2} cède** : {N3}, puis {N4}, puis {N5}, puis {N6}.\n- **Invalidation de B** : clôture 2h au-dessus de {N1} **avec** un OI coin en hausse (longs neufs). Sans OI en hausse, ce serait un nouveau squeeze, pas un SOS.",
+  "text": "### 1. Contexte macro (top-down)\n[[macro]]\n- **TF supérieure (3D)** : distribution en Phase D. Le plancher {N2} a cassé en clôture le 29/10, bas à 76 326 le 30/10.\n- **Tendance primaire** : baissière, 126 199 → 97 924 → 87 395.\n- **Position de la plage 2h** : sous le plancher 3D cassé, après un SOW 3D. C'est une plage dans un downtrend.\n- **Cadre par défaut** : **redistribution**. L'accumulation devra se gagner.\n- **Conséquence** : étiquettes conditionnelles. Le passage au-dessus de {N2} n'est un SOS qu'après tenue et back-up ; sinon, c'est un upthrust / LPSY 3D.\n[[phase]]\n\n### 2. Lecture événement par événement\nSeuils : climax ≥ ×2.0, test ≤ ×0.85, SOS/SOW ≥ ×1.3, spread large ≥ 1.3 ATR. Clic sur une ligne : le graphe s'y place ; « Théorie » rappelle le rôle et les seuils de l'événement.\n[[events]]\n- {M1} : le {BC} se construit en covering.\n- {M2} : la baisse ouvre des positions des deux côtés : des shorts posés (offre passive) face à des longs qui achètent la baisse et perdent, signature d'une redistribution.\n- {M3} : le rebond vers le {ST} est porté par les shorts qui sortent.\n- {M4} : le {SOS?} est un débouclage forcé, pas une demande neuve.\n\n### Tierces : CVD / absorption\n- {BC} : achats agressifs attendus qui s'essoufflent. Observé : delta_z +2.30, absorption −0.14, absorption_w −1.13 ; achats honnêtes en spot pendant que le perp se rachète. **Rien d'exploitable.**\n- {SOW} : baisse avec CVD en baisse attendue. Observé : delta_z positif (+2.54 à 16h, +1.46 à 22h), absorption +1.22, absorption_w de +1.11 à +1.94 sur plusieurs barres : l'offre absorbe les achats agressifs. **Confirme la distribution**, en accord avec OI +4.6 %.\n- {ABS} : vente agressive absorbée attendue. Observé : delta_z −3.53, absorption +1.28, clôture haute : la demande absorbe l'offre. **Affaiblit** la continuation baissière à court terme.\n- {ST} : CVD plat attendu. Observé : CVD +1 103 sur le rebond, absorption_w négatif (montée honnête) ; le spot achète, le perp se rachète. **Rien d'exploitable.**\n- {SP?} : delta_z −0.39, absorption +0.01. **Rien d'exploitable.**\n- {SOS?} : CVD en hausse franche attendu. Observé : delta_z +2.56, absorption −1.02 (achat honnête) ; à 18h delta_z +1.89, absorption +0.49, clôture 0.37 : première absorption de la demande après le pic. Demande spot réelle, perp qui se rachète. **Affaiblit** la lecture SOS.\n\n### Tierces : positionnement\nPendant {M2}, la foule s'est chargée en longs (68 % → 73 %), l'OI a pris +4.6 % et 442 BTC de longs ont été liquidés : des longs piégés. Pendant {M4}, 976 BTC de shorts liquidés, OI −2.8 %, la foule passe short (62.7 % → 58 % long), funding neutre (0.01 %) : **débouclage forcé de shorts, de nouveaux shorts ouvrent au sommet, aucun long neuf**.\n**Lecture froide** : une foule à 58 % long, le plus bas de la fenêtre, est un carburant haussier latent ; si {N2} avait tenu, un nouveau squeeze était possible. C'est le principal risque pour la thèse baissière.\n\n### 3. Note fractale\n- **À l'échelle 2h** : structure complète {BC} → {SOW} → {ABS} → {ST} → {SP?} → {SOS?} → {BU}.\n- **À l'échelle 3D** : toute cette structure n'est qu'un seul événement, le retest du plancher cassé {N2}–{N1}, c'est-à-dire le **LPSY de la Phase D**.\n- **À la fin de la fenêtre** : le local (spring + SOS ?) et le 3D (LPSY) divergent, pas encore de confluence.\n\n### 4. Synthèse\n- **Séquence** : {BC} → {SOW} → {ABS} → {ST} → {SP?} → {SOS?} → {BU}.\n- **Scénario A (accumulation locale)** : spring {N5}, SOS {N1}, LPS au-dessus de {N2}. Il faut que {N2} tienne en clôture 2h **et** que l'OI coin monte sur la prochaine poussée au-dessus de {N1}.\n- **Scénario B (redistribution / upthrust 3D)** : le squeeze n'a fait entrer aucun long neuf (OI −2.8 %), les shorts rouvrent au sommet, le cadre 3D est en Phase D.\n- **Biais** : penche B, conviction moyenne. L'OI et le CVD de la baisse pèsent ; le back-up à volume sec et une foule short limitent la conviction.\n- **Verdict au 05/11 01h** : trop tôt. Attendre la clôture 2h sous {N2} (B) ou une poussée au-dessus de {N1} avec OI en hausse (A).\n- **Ce qui a suivi (hors fenêtre)** : {M5}. **Le scénario B est validé** : le squeeze était un upthrust / LPSY 3D, et {N5} a été cassé ensuite (75 208 le 05/11, 74 888 le 06/11).\n\n### 5. Niveaux (justifiés)\n[[levels]]\n- **Stop d'un short sur échec** : au-dessus de {N1} (sommet de l'upthrust) ; le reprendre avec un OI en hausse invaliderait B.\n- **Cibles si {N2} cède** : {N3}, puis {N4}, puis {N5}, puis {N6}.\n- **Invalidation de B** : clôture 2h au-dessus de {N1} **avec** un OI coin en hausse (longs neufs). Sans OI en hausse, ce serait un nouveau squeeze, pas un SOS.",
   "footer": "Mémo théorie : un SOS exige des longs neufs (OI en hausse) en plus du volume et du spread. C'est exactement ce qui sépare un vrai SOS du squeeze du 04/11 16h (×4.00 mais OI −1.86 %). Le bouton « Théorie » de chaque ligne et le mémo HTML joint donnent les seuils.",
   "macro": {
     "points": [
@@ -204,5 +204,73 @@
       }
     ],
     "caption": "Tendance primaire baissière : sommets 126k → 98k → 87k ; le rebond depuis 57,8k a échoué sous 87,4k."
+  },
+  "phase": {
+    "tf": "Daily",
+    "title": "Distribution, Phase D",
+    "points": [
+      {
+        "label": "LPS",
+        "price": 74968,
+        "date": "15/09"
+      },
+      {
+        "label": "BC",
+        "price": 87396,
+        "date": "21/09"
+      },
+      {
+        "label": "AR",
+        "price": 82563,
+        "date": "28/09"
+      },
+      {
+        "label": "ST",
+        "price": 87220,
+        "date": "02/10"
+      },
+      {
+        "label": "SOW",
+        "price": 80394,
+        "date": "08/10"
+      },
+      {
+        "label": "LPSY",
+        "price": 84898,
+        "date": "21/10"
+      },
+      {
+        "label": "SOW",
+        "price": 76326,
+        "date": "30/10"
+      },
+      {
+        "label": "ici (UT ?)",
+        "price": 81196,
+        "date": "04/11"
+      }
+    ],
+    "range": {
+      "hi": 87396,
+      "lo": 79800
+    },
+    "phases": [
+      {
+        "from": 1,
+        "to": 3,
+        "label": "A"
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "label": "B"
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "label": "C-D"
+      }
+    ],
+    "caption": "Plage de distribution 79 800–87 396 : le prix vient de casser le plancher puis teste la glace par le haut."
   }
 }
