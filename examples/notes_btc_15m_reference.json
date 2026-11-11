@@ -1,0 +1,288 @@
+{
+  "page_title": "BTC 15m Wyckoff",
+  "title": "BTCUSDT 15m — mise à jour 11/11 11h45 : rejet de 74 180 (upthrust), repli vers 73 600",
+  "subtitle": "Format canonique Wyckoff (5 sections). Prix + CVD : Binance spot 15m. OI coin, ratio L/S, liquidations, funding : Binance via Coinalyze. Heures CEST. Mise à jour du 11/11 11h45 (bougie en cours).",
+  "bias": "distribution",
+  "view": {
+    "from": "10/11 11:30",
+    "to": "11/11 11:45"
+  },
+  "levels": [
+    {
+      "id": "N1",
+      "price": 74843.82,
+      "label": "résistance",
+      "kind": "supply",
+      "reason": "high du ST-haut 5m du 10/11 17h (rachat de shorts), juste sous 74 968, dernier plus-bas montant 3D"
+    },
+    {
+      "id": "N2",
+      "price": 74179.64,
+      "label": "plafond 15m",
+      "kind": "supply",
+      "reason": "high du 11/11 10h00 : troisième test du plafond (74 028 le 10/11 23h, 74 035 à 03h30), rejeté à 10h15"
+    },
+    {
+      "id": "N3",
+      "price": 73510.0,
+      "label": "glace (ex-plancher 1h)",
+      "kind": "range",
+      "from": "01/11 00:00",
+      "reason": "plancher de la plage 1h, cassé le 10/11 à 17h35 puis repris en clôture 1h à 22h ; le prix tient au-dessus depuis"
+    },
+    {
+      "id": "N4",
+      "price": 73209.12,
+      "label": "plus-bas plus haut",
+      "kind": "range",
+      "reason": "low du 11/11 04h30, clôture au plus haut (clv 1.00) : deuxième plus-bas montant de la plage"
+    },
+    {
+      "id": "N5",
+      "price": 72727.27,
+      "label": "plancher",
+      "kind": "pivot",
+      "reason": "low du 10/11 18h30 après le SOW (86 BTC de longs liquidés, OI −0.48 %) : borne basse de la plage 15m"
+    },
+    {
+      "id": "N6",
+      "price": 72582.82,
+      "label": "cible 3D",
+      "kind": "supply",
+      "from": "01/11 00:00",
+      "reason": "low 3D du 26/05, au pied de la barre de saut du 18/08 (haut 73 400) : zone de retest de l'ancienne cassure"
+    }
+  ],
+  "zones": [
+    {
+      "id": "M1",
+      "from": "10/11 20:00",
+      "to": "10/11 23:15",
+      "kind": "demand",
+      "label": "retour au-dessus de 73 510 sans volume",
+      "reason": "prix +0.9 % jusqu'à 74 028, volume ×0.45, OI coin −1.06 %, 50 BTC de shorts liquidés, CVD +224 : rachat de shorts, pas de demande neuve"
+    },
+    {
+      "id": "M2",
+      "from": "11/11 03:00",
+      "to": "11/11 04:30",
+      "kind": "range",
+      "label": "aller-retour 74 035 → 73 209",
+      "reason": "volume ×1.39, OI coin +0.61 %, CVD −7 : rejet à 74 035 puis plus-bas plus haut à 73 209, clôture au plus haut"
+    },
+    {
+      "id": "M3",
+      "from": "11/11 04:45",
+      "to": "11/11 09:00",
+      "kind": "range",
+      "label": "plage au-dessus de la glace, longs qui sortent",
+      "reason": "73 478–73 970, volume ×0.99, OI coin +0.05 %, foule 74.7 % → 73.8 % long, liquidations quasi nulles : débouclage lent et ordonné"
+    },
+    {
+      "id": "M4",
+      "from": "11/11 09:15",
+      "to": "11/11 10:15",
+      "kind": "trap",
+      "label": "poussée vers 74 180 puis rejet",
+      "reason": "volume ×1.33, OI coin +0.28 %, CVD +169 (achat spot agressif) ; rejet dès 10h15"
+    },
+    {
+      "id": "M5",
+      "from": "11/11 10:15",
+      "to": "11/11 11:30",
+      "kind": "supply",
+      "label": "repli après le rejet",
+      "reason": "prix −0.65 % jusqu'à 73 563, volume ×0.83, OI coin −0.31 %, CVD +10, liquidations quasi nulles, foule 73.6 % → 73.9 % long : repli calme, des longs ferment sans être forcés"
+    }
+  ],
+  "events": [
+    {
+      "id": "SOW",
+      "name": "SOW",
+      "theory_of": "SOW",
+      "time": "10/11 17:30",
+      "kind": "supply",
+      "where": "low",
+      "verdict": "validé",
+      "sense": "Cassure du plancher 1h 73 510 jusqu'à 72 866 ; 277 BTC de longs liquidés : offre agressive réelle."
+    },
+    {
+      "id": "BB",
+      "name": "Plancher (AR-bas)",
+      "time": "10/11 18:30",
+      "kind": "pivot",
+      "where": "low",
+      "theory": "Dans un cadre distribution, le plus-bas qui suit le SOW et précède un rallye fixe la borne basse (AR-bas) ; le rallye qui suit est un ST-haut. La lecture accumulation (SC / spring) ne vaut que si la borne haute est ensuite franchie avec tenue et back-up. Repère d'un climax : volume ≥ ×2.0 et spread ≥ 1.3 ATR.",
+      "verdict": "validé (borne basse)",
+      "sense": "Pas de climax de volume. Fixe la borne basse de la plage 15m ; jamais revisité depuis. 86 BTC de longs liquidés.",
+      "full": "borne basse de la plage 15m",
+      "naming": "Pas « SC » : ce n'est pas un climax (×1.39, sous le seuil ×2.0), et dans un cadre distribution un plus-bas suivi d'un rallye se lit AR-bas, jamais SC. Pas « AR » non plus : l'AR répond à un BC, et ici le climax qui précède est un SOW, pas un BC. Le libellé neutre « BB » (borne basse) décrit son rôle dans la plage sans forcer une grammaire tant que la plage n'est pas tranchée."
+    },
+    {
+      "id": "ST",
+      "name": "ST-haut",
+      "theory_of": "ST",
+      "time": "10/11 23:00",
+      "kind": "supply",
+      "where": "high",
+      "verdict": "validé (covering)",
+      "sense": "Fin du rallye M1 à volume sec (×0.45 en moyenne), OI −1.06 % et 50 BTC de shorts liquidés sur la montée : rachat de shorts. Le rallye repasse au-dessus de 73 510 : le cadre est à requestionner."
+    },
+    {
+      "id": "T1",
+      "name": "Plus-bas plus haut",
+      "time": "11/11 04:30",
+      "kind": "range",
+      "where": "low",
+      "theory": "Plus-bas montants dans une plage : en accumulation, ils montrent que l'offre ne peut plus ramener le prix au plancher (ST de Phase B) ; en distribution, une plage à plus-bas montants sous une résistance peut être un LPSY étalé avant la reprise du markdown. Repère : volume ≤ ×0.85 pour un test de qualité ; clôture haute = rejet du bas.",
+      "verdict": "validé",
+      "sense": "482 points au-dessus du plancher, clôture au plus haut, après le rejet de 74 035 à 03h30.",
+      "full": "test n°1 du bas de plage",
+      "naming": "Pas « ST » : un ST reteste le climax (ici le plancher 72 727) ; T1 cale 482 points au-dessus sans s'en approcher. Pas « spring » : il ne passe pas sous le plancher. Pas « LPS » : un LPS suit un SOS, absent ici. C'est un test intermédiaire qui dessine un plus-bas plus haut, d'où « T1 »."
+    },
+    {
+      "id": "T2",
+      "name": "Test sec de la glace",
+      "time": "11/11 06:15",
+      "kind": "pivot",
+      "where": "low",
+      "theory": "Test sec : volume ≤ ×0.85, spread étroit, OI en repli. Au-dessus d'un ancien support repris, il signale que l'offre ne revient pas ; c'est le test qu'on attendait pour un long contre-tendance.",
+      "verdict": "validé (sec)",
+      "sense": "Test de la glace 73 510 par le haut : il tient, à volume sec, avec un OI qui recule.",
+      "full": "test n°2 : test sec de la glace 73 510",
+      "naming": "Pas « ST » : il ne reteste pas le plancher 72 727. Pas « LPS » : aucun SOS ne le précède. Pas « spring » : il ne casse pas le plancher de la plage. C'est le test, par le haut, de l'ancien support 73 510 repris ; second test de la plage, cette fois à sec, d'où « T2 »."
+    },
+    {
+      "id": "UT",
+      "name": "Upthrust (rejet du plafond)",
+      "theory_of": "UTAD",
+      "bias": "distribution",
+      "time": "11/11 10:00",
+      "kind": "trap",
+      "where": "high",
+      "verdict": "validé (rejet)",
+      "sense": "Mèche au-dessus de 74 035 sans clôture au-dessus de 74 180. La bougie suivante (10h15) clôture au plus bas (CLV 0.04) avec absorption_w +1.68 : l'offre a absorbé les achats agressifs de 09h15-09h45. Le prix est revenu dans le bas de la plage."
+    }
+  ],
+  "text": "### 1. Contexte macro (top-down)\n[[macro]]\n- **3D / Daily / 4h** : distribution, début de Phase E ; le prix est sous 74 968 (dernier plus-bas montant 3D).\n- **1h** : SOW du 10/11 17h35 sous {N3} ; mais reclôture au-dessus dès 22h et tenue depuis. C'est l'inattendu : un breakdown qui ne poursuit pas doit faire requestionner le cadre.\n- **Cadre 15m** : plage sous la résistance, dans un markdown. Défaut : **redistribution** (LPSY étalé sous {N1}). Second scénario tenu en parallèle : **accumulation 15m** (le SOW devient un shakeout de la plage 1h).\n[[phase]]\n\n### 2. Lecture événement par événement\nSeuils : climax ≥ ×2.0, test ≤ ×0.85, SOS/SOW ≥ ×1.3, spread large ≥ 1.3 ATR. Clic sur une ligne : le graphe s'y place ; « Théorie » rappelle le rôle et les seuils.\n[[events]]\n- {M1} : le retour au-dessus de {N3} est du rachat de shorts sans volume.\n- {M2} : rejet sous 74 035, puis un plus-bas plus haut ({T1}).\n- {M3} : la plage tient au-dessus de la glace et les longs commencent à sortir.\n- {M4} : la poussée vers {N2} a de l'achat agressif, mais elle est rejetée : c'est l'{UT}.\n- {M5} : repli calme vers le bas de la plage, sans liquidations ; les longs ferment doucement.\n\n### Tierces : CVD / absorption\n- {SOW} : delta_z −3.88, absorption −2.99 : vente agressive honnête. **Confirme la distribution.**\n- {BB} : delta_z −0.87, absorption +0.46 : légère absorption de la vente au plancher. **Affaiblit** (faible).\n- {M1} : CVD +224 pour +0.9 % à ×0.45 : hausse sans demande agressive (covering). **Confirme la distribution.**\n- 11/11 02h15 (73 523) : delta_z +3.79, absorption −2.23 : achat agressif qui défend 73 5xx. **Affaiblit** la distribution.\n- {T2} : delta_z −0.07 : pas de vente agressive sur le test. **Rien d'exploitable** (le volume sec parle seul).\n- {UT} : 09h15 et 09h45 delta_z +3.03 et +3.07 (achat spot honnête), puis à 10h15 absorption_w +1.68 et clôture au plus bas : l'offre absorbe au plafond. **Confirme la distribution.**\n- {M5} : CVD +10 pour un prix −0.65 % ; à 10h45, delta_z +1.26, absorption +0.90 : de petits achats encore absorbés. **Confirme la distribution** (faible).\n\n### Tierces : positionnement\nSur toute la plage (depuis le 10/11 18h45), la foule est passée de 75.5 % à 73.9 % long, l'OI coin a reculé de 0.51 %, les liquidations sont faibles des deux côtés (39 BTC de longs, 75 de shorts) et le funding est à 0.008 % : **des longs qui sortent lentement et en ordre**, sans flush. Le carburant baissier diminue, mais 73.6 % long reste encombré.\n**Lecture froide** : ce débouclage et les plus-bas montants vont contre la thèse baissière par défaut. Ils ne suffisent pas à la renverser : pas de clôture au-dessus de {N2}, pas d'OI en hausse qui tient, et la TF supérieure reste baissière.\n\n### 3. Note fractale\n- **À l'échelle 15m** : plage {BB} → {ST} → {T1} → {T2} → {UT}, avec des plus-bas montants (72 727 → 73 209 → 73 478) sous un plafond plat (74 028–74 180) qui vient de rejeter une troisième fois.\n- **À l'échelle 1h** : soit le SOW de 17h35 a échoué et devient un shakeout de la plage 1h (lecture accumulation, encore à gagner), soit la plage 15m est le LPSY 1h sous 74 844–75 442.\n- **À l'échelle 4h / Daily** : retest par le dessous de la zone 73 510–74 968, perdue cette semaine.\n- **Divergence** : le 15m devient constructif pendant que les TF supérieures restent baissières. Pas de confluence.\n\n### 4. Synthèse\n- **Séquence** : {SOW} → {BB} → {ST} → {T1} → {T2} → {UT} → {M5}.\n- **Scénario B (redistribution, défaut)** : nouveau rejet sous {N2}, puis perte de {N3} et de {N4} : retour vers {N5}, puis {N6}.\n- **Scénario A (accumulation 15m)** : clôture 15m au-dessus de {N2} avec ×1.3 et OI coin en hausse qui tient, puis back-up sec qui reste au-dessus d'environ 74 000 (LPS). Objectifs : {N1}, puis 75 442 (dernier sommet plus bas 1h).\n- **Biais** : **légèrement baissier, conviction faible à moyenne.** Le rejet du plafond penche pour B et le défaut top-down reste baissier. Les plus-bas montants et le débouclage lent des longs tiennent encore le scénario A ouvert.\n- **Verdict** : la plage n'est pas cassée. Prochain test : {N3} (73 510) ; une clôture 15m sous {N4} valide B, une nouvelle clôture au-dessus de {N2} rouvre A.\n- **Pour un long** : l'entrée propre est le scénario A (achat sur le back-up après la cassure de {N2}, stop sous ce back-up). L'entrée agressive (achat près de {N3}, stop sous {N4}) va contre la tendance : taille réduite.\n\n### 5. Niveaux (justifiés)\n[[levels]]\n- **Stop d'un long sur back-up** : sous le plus-bas du back-up, au pire sous {N3}.\n- **Stop d'un long agressif** : sous {N4} ; sous {N5}, la plage 15m est cassée.\n- **Cibles d'un long** : {N2}, puis {N1}, puis 75 442.\n- **Invalidation du long** : clôture 15m sous {N4} avec OI en hausse (positions neuves dans la baisse).",
+  "footer": "Mémo théorie : un upthrust se lit sur un passage au-dessus de la résistance sans clôture qui tienne, avec une demande absorbée (CVD qui ne suit plus). Le rejet de 10h15 en a la signature ; le mémo joint donne les seuils.",
+  "macro": {
+    "points": [
+      {
+        "date": "04/10/25",
+        "price": 126199,
+        "label": "ATH"
+      },
+      {
+        "date": "14/01",
+        "price": 97924,
+        "label": "LH"
+      },
+      {
+        "date": "01/07",
+        "price": 57800,
+        "label": "bas"
+      },
+      {
+        "date": "21/09",
+        "price": 87396,
+        "label": "BC"
+      },
+      {
+        "date": "11/11",
+        "price": 73700,
+        "label": "actuel"
+      }
+    ],
+    "lines": [
+      {
+        "price": 74968,
+        "label": "plus-bas montant 3D"
+      }
+    ],
+    "caption": "Tendance primaire baissière : sommets 126k → 98k → 87k. Le rebond depuis 57,8k a échoué sous 87,4k ; le prix est repassé sous 75k."
+  },
+  "phase": {
+    "tf": "Daily",
+    "title": "Distribution, début de Phase E",
+    "points": [
+      {
+        "label": "LPS",
+        "price": 74968,
+        "date": "15/09"
+      },
+      {
+        "label": "BC",
+        "price": 87396,
+        "date": "21/09"
+      },
+      {
+        "label": "AR",
+        "price": 82563,
+        "date": "28/09"
+      },
+      {
+        "label": "ST",
+        "price": 87220,
+        "date": "02/10"
+      },
+      {
+        "label": "SOW",
+        "price": 80394,
+        "date": "08/10"
+      },
+      {
+        "label": "LPSY",
+        "price": 84898,
+        "date": "21/10"
+      },
+      {
+        "label": "SOW",
+        "price": 76326,
+        "date": "30/10"
+      },
+      {
+        "label": "UT",
+        "price": 81196,
+        "date": "04/11"
+      },
+      {
+        "label": "SOW",
+        "price": 75208,
+        "date": "05/11"
+      },
+      {
+        "label": "ici",
+        "price": 73700,
+        "date": "11/11"
+      }
+    ],
+    "range": {
+      "hi": 87396,
+      "lo": 79800
+    },
+    "phases": [
+      {
+        "from": 1,
+        "to": 3,
+        "label": "A"
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "label": "B"
+      },
+      {
+        "from": 5,
+        "to": 8,
+        "label": "C-D"
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "label": "E"
+      }
+    ],
+    "caption": "Plage de distribution 79 800–87 396 : arrêt (A), construction (B), dernier rebond raté puis cassure et upthrust (C-D), markdown en cours (E). Le prix est sous la plage."
+  }
+}

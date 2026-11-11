@@ -98,7 +98,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   un pointillé de niveau** (± 6 px, sur sa portion tracée ; prioritaire sur l'événement) → sa ligne
   du tableau Niveaux. Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
-  `M1…`, événements discrétionnaires, texte ; gabarit **`examples/notes_btc_2h_canonique.json`**, heures en
+  `M1…`, événements discrétionnaires, texte ; modèle **`examples/notes_btc_15m_reference.json`**, heures en
   CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
   --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
@@ -344,7 +344,7 @@ le livrable **par défaut** dès qu'une analyse de séquence est demandée (« a
 le fil) **uniquement** si Gauthier le demande. Suivi rapide (question d'état) : réponse courte,
 pas de page. Procédure :
 1. Faire l'analyse normalement (données, lecture volume → OI → tierces), puis écrire un
-   `notes.json` sur le gabarit **`examples/notes_btc_2h_canonique.json`** :
+   `notes.json` sur le modèle **`examples/notes_btc_15m_reference.json`** (référence actuelle) :
    - `title` (en-tête canonique `ACTIF TF — séquence et dates`), `page_title` (nom court de
      l'onglet, 2-4 mots), `subtitle` (sources + fenêtre), `bias` (cadre pour la théorie auto),
      `view` (`from`/`to` en CEST : fenêtre initiale ≥ 80 bougies), `footer` (phrase mémo théorie) ;
