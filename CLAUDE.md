@@ -104,6 +104,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
+- `screener/session.py` — **séance** (week-end / reprise du lundi) : `session_of(ts_utc)`,
+  `is_thin`, `session_rvol(df)` (volume ÷ médiane de la même heure UTC en semaine ; le Rvol(20)
+  masque le creux du week-end). Usage **quand utile uniquement** : `memos/weekend_btc.md` §7.
 - `screener/theory_table.py` — `build_theory_html` : mémo « Mémo théorie » (**HTML
   cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
   ses seuils de validité (vol×, spread ATR, clôture) **+ le comportement d'OI attendu**.
