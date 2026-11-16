@@ -330,7 +330,8 @@ H8 depuis 02/06 »). Les 3 paramètres utiles :
 **Distinguer du suivi rapide** : une simple question d'état (« où en est BTC », « réactualise
 sur la dernière bougie », « le niveau X tient ? ») n'est PAS une analyse de séquence → réponse
 courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd est réservé aux
-**analyses de séquence**.
+**analyses de séquence**. **Mais tout suivi s'accompagne d'une page de suivi interactive**
+(graphe + niveaux / événements cités, cliquables ; cf. `memos/memo_analyse_interactive.md` §1 bis).
 
 ### Format interactif (DÉFAUT de toute analyse de séquence)
 **Avant toute analyse, lire `memos/memo_analyse_interactive.md`** pour la **forme** (données à
@@ -341,8 +342,8 @@ Même fond, mêmes 5 sections, mêmes interdits que le format canonique ci-desso
 une **page claude.ai** (graphe Lightweight Charts prix / volume / OI coin relié au texte). C'est
 le livrable **par défaut** dès qu'une analyse de séquence est demandée (« analyse wyckoff … »,
 « fais analyse BTC 2h … »), même sans le mot « interactif ». Format statique (PNG + markdown dans
-le fil) **uniquement** si Gauthier le demande. Suivi rapide (question d'état) : réponse courte,
-pas de page. Procédure :
+le fil) **uniquement** si Gauthier le demande. Suivi rapide (question d'état) : réponse courte + **page de suivi** (§1 bis du mémo),
+sans mémo théorie. Procédure :
 1. Faire l'analyse normalement (données, lecture volume → OI → tierces), puis écrire un
    `notes.json` sur le modèle **`examples/notes_btc_15m_reference.json`** (référence actuelle) :
    - `title` (en-tête canonique `ACTIF TF — séquence et dates`), `page_title` (nom court de

@@ -296,7 +296,8 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         last_i = _bar_at(df, _parse_local(view["to"], year, tz_hours))
     if view.get("from"):
         first = _bar_at(df, _parse_local(view["from"], year, tz_hours))
-    first = max(0, min(first, last_i - min_bars + 1))
+    # Page de suivi : vue resserrée sur la position (`view.min_bars`, ex. 30).
+    first = max(0, min(first, last_i - int(view.get("min_bars", min_bars)) + 1))
 
     pr = _precision(float(df["close"].iloc[-1]))
     candles, volume, vol_ma = [], [], []
