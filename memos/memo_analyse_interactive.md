@@ -58,8 +58,12 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
   `### 3. Tierces` (CVD + positionnement, lecture froide) ·
   `### 4. Position` (`[[levels]]` + stop / point mort / cibles / sortie anticipée en bullets).
   Pas de tableau markdown dans le texte (non rendu) : bullets.
-- **Fichier** : un nouveau fichier par actualisation (l'historique reste consultable) ;
-  une correction de la même actualisation = republier le même fichier.
+- **Fichier : UNE page de suivi par position** (choix de Gauthier, 16/11 : éviter d'encombrer la
+  galerie). Toutes les actualisations d'une même position republient **le même fichier** (même
+  lien ; l'historique est dans les versions de l'artifact). Nom stable :
+  `suivi_<actif>_<sens>_<entrée>.html` (ex. `suivi_btc_short_65150.html`). Nouvelle position
+  (autre entrée ou autre sens) = nouveau fichier. Sans position ouverte : une page de suivi par
+  actif et TF, republiée de même. La TF peut changer d'une actualisation à l'autre sur la même page.
 - **Fil** : le lien + la réponse courte habituelle (état, signal attendu, action) ; le détail
   et les clics sont dans la page.
 
