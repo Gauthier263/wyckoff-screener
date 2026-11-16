@@ -40,6 +40,21 @@ dans la conversation.
   prix ne repart pas), même si la clôture n'est pas au plancher. Ex. BTC 14/07 (64 744, vol ×3.1) :
   climax validé par l'échec à suivre, pas par le CLV.
 
+### Séance : week-end et reprise du lundi (étude 16/11/2026, `memos/weekend_btc.md`)
+- **Quand utile uniquement** : dernière bougie, position ou événement clé entre samedi 02h et
+  lundi 08h CEST. Sinon, ne rien écrire.
+- Week-end typique : volume ≈ 0,5× et range ≈ 0,55× la même heure en semaine ; mouvement ≥ 3 %
+  deux fois moins probable que sur deux jours de semaine ; **76 % des cassures reviennent dans la
+  plage sous 12 h** (66 % en semaine) → une cassure de week-end est une *tentative*.
+- **Le Rvol(20) masque le creux** (0,91 affiché pour 0,47 réel le dimanche) : citer le **Rvol
+  séance** (`session.session_rvol`, volume ÷ même heure en semaine) pour les barres de week-end.
+- Reprise dimanche 22h → lundi 08h CEST : volume revenu à 1×, cassures les mieux suivies (53 %
+  de suite ≥ 2 ATR).
+- Après un markdown de week-end ≥ 3 %, le lundi prolonge seulement 40 % du temps (lundi moyen
+  +1 %) ; après un markup ≥ 3 %, 54 %.
+- **Lecture froide** : un week-end de crash peut avoir un volume de semaine (14–15/11/2026 : Rvol
+  séance ×1 à ×2,3). Vérifier avant d'appliquer la décote.
+
 ## 3 · OI (en coin)
 
 - **Seuil de TF où l'OI redevient exploitable événement par événement : ~15m→H4 (cœur), 5m avec
