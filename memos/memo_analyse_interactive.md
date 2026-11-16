@@ -58,6 +58,8 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
   `### 3. Tierces` (CVD + positionnement, lecture froide) ·
   `### 4. Position` (`[[levels]]` + stop / point mort / cibles / sortie anticipée en bullets).
   Pas de tableau markdown dans le texte (non rendu) : bullets.
+- **Mot « inline »** (« actualise btc 5m inline ») : réponse **dans le fil seulement**, pas de
+  page de suivi (choix de Gauthier, 16/11). Sans ce mot, la page de suivi reste le défaut.
 - **Fichier : UNE page de suivi par position** (choix de Gauthier, 16/11 : éviter d'encombrer la
   galerie). Toutes les actualisations d'une même position republient **le même fichier** (même
   lien ; l'historique est dans les versions de l'artifact). Nom stable :

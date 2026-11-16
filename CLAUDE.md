@@ -332,7 +332,8 @@ sur la dernière bougie », « le niveau X tient ? ») n'est PAS une analyse de 
 courte, sans dérouler les 5 sections ni regénérer le mémo. Le format lourd est réservé aux
 **analyses de séquence**. **Mais tout suivi s'accompagne d'une page de suivi interactive**
 (graphe + niveaux / événements cités, cliquables ; cf. `memos/memo_analyse_interactive.md` §1 bis),
-**une seule page par position**, republiée à chaque actualisation (même lien).
+**une seule page par position**, republiée à chaque actualisation (même lien). Mot **« inline »** →
+réponse dans le fil seulement, sans page.
 
 ### Format interactif (DÉFAUT de toute analyse de séquence)
 **Avant toute analyse, lire `memos/memo_analyse_interactive.md`** pour la **forme** (données à
