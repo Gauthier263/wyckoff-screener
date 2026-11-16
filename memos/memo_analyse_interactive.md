@@ -29,13 +29,39 @@ La page met ce fond en forme ; elle n'en change rien.
 |---|---|
 | Analyse de séquence (« analyse wyckoff BTC 2h depuis… », « analyse btc 15m », « analyse de 2 nov 5h à 5 nov 1h ») | **Page interactive** (défaut, sans que le mot « interactif » soit dit) + mémo théorie |
 | « version PNG », « version statique », « image » | PNG (Read inline + SendUserFile) + texte markdown + mémo théorie |
-| Question d'état (« où en est BTC », « le niveau X tient ? », plan d'entrée) | Réponse courte dans le fil, pas de page, pas de mémo |
+| Suivi / actualisation (« actualise btc 15m », « je suis short à… », « quand renforcer ? », « le niveau X tient ? ») | **Page de suivi** interactive (§1 bis) + réponse courte dans le fil ; pas de mémo théorie |
 | Correction de la page en cours | Republier **le même fichier** (même lien) |
 | Nouvelle analyse, y compris une mise à jour de la même TF plus tard | **Nouveau fichier** (nouveau lien) ; l'ancienne page reste consultable |
 
 Réponse dans le fil après publication : le lien, quelques lignes (biais, ce qui a changé, signal
 attendu, niveaux justifiés), le mémo théorie joint. Le détail est dans la page. Pas d'emoji,
 pas de pastille de couleur.
+
+## 1 bis. Page de suivi (actualisations, gestion de position)
+
+Demande de Gauthier (16/11) : **toute actualisation s'accompagne d'un graphe interactif** pour
+se repérer, avec un clic sur chaque niveau ou événement cité dans le texte. Même générateur, mêmes
+comportements de rendu que la page d'analyse ; seul le contenu est allégé.
+
+- **Notes** : `title` `ACTIF TF — suivi JJ/MM HHh` (+ position si donnée, ex. « short 65 150 »),
+  `page_title` « BTC 1h suivi », `subtitle` (sources + heure de la donnée), `bias`, `view` **resserrée sur la zone de
+  position** (~30 bougies : plage en cours + dernier extrême ; la règle des 80 bougies écrase la
+  zone utile, « Tout » garde le contexte) : `"view": {"from": …, "to": …, "min_bars": 30}`. **Pas de `macro` ni de `phase`** (déjà dans la page d'analyse).
+- **Niveaux `N…`** : tous les prix cités (stop, entrée, cibles, invalidation, bornes) avec
+  `reason`. **L'entrée de Gauthier est un niveau** (`label` « entrée short », `kind` pivot).
+- **Événements** : les barres commentées depuis le dernier point (squeeze, rejet, UT, absorption,
+  cassure…) avec `verdict` et `sense` ; libellé maison → `full` + `naming` + `theory`.
+- **Zones `M…`** : les mouvements cités (rebond en rachat de shorts, jambe, compression).
+- **Texte** (sections `###`, références `{N…}` `{M…}` `{ID}` partout) :
+  `### 1. État` (prix, gain/perte de la position, où on est dans la plage) ·
+  `### 2. Ce qui a changé` (`[[events]]` + bullets) ·
+  `### 3. Tierces` (CVD + positionnement, lecture froide) ·
+  `### 4. Position` (`[[levels]]` + stop / point mort / cibles / sortie anticipée en bullets).
+  Pas de tableau markdown dans le texte (non rendu) : bullets.
+- **Fichier** : un nouveau fichier par actualisation (l'historique reste consultable) ;
+  une correction de la même actualisation = republier le même fichier.
+- **Fil** : le lien + la réponse courte habituelle (état, signal attendu, action) ; le détail
+  et les clics sont dans la page.
 
 ---
 

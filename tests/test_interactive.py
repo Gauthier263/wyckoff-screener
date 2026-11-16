@@ -201,3 +201,15 @@ def test_custom_label_gets_full_and_naming_known_does_not():
     ev = {e["id"]: e for e in build_model("TEST/USDT", "1h", _df(), notes=notes, min_bars=10)["events"]}
     assert ev["SOW"]["full"] == "" and ev["SOW"]["naming"] == ""
     assert ev["BB"]["full"] == "borne basse" and ev["BB"]["naming"].startswith("Pas")
+
+
+def test_followup_view_min_bars_override():
+    """Page de suivi : `view.min_bars` resserre la vue initiale sur la zone de position."""
+    df = _df()
+    to = (df.index[-1] + pd.Timedelta(hours=2)).strftime("%d/%m %H:%M")
+    fr = (df.index[-6] + pd.Timedelta(hours=2)).strftime("%d/%m %H:%M")
+    wide = build_model("TEST/USDT", "1h", df, notes={"view": {"from": fr, "to": to}}, min_bars=20)
+    tight = build_model("TEST/USDT", "1h", df,
+                        notes={"view": {"from": fr, "to": to, "min_bars": 6}}, min_bars=20)
+    assert wide["last_i"] - wide["first"] + 1 >= 20
+    assert tight["last_i"] - tight["first"] + 1 == 6
