@@ -4,7 +4,7 @@ interactive.py — Graphe interactif HTML (texte de l'analyse ↔ graphe, sur un
 But : supprimer l'aller-retour analyse ↔ TradingView. La page embarque :
   * un graphe **Lightweight Charts** (librairie open-source de TradingView, même rendu,
     zoom/pan à la souris) en 3 panneaux synchronisés : cours / volume (+ vol MA) / OI ;
-    bougies **dans la même TF que l'analyse**, horodatage CEST ;
+    bougies **dans la même TF que l'analyse**, horodatage heure de Paris (CET l'hiver, CEST l'été) ;
   * un **panneau latéral** : texte de l'analyse + table des niveaux + table des événements.
     Chaque référence du texte (`{BH}`, `{SC}`, `{N1}`, `{M1}`…) devient une **référence
     cliquable** (étiquette neutre, sans pastille de couleur) : clic → le graphe se recentre et met l'élément en surbrillance ; survol →
@@ -26,7 +26,7 @@ Deux sources de contenu, combinables :
                      "kind": "trap", "where": "high", "why": "…"}],
          "text":   "### Lecture\\n{BC} fixe le plafond {BH}… **{N1}** tient."
        }
-     Heures des notes en **CEST** (heure affichée sur le graphe), formats acceptés :
+     Heures des notes en **heure de Paris** (CET/CEST selon la date, heure affichée sur le graphe), formats acceptés :
      « JJ/MM HH:MM », « AAAA-MM-JJ HH:MM ». `kind` = sens/couleur (palette CLAUDE.md) :
      demand (vert) · supply (rouge) · trap (orange) · range (bleu) · pivot (violet).
 
@@ -47,6 +47,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from . import clock
 from .window import WindowStructure
 
 _VENDOR = Path(__file__).with_name("vendor") / "lightweight-charts-5.0.8.js"
@@ -93,8 +94,11 @@ def _precision(v: float) -> int:
     return 0 if a >= 10000 else 1 if a >= 1000 else 2 if a >= 1 else 4 if a >= 0.01 else 6
 
 
-def _parse_local(s: str, year: int, tz_hours: int) -> pd.Timestamp:
-    """Heure CEST (texte) → Timestamp UTC réel."""
+def _parse_local(s: str, year: int, tz_hours: int | None) -> pd.Timestamp:
+    """Heure locale (texte) → Timestamp UTC réel. `tz_hours=None` (défaut) = heure de Paris
+    (CET/CEST selon la date) ; un entier = décalage fixe (ancien comportement)."""
+    if tz_hours is None:
+        return clock.parse(s, year)
     s = s.strip()
     for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%d/%m/%Y %H:%M", "%d/%m %H:%M",
                 "%d/%m %Hh", "%Y-%m-%d %Hh"):
@@ -108,10 +112,18 @@ def _parse_local(s: str, year: int, tz_hours: int) -> pd.Timestamp:
     raise ValueError(f"heure non reconnue : {s!r} (attendu « JJ/MM HH:MM »)")
 
 
-def _sec(ts: pd.Timestamp, tz_hours: int) -> int:
-    """Secondes epoch décalées de +tz_hours : Lightweight Charts affiche en UTC, on lui
-    donne donc l'heure CEST « étiquetée UTC » (même convention que plot.py)."""
+def _sec(ts: pd.Timestamp, tz_hours: int | None) -> int:
+    """Secondes epoch de l'heure locale « étiquetée UTC » : Lightweight Charts affiche en
+    UTC. `None` = heure de Paris (CET/CEST), sinon décalage fixe."""
+    if tz_hours is None:
+        return clock.wall_sec(ts)
     return int(ts.timestamp()) + tz_hours * 3600
+
+
+def _fmt(ts: pd.Timestamp, tz_hours: int | None, f: str = "%d/%m %H:%M") -> str:
+    if tz_hours is None:
+        return clock.fmt(ts, f)
+    return (ts + pd.Timedelta(hours=tz_hours)).strftime(f)
 
 
 # --------------------------------------------------------------------------- #
@@ -237,14 +249,29 @@ def _bar_at(df: pd.DataFrame, ts: pd.Timestamp) -> int:
 
 def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
                 struct: WindowStructure | None = None, notes: dict | None = None,
-                oi_ohlc: pd.DataFrame | None = None, tz_hours: int = 2,
-                tz_label: str = "CEST", min_bars: int = 80) -> dict:
-    """Assemble les données sérialisées en JSON pour la page (fonction pure, hors-ligne)."""
+                oi_ohlc: pd.DataFrame | None = None, tz_hours: int | None = None,
+                tz_label: str | None = None, min_bars: int = 80) -> dict:
+    """Assemble les données sérialisées en JSON pour la page (fonction pure, hors-ligne).
+    Heures en heure de Paris par défaut (CET l'hiver, CEST l'été)."""
     notes = notes or {}
     if "vol_ma" not in df.columns:
         from .features import add_features
         df = add_features(df)
     year = int(df.index[-1].year)
+    if tz_label is None:
+        tz_label = clock.label(df.index[-1]) if tz_hours is None else "CEST"
+    # Temps d'affichage par bougie, strictement croissant (le passage à l'heure d'hiver
+    # répète une heure murale : on décale ces bougies d'un pas pour garder l'ordre).
+    tmap, prev = {}, None
+    step = int(pd.Series(df.index).diff().median().total_seconds()) if len(df) > 1 else 60
+    for ts in df.index:
+        t = _sec(ts, tz_hours)
+        if prev is not None and t <= prev:
+            t = prev + step
+        tmap[ts] = prev = t
+
+    def T(ts):
+        return tmap.get(ts, _sec(ts, tz_hours))
 
     levels, events = _struct_items(struct)
     by_id = {lv["id"]: lv for lv in levels}
@@ -283,7 +310,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         zones.append(dict(
             id=z["id"], label=z.get("label", ""), reason=z.get("reason", ""),
             kind=z.get("kind", "range"), i0=i0, i1=i1,
-            t0=_sec(df.index[i0], tz_hours), t1=_sec(df.index[i1], tz_hours),
+            t0=T(df.index[i0]), t1=T(df.index[i1]),
             lo=float(z.get("low", seg["low"].min())), hi=float(z.get("high", seg["high"].max()))))
 
     # Fenêtre initiale : ≥ min_bars, couvrant les événements/zones + la dernière barre.
@@ -303,7 +330,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
     candles, volume, vol_ma = [], [], []
     ev_bars = {_bar_at(df, e["ts"]): e for e in events}
     for i, (ts, r) in enumerate(df.iterrows()):
-        t = _sec(ts, tz_hours)
+        t = T(ts)
         candles.append(dict(time=t, open=round(float(r["open"]), pr + 1),
                             high=round(float(r["high"]), pr + 1),
                             low=round(float(r["low"]), pr + 1),
@@ -321,12 +348,12 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         scale, oi_unit = (1e9, "Md$") if med > 1e6 else (1e3, "k coin")
         lo_ts, hi_ts = df.index[0], df.index[-1]
         for ts, r in oi_ohlc.loc[lo_ts:hi_ts].iterrows():
-            oi.append(dict(time=_sec(ts, tz_hours),
+            oi.append(dict(time=T(ts),
                            **{k: float(r[k]) / scale for k in ("open", "high", "low", "close")}))
 
     def ev_out(e):
-        return dict(id=e["id"], name=e["name"], time=_sec(e["ts"], tz_hours),
-                    label=(e["ts"] + pd.Timedelta(hours=tz_hours)).strftime("%d/%m %H:%M"),
+        return dict(id=e["id"], name=e["name"], time=T(e["ts"]),
+                    label=_fmt(e["ts"], tz_hours),
                     kind=e["kind"], color=KIND_COLOR.get(e["kind"], KIND_COLOR["neutral"]),
                     where=e["where"], price=e["price"], price_txt=_fmt_price(e["price"]),
                     vol_ratio=None if pd.isna(e["vol_ratio"]) else round(float(e["vol_ratio"]), 2),
@@ -341,11 +368,11 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         """Bougie d'origine du niveau : `from` des notes (CEST), sinon la bougie dont le
         high ou le low vaut le prix (± 0.02 %). None → ligne sur toute la largeur."""
         if lv.get("from"):
-            return _sec(df.index[_bar_at(df, _parse_local(lv["from"], year, tz_hours))], tz_hours)
+            return T(df.index[_bar_at(df, _parse_local(lv["from"], year, tz_hours))])
         p = float(lv["price"])
         d = np.minimum((df["high"] - p).abs(), (df["low"] - p).abs())
         if len(d) and float(d.min()) <= p * 2e-4:
-            return _sec(d.idxmin(), tz_hours)
+            return T(d.idxmin())
         return None
 
     lv_out = [dict(id=lv["id"], price=float(lv["price"]), price_txt=_fmt_price(float(lv["price"])),
@@ -354,8 +381,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
                    color=KIND_COLOR.get(lv["kind"], KIND_COLOR["neutral"]))
               for lv in sorted(levels, key=lambda x: -float(x["price"]))]
     zn_out = [dict(z, color=KIND_COLOR.get(z["kind"], KIND_COLOR["neutral"]),
-                   span=(f"{(df.index[z['i0']] + pd.Timedelta(hours=tz_hours)).strftime('%d/%m %H:%M')}"
-                         f" → {(df.index[z['i1']] + pd.Timedelta(hours=tz_hours)).strftime('%d/%m %H:%M')}"))
+                   span=f"{_fmt(df.index[z['i0']], tz_hours)} → {_fmt(df.index[z['i1']], tz_hours)}")
               for z in zones]
     ev_list = [ev_out(e) for e in events]
 
@@ -373,7 +399,7 @@ def build_model(symbol: str, timeframe: str, df: pd.DataFrame,
         symbol=symbol, timeframe=timeframe, tz=tz_label, bias=bias, seq=seq,
         title=notes.get("title") or f"{symbol} {timeframe} — {bias}",
         last=last, last_txt=_fmt_price(last),
-        last_time=(df.index[-1] + pd.Timedelta(hours=tz_hours)).strftime("%d/%m %H:%M"),
+        last_time=_fmt(df.index[-1], tz_hours),
         precision=pr, candles=candles, volume=volume, vol_ma=vol_ma, oi=oi, oi_unit=oi_unit,
         levels=lv_out, zones=zn_out, events=ev_list, first=first, last_i=last_i,
         subtitle=notes.get("subtitle", ""), footer=notes.get("footer", ""),
@@ -570,8 +596,8 @@ def _auto_text(bias: str, levels: list[dict], events: list[dict]) -> str:
 # --------------------------------------------------------------------------- #
 def build_interactive_html(symbol: str, timeframe: str, df: pd.DataFrame, out_path: str,
                            struct: WindowStructure | None = None, notes: dict | None = None,
-                           oi_ohlc: pd.DataFrame | None = None, tz_hours: int = 2,
-                           tz_label: str = "CEST") -> str:
+                           oi_ohlc: pd.DataFrame | None = None, tz_hours: int | None = None,
+                           tz_label: str | None = None) -> str:
     """Écrit la page interactive autonome (librairie inlinée) et renvoie son chemin."""
     model = build_model(symbol, timeframe, df, struct, notes, oi_ohlc, tz_hours, tz_label)
     payload = json.dumps(model, ensure_ascii=False).replace("</", "<\\/")

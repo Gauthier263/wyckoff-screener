@@ -1,7 +1,7 @@
 # Week-end BTC — étude et règle d'usage
 
 Étude du 16/11/2026, Binance spot BTC/USDT. Daily 2019-01 → 2026-11 (411 week-ends), 1h 2024-01
-→ 2026-11. Heures en **UTC réel** (CEST = UTC+2 dans nos pages). Script : `screener/session.py`
+→ 2026-11. Heures en **UTC réel** (nos pages sont en heure de Paris : CET = UTC+1 l'hiver, CEST = UTC+2 l'été). Script : `screener/session.py`
 (fonctions) ; chiffres reproduits par les scripts de l'étude (cf. historique de session).
 
 ## 1. Volume et amplitude par jour (daily, médianes)
@@ -77,7 +77,7 @@ de semaine normale**. Toujours vérifier le Rvol séance avant de conclure « we
 ## 7. Règle d'usage (quand utile uniquement)
 
 **Activer** la lecture séance si : la dernière bougie, la position suivie ou un événement clé
-tombe entre samedi 00h et lundi 06h UTC (samedi 02h → lundi 08h CEST), ou si l'analyse porte sur
+tombe entre samedi 00h et lundi 06h UTC (samedi 01h → lundi 07h CET, 02h → 08h CEST l'été), ou si l'analyse porte sur
 un mouvement de week-end. **Sinon, ne rien écrire.**
 
 Quand elle est active :
@@ -86,7 +86,7 @@ Quand elle est active :
 2. **Volume** : citer le Rvol séance à côté du Rvol(20) pour les barres de week-end ; un « test à
    volume sec » le dimanche ne vaut que si le Rvol séance est aussi bas.
 3. **Cassure de week-end** : la traiter comme **tentative** (76 % reviennent dans la plage) ;
-   la confirmation se cherche à la reprise (dimanche 22h → lundi 08h CEST).
+   la confirmation se cherche à la reprise (dimanche 21h → lundi 07h CET, 22h → 08h CEST l'été).
 4. **Objectifs** : sur un week-end creux, réduire l'ambition (mouvement ≥ 3 % : ~11 % de chance)
    ou décaler l'attente à la reprise ; après un markdown de week-end ≥ 3 %, le lundi reprend
    plus souvent qu'il ne prolonge (40 % de suite) : risque pour un short pris en fin de week-end.

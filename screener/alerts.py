@@ -152,8 +152,9 @@ def evaluate(symbol: str, timeframe: str, levels: dict, since_ts=None):
     if res is None:
         return (last_ts, None, None)
     typ, m, ts = res
-    cest = (ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh%M")
-    return (last_ts, typ, f"{symbol} {timeframe} @ {cest} CEST\n{m}\n[aide à la décision, pas un ordre]")
+    from . import clock
+    paris = clock.fmt(ts, "%d/%m %Hh%M")
+    return (last_ts, typ, f"{symbol} {timeframe} @ {paris} {clock.label(ts)}\n{m}\n[aide à la décision, pas un ordre]")
 
 
 def _load_state(path: str) -> dict:

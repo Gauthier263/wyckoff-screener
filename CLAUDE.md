@@ -82,10 +82,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **volume** : barres + **moyenne (vol MA)** + **étiquette de chaque événement** (nom +
   ×vol_ratio). Panneau **OI** : bougies d'OI agrégé (`fetch_open_interest_ohlc`, source
   `agg3`) **à la MÊME TF que le cours** (vert = OI↑, rouge = OI↓), omis si OI indispo. Traits
-  verticaux d'événement (teintés) sur les 3 panneaux. Horodatage en CEST.
+  verticaux d'événement (teintés) sur les 3 panneaux. Horodatage en heure de Paris (`screener/clock.py`).
 - `screener/interactive.py` — **graphe interactif HTML** (`build_interactive_html`) : page
   autonome (Lightweight Charts de TradingView **inliné**, `screener/vendor/`, hors-ligne) avec
-  cours / volume (+ vol MA) / OI en 3 panneaux synchronisés, **même TF**, heure CEST, zoom/pan ;
+  cours / volume (+ vol MA) / OI en 3 panneaux synchronisés, **même TF**, heure de Paris (CET/CEST), zoom/pan ;
   à côté, le **texte de l'analyse** + tables niveaux / mouvements / événements. Les références
   `{ID}` du texte deviennent des **références cliquables** (étiquettes neutres, sans pastille de couleur) (clic → le graphe s'y recentre et
   surligne ; survol d'une bougie d'événement → sa ligne s'allume). Vignettes zoomées sous les zones `{M…}`
@@ -99,7 +99,7 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   du tableau Niveaux. Contenu = structure détectée
   (bornes auto `BH`/`BB`, événements par nom) **+ `notes` JSON** (niveaux `N1…`, zones/mouvements
   `M1…`, événements discrétionnaires, texte ; modèle **`examples/notes_btc_15m_reference.json`**, heures en
-  CEST). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
+  heure de Paris). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
   --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
@@ -186,6 +186,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   (ex. « le tableau penche distribution, MAIS funding négatif + crowd déjà short = carburant
   haussier latent, la thèse est fragilisée »). Ne jamais tordre les tierces pour forcer le
   consensus : une divergence tierce **est** un signal, pas un bruit à gommer.
+- **Heure = heure de PARIS, jamais un décalage fixe** (demande de Gauthier, 20/11/2026). CET (UTC+1)
+  de fin octobre à fin mars, CEST (UTC+2) l'été : `screener/clock.py` (`fmt`, `label`, `parse`,
+  `wall_index`, `wall_sec`). Les données restent en UTC réel ; on convertit à l'affichage et à la
+  lecture des notes. Dans les réponses, écrire l'heure de Paris et son fuseau (« 11h50 CET »).
+  **Erreur à ne plus refaire** : le « +2h CEST toute l'année » donnait une heure de trop en hiver.
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
@@ -240,8 +245,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   agressive (delta −1 822) mais prix qui récupère (absorption au plancher → affaiblit la
   continuation baissière). **Fuseau horaire — OBLIGATOIRE de vérifier** : `publicGetKlines`
   renvoie les **mêmes open times UTC réel** que `fetch_ohlcv` (vérifié : timestamps + close
-  identiques bougie par bougie, écart 0) → appliquer le **même décalage +2h** (`index += 2h`,
-  tz=UTC) qu'au prix et à l'OI. Ne jamais laisser le CVD sur un fuseau différent : une barre
+  identiques bougie par bougie, écart 0) → appliquer le **même passage à l'heure de Paris** (`clock.wall_index`)
+  qu'au prix et à l'OI. Ne jamais laisser le CVD sur un fuseau différent : une barre
   CVD décalée fausse la lecture de divergence. Toujours réaligner sur l'index des bougies prix.
 - **Actifs NON-24/7 (or/XAU, indices) — source + filtre week-end.** L'or réel (COMEX/forex) est
   **fermé le week-end**, mais les perps crypto XAU trade 24/7 → ils affichent des bougies Sam/Dim
@@ -277,10 +282,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   - **PAS de code couleur emoji dans le texte** (🟢🔴🔵🟣🟠🟩🟥 etc. bannis du corps de
     l'analyse). Les couleurs restent sur le graphe uniquement (marqueurs, flèches, traits
     verticaux). Dans le texte, nommer directement l'événement sans pastille.
-  - **Alignement des étiquettes** (bug récurrent des scripts ad hoc) : les bougies sont
-    décalées +2h en gardant `tz=UTC` ; les timestamps d'événements doivent l'être *aussi*
-    (`pd.Timestamp('HH:MM', tz='UTC')` = heure CEST étiquetée UTC), JAMAIS `+02:00` (que
-    matplotlib reconvertit → étiquette 2 bougies trop à gauche). Vérifier l'alignement.
+  - **Alignement des étiquettes** (bug récurrent des scripts ad hoc) : passer l'index à l'**heure de
+    Paris étiquetée UTC** avec `clock.wall_index` (CET = UTC+1 l'hiver, CEST = UTC+2 l'été) ; les
+    timestamps d'événements doivent l'être *aussi* (même fonction), JAMAIS un `+01:00`/`+02:00` que
+    matplotlib reconvertit (étiquette décalée). Vérifier l'alignement.
   - Toujours : panneau **volume avec moyenne (vol MA) + étiquettes d'événements** (nom +
     ×vol_ratio), et panneau **OI à la MÊME TF que le cours** (jamais une TF d'OI différente).
   - **Panneau OI = BOUGIES OHLC, jamais une ligne.** L'OI se trace en **chandeliers de la
@@ -353,10 +358,10 @@ sans mémo théorie. Procédure :
    `notes.json` sur le modèle **`examples/notes_btc_15m_reference.json`** (référence actuelle) :
    - `title` (en-tête canonique `ACTIF TF — séquence et dates`), `page_title` (nom court de
      l'onglet, 2-4 mots), `subtitle` (sources + fenêtre), `bias` (cadre pour la théorie auto),
-     `view` (`from`/`to` en CEST : fenêtre initiale ≥ 80 bougies), `footer` (phrase mémo théorie) ;
+     `view` (`from`/`to` en heure de Paris : fenêtre initiale ≥ 80 bougies), `footer` (phrase mémo théorie) ;
    - `levels` `N1…` (prix + `reason` obligatoire ; le pointillé part de la bougie d'origine :
-     auto = bougie dont le high/low vaut le prix, sinon `from` en CEST ; aucune → toute la largeur), `zones` `M1…` (mouvements cités, de/à CEST),
-     `events` (id, `name`, `time` CEST, `where`, `verdict` validé/ambigu/non validé/tentative,
+     auto = bougie dont le high/low vaut le prix, sinon `from` en heure de Paris ; aucune → toute la largeur), `zones` `M1…` (mouvements cités, de/à heure de Paris),
+     `events` (id, `name`, `time` heure de Paris, `where`, `verdict` validé/ambigu/non validé/tentative,
      `sense` = colonne « Volume + OI = sens », `theory_of`/`bias` pour le mémo théorie auto) ;
    - `text` : sections `### 1. Contexte macro (top-down)`, `### 2. Lecture événement par
      événement` (+ ligne `[[events]]` = le tableau), `### Tierces : CVD / absorption`,
@@ -406,14 +411,14 @@ validé ou non. C'est le cœur pédagogique : développer les automatismes event
 Colonnes selon disponibilité des données :
 
 — VSA pur (OI indisponible, ex. XAU) :
-`Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Lecture VSA`
+`Événement | Heure (Paris) | Prix | vol× | spread/ATR | CLV | Lecture VSA`
 
 La colonne "Lecture VSA" inclut systématiquement : seuil théorique attendu pour cet
 événement (ex. SC : vol ≥ climax_vol×, spread large, clv ≤ 0.3 pour capitulation pure) +
 valeur observée + verdict (validé / ambigu / non validé).
 
 — Avec OI (ex. BTC via Coinalyze) :
-`Événement | Heure CEST | Prix | vol× | spread/ATR | CLV | Volume + OI = sens`
+`Événement | Heure (Paris) | Prix | vol× | spread/ATR | CLV | Volume + OI = sens`
 
 La colonne "Volume + OI = sens" dit la signature théorique attendue (ex. AR : OI en repli
 attendu = débouclage) + ce qu'on observe + interprétation (covering / nouveaux longs /
@@ -439,7 +444,7 @@ hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
    · **UTAD / upthrust** : prix↑ **mais CVD plat/divergent** = pas de demande = piège confirmé ;
    · **AR / ST** : CVD plat/modeste attendu (réflexe, pas d'agression).
    **Chiffrer avec `add_absorption`** (cf. `data.fetch_taker_delta` + `features.add_absorption`,
-   même décalage +2h que le prix) : citer pour chaque event la valeur `absorption` (>0 = flux
+   même heure de Paris que le prix) : citer pour chaque event la valeur `absorption` (>0 = flux
    rejeté ; signe de delta_z = côté) **OU** le flag `no_demand`/`no_supply` (prix qui voyage sans
    flux — l'autre divergence, que l'absorption ne voit pas). Toujours distinguer les deux :
    *absorption* = effort fort rejeté ; *no-demand* = résultat fort sans effort.

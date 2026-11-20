@@ -87,7 +87,7 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
 
 ---
 
-## 3. Données à charger pour la page (même TF que l'analyse, heures CEST)
+## 3. Données à charger pour la page (même TF que l'analyse, heure de Paris)
 
 | Donnée | Fonction | Remarques |
 |---|---|---|
@@ -99,7 +99,9 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
 | Liquidations | `fetch_liquidations(sym, tf, limit)` → long_liq, short_liq | En BTC |
 | Contexte (macro, phase) | `fetch_ohlcv` en 3D / 1D / 4h | Pour les deux schémas de la section 1 |
 
-- **Fuseau** : index UTC réel + 2h, étiqueté UTC (convention du repo, « CEST » toute l'année).
+- **Fuseau** : heure de Paris (CET l'hiver, CEST l'été) via `screener/clock.py` ; le générateur
+  convertit tout seul, les heures des notes s'écrivent en heure de Paris. L'ancien « +2h CEST toute
+  l'année » est abandonné (une heure de trop en hiver).
   Toutes les heures des notes sont dans cette convention ; le générateur fait le décalage.
 - **Vérifier la fraîcheur** : relire l'heure (`date -u`) et la date de la dernière bougie à
   chaque fetch ; la dernière bougie est souvent incomplète (ne pas la lire comme un événement).
@@ -195,7 +197,7 @@ python -m screener.theory_table $SP/memo_theorie.html
 
 **Page**
 - **Thème clair (fond blanc) par défaut**, même si l'appareil est en sombre ; sombre via ◐.
-- **Pas de titre** : l'en-tête ne garde que « dernier prix @ heure (CEST) » et les boutons
+- **Pas de titre** : l'en-tête ne garde que « dernier prix @ heure (CET ou CEST) » et les boutons
   (« Masquer / Afficher zones M », « Vue initiale », « Tout », ◐).
 - Panneau de droite : barre de navigation par section, sous-titre, texte, pied mémo théorie.
 - Références et tableaux sans pastille de couleur (la couleur vit sur le graphe).
@@ -253,7 +255,7 @@ python -m screener.theory_table $SP/memo_theorie.html
 | OI 2h faux / tronqué | Corrigé dans `data.py` ; une nouvelle TF s'ajoute à `_TF_MIN`, `_COINALYZE_INTERVAL`, `_TF_FREQ` et à la base fine de `fetch_open_interest_ohlc` |
 | Clé Coinalyze absente (401) | `request_credential` sur `api.coinalyze.net`, en-tête `api_key` |
 | Niveau hors des données chargées | Le pointillé part de la gauche : normal ; le dire si utile |
-| Niveau dont le prix n'est pas un high/low exact | Mettre `from` (heure CEST de la bougie d'origine) |
+| Niveau dont le prix n'est pas un high/low exact | Mettre `from` (heure de Paris de la bougie d'origine) |
 | Niveau de TF supérieure hors des données : l'ancrage auto accroche une bougie récente qui frôle le prix | Mettre un `from` antérieur au début des données |
 | Événement sans définition Wyckoff stricte | Libellé maison + `full` + `naming` ; ne jamais forcer un ST / spring / LPS |
 | « Attendu : … » dans `sense` | Le déplacer dans `theory` (ou laisser la théorie auto) |

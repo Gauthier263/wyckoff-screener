@@ -70,7 +70,7 @@ def _candles(ax, df, width):
 
 def plot_window_structure(
     symbol: str, analysis_tf: str, struct: WindowStructure, out_path: str,
-    ex=None, tz_hours: int = 2, tz_label: str = "CEST", limit: int = 1000,
+    ex=None, tz_hours: int | None = None, tz_label: str | None = None, limit: int = 1000,
     oi_source: str = "binance", oi_ohlc=None,
 ) -> str:
     """Dessine la structure `struct` détectée en `analysis_tf`, **dans la même TF** (bougies
@@ -87,9 +87,16 @@ def plot_window_structure(
     sub_utc = df.loc[min(ts) - pad: max(ts) + pad].copy()
     if len(sub_utc) < 3:
         sub_utc = df.iloc[-60:].copy()
-    delta = pd.Timedelta(hours=tz_hours)
+    # Heure de Paris (CET/CEST) par défaut ; `tz_hours` entier = ancien décalage fixe.
+    if tz_hours is None:
+        from . import clock
+        shift = clock.wall_index
+        tz_label = tz_label or clock.label(sub_utc.index[-1])
+    else:
+        shift = lambda idx: idx + pd.Timedelta(hours=tz_hours)
+        tz_label = tz_label or "CEST"
     sub = sub_utc.copy()
-    sub.index = sub.index + delta
+    sub.index = shift(sub.index)
 
     from .features import add_features
     sub = add_features(sub)
@@ -105,7 +112,7 @@ def plot_window_structure(
     has_oi = oi_ohlc is not None and len(oi_ohlc) > 0
     if has_oi:
         oi_ohlc = oi_ohlc.copy()
-        oi_ohlc.index = oi_ohlc.index + delta
+        oi_ohlc.index = shift(oi_ohlc.index)
         oi_ohlc = oi_ohlc[(oi_ohlc.index >= sub.index[0]) & (oi_ohlc.index <= sub.index[-1])]
         # Auto-échelle d'unité : OI USD (~1e9 = Md$) vs OI coin (~1e5 = k unités).
         med = float(oi_ohlc["close"].median()) if len(oi_ohlc) else 0.0
@@ -132,7 +139,7 @@ def plot_window_structure(
     # Bougies même TF que les événements → marqueur posé sur l'extrême réel de LA barre.
     def locate(e):
         want = _wanted_extreme(e.name, acc)
-        return (mdates.date2num((e.ts + delta).to_pydatetime()),
+        return (mdates.date2num(shift(pd.DatetimeIndex([e.ts]))[0].to_pydatetime()),
                 e.bar_high if want == "high" else e.bar_low)
 
     pts = {name: locate(e) for name, e in ev.items()}
