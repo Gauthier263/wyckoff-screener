@@ -65,6 +65,10 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
 - **Réponses dans le fil (inline, suivi)** : **pas de titres `#`/`##`** (ils s'affichent en grand) ;
   un libellé en gras sur une ligne suffit (ex. « **BTC 5m, 12h15 CET** : … »). Tableaux courts, peu de
   colonnes, pas de répétition (choix de Gauthier, 20/11 : lisibilité).
+- **Ordre du suivi (fil et page)** : **lecture à froid d'abord**, un peu détaillée (ce que le marché
+  fait, qui agit, ce qui confirme / fragilise), puis la position, et **le tableau bougie par bougie à
+  la fin** (choix de Gauthier, 20/11). Page de suivi : sections `### 1. Lecture à froid`,
+  `### 2. Position` (`[[levels]]`), `### 3. Bougie par bougie` (`[[events]]`).
 - **Fichier : UNE page de suivi par position** (choix de Gauthier, 16/11 : éviter d'encombrer la
   galerie). Toutes les actualisations d'une même position republient **le même fichier** (même
   lien ; l'historique est dans les versions de l'artifact). Nom stable :
