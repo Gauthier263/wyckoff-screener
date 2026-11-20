@@ -145,9 +145,9 @@ def test_level_line_starts_at_its_origin_bar():
         {"id": "N3", "price": 100.0, "label": "forcé", "from": "04/11 05:00"}]}
     m = build_model("TEST/USDT", "1h", df, notes=notes, min_bars=10)
     lv = {l["id"]: l for l in m["levels"]}
-    assert lv["N1"]["t0"] == int(hi_ts.timestamp()) + 2 * 3600
+    assert lv["N1"]["t0"] == int(hi_ts.timestamp()) + 3600          # novembre : CET = UTC+1
     assert lv["N2"]["t0"] is None
-    assert lv["N3"]["t0"] == int(pd.Timestamp("2026-11-04 03:00", tz="UTC").timestamp()) + 2 * 3600
+    assert lv["N3"]["t0"] == int(pd.Timestamp("2026-11-04 04:00", tz="UTC").timestamp()) + 3600
 
 
 def test_no_thumbnail_by_default():

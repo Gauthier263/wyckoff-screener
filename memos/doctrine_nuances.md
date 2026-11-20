@@ -41,14 +41,14 @@ dans la conversation.
   climax validé par l'échec à suivre, pas par le CLV.
 
 ### Séance : week-end et reprise du lundi (étude 16/11/2026, `memos/weekend_btc.md`)
-- **Quand utile uniquement** : dernière bougie, position ou événement clé entre samedi 02h et
-  lundi 08h CEST. Sinon, ne rien écrire.
+- **Quand utile uniquement** : dernière bougie, position ou événement clé entre samedi 01h et
+  lundi 07h CET (02h → 08h CEST l'été). Sinon, ne rien écrire.
 - Week-end typique : volume ≈ 0,5× et range ≈ 0,55× la même heure en semaine ; mouvement ≥ 3 %
   deux fois moins probable que sur deux jours de semaine ; **76 % des cassures reviennent dans la
   plage sous 12 h** (66 % en semaine) → une cassure de week-end est une *tentative*.
 - **Le Rvol(20) masque le creux** (0,91 affiché pour 0,47 réel le dimanche) : citer le **Rvol
   séance** (`session.session_rvol`, volume ÷ même heure en semaine) pour les barres de week-end.
-- Reprise dimanche 22h → lundi 08h CEST : volume revenu à 1×, cassures les mieux suivies (53 %
+- Reprise dimanche 21h → lundi 07h CET (22h → 08h CEST l'été) : volume revenu à 1×, cassures les mieux suivies (53 %
   de suite ≥ 2 ATR).
 - Après un markdown de week-end ≥ 3 %, le lundi prolonge seulement 40 % du temps (lundi moyen
   +1 %) ; après un markup ≥ 3 %, 54 %.
@@ -141,8 +141,8 @@ dans la conversation.
   événements de CYCLE** (top de cycle, SC/crash, spring du bas, SOS breakout, markup high, lower
   high). Niveaux = bornes de cycle (top, zone de distribution précédente, base/bas de cycle, creek).
   OI/CVD omis à ces TF (cf. §3). Modèle suivi pour BTC 3D et 1W.
-- **Marqueurs d'événements : timestamp en CEST étiqueté UTC** (`pd.Timestamp('...', tz='UTC')` sur un
-  index décalé +2h), jamais `+02:00`. Rappel critique de CLAUDE.md, source de bug récurrent dans les
+- **Marqueurs d'événements : heure de Paris étiquetée UTC** (`clock.wall_index`, CET l'hiver, CEST
+  l'été), jamais `+01:00`/`+02:00`. Rappel critique de CLAUDE.md, source de bug récurrent dans les
   scripts ad hoc — vérifié à chaque graphe.
 - **Suivi vs analyse de séquence :** une mise à jour (« mets à jour analyse btc ») = graphe rafraîchi
   + lecture focalisée (ce qui a changé, niveaux, biais), **sans dérouler les 5 sections ni re-livrer

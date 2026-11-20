@@ -14,6 +14,7 @@ import sys
 import pandas as pd
 import yaml
 
+from . import clock
 from . import data as data_mod
 from .events import Thresholds, detect_events
 from .features import add_features, detect_trading_range, swing_points
@@ -129,7 +130,7 @@ def run_window(cfg: dict) -> pd.DataFrame:
             for e in struct.events:
                 rows.append({
                     "symbol": sym, "schema": struct.bias, "event": e.name,
-                    "time": (e.ts + pd.Timedelta(hours=2)).strftime("%d/%m %Hh"),
+                    "time": clock.fmt(e.ts, "%d/%m %Hh"),
                     "price": round(e.price, 2), "vol_x": round(e.vol_ratio, 2),
                     "spread_atr": round(e.spread_atr, 2), "clv": round(e.clv, 2),
                     "oi_3h_%": "—" if pd.isna(e.oi_chg) else round(e.oi_chg, 2),
