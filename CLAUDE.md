@@ -101,6 +101,9 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `M1…`, événements discrétionnaires, texte ; modèle **`examples/notes_btc_15m_reference.json`**, heures en
   heure de Paris). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
   --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
+- `tradingview/oi_inflexion.pine` — **indicateur TradingView (Pine v6)** d'inflexion de l'OI coin
+  (`<TICKER>_OI`) : anticipation (MACD de log(OI) qui décélère), point mort (pente z ≈ 0 + compression
+  de la fourchette d'OI), reprise (sortie du point mort, |pente z| ≥ seuil), bascule de régime prix × OI.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.

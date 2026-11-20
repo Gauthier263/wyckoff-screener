@@ -1,0 +1,129 @@
+//@version=6
+// OI Inflexion — anticiper un point d'inflexion de l'Open Interest (en COIN).
+// Trois lectures, de la plus précoce à la plus tardive :
+//   1. ANTICIPATION  : l'OI monte (ou baisse) encore mais DÉCÉLÈRE (MACD de log(OI) qui croise son signal
+//                      du mauvais côté de zéro) → l'impulsion d'ouverture/fermeture s'épuise.
+//   2. POINT MORT    : pente d'OI ~ nulle pendant N barres + compression de la fourchette d'OI
+//                      (percentile bas) → personne n'ouvre ni ne ferme, le marché « charge ».
+//   3. REPRISE       : sortie du point mort avec une pente z franche (ouverture = OI↑, débouclage = OI↓).
+//   + CHANGEMENT DE COMPORTEMENT : bascule persistante du quadrant prix × OI
+//     (nouveaux longs / nouveaux shorts / short covering / liquidation de longs).
+// OI = symbole TradingView <TICKER>_OI (ex. BINANCE:BTCUSDT.P_OI), exprimé en coin → direction fiable
+// (pas de pollution par le prix comme en USD). Aide à la décision uniquement.
+indicator("OI Inflexion (coin) — anticipation / point mort / reprise / régime", shorttitle = "OI Inflexion", overlay = false)
+
+// ── Source ────────────────────────────────────────────────────────────────────────────────
+grpS    = "Source OI"
+autoSym = input.bool(true, "Symbole OI auto (TICKER_OI du graphe)", group = grpS)
+manSym  = input.symbol("BINANCE:BTCUSDT.P_OI", "Symbole OI manuel", group = grpS)
+oiSym   = autoSym ? syminfo.prefix + ":" + syminfo.ticker + "_OI" : manSym
+[oiH, oiL, oiC] = request.security(oiSym, timeframe.period, [high, low, close], ignore_invalid_symbol = true)
+
+// ── Momentum de l'OI (log → variations en %) ──────────────────────────────────────────────
+grpM     = "Momentum OI"
+mode     = input.string("Pente z", "Affichage", options = ["Pente z", "MACD OI"], group = grpM)
+fastLen  = input.int(8, "EMA rapide", minval = 2, group = grpM)
+slowLen  = input.int(21, "EMA lente", minval = 3, group = grpM)
+sigLen   = input.int(5, "Signal", minval = 1, group = grpM)
+slopeLen = input.int(10, "Pente : régression sur N barres", minval = 3, group = grpM)
+zLen     = input.int(100, "Normalisation (barres)", minval = 20, group = grpM)
+
+lo     = math.log(oiC)
+macd   = (ta.ema(lo, fastLen) - ta.ema(lo, slowLen)) * 100      // écart des EMA, en %
+sig    = ta.ema(macd, sigLen)
+hist   = macd - sig                                             // accélération de l'OI
+slope  = (ta.linreg(lo, slopeLen, 0) - ta.linreg(lo, slopeLen, 1)) * 100   // % par barre
+sd     = ta.stdev(slope, zLen)
+slopeZ = sd > 0 ? slope / sd : 0.0                              // pente en σ (comparable entre actifs/TF)
+
+// ── Point mort & reprise ──────────────────────────────────────────────────────────────────
+grpF     = "Point mort / reprise"
+flatZ    = input.float(0.5, "Point mort : |pente z| <", step = 0.1, group = grpF)
+flatBars = input.int(5, "Point mort : barres mini", minval = 1, group = grpF)
+useSq    = input.bool(true, "Exiger une compression de la fourchette d'OI", group = grpF)
+sqLen    = input.int(20, "Compression : fenêtre", minval = 5, group = grpF)
+sqPct    = input.float(30, "Compression : percentile max", minval = 1, maxval = 100, group = grpF)
+reprZ    = input.float(1.5, "Reprise : |pente z| ≥", step = 0.1, group = grpF)
+memo     = input.int(12, "Reprise valide si point mort ≤ N barres avant", minval = 1, group = grpF)
+
+bw     = (ta.highest(oiH, sqLen) - ta.lowest(oiL, sqLen)) / ta.sma(oiC, sqLen) * 100
+bwRank = ta.percentrank(bw, zLen)
+var int flatRun = 0
+flatRun := math.abs(slopeZ) < flatZ ? flatRun + 1 : 0
+pointMort = flatRun >= flatBars and (not useSq or bwRank <= sqPct)
+
+sinceFlat  = ta.barssince(pointMort)
+recentFlat = not na(sinceFlat) and sinceFlat <= memo
+repriseUp  = recentFlat and ta.crossover(slopeZ, reprZ)        // l'OI repart à la hausse : ouvertures
+repriseDn  = recentFlat and ta.crossunder(slopeZ, -reprZ)      // l'OI repart à la baisse : débouclage
+
+// ── Anticipation (décélération) puis inflexion confirmée ──────────────────────────────────
+anticipSommet = ta.crossunder(macd, sig) and macd > 0          // OI monte encore mais décélère
+anticipCreux  = ta.crossover(macd, sig) and macd < 0           // OI baisse encore mais décélère
+inflexSommet  = ta.crossunder(macd, 0)                         // tendance d'OI retournée à la baisse
+inflexCreux   = ta.crossover(macd, 0)                          // tendance d'OI retournée à la hausse
+
+// ── Régime prix × OI (changement de comportement) ─────────────────────────────────────────
+grpR    = "Régime prix × OI"
+showReg = input.bool(true, "Fond coloré par régime", group = grpR)
+regLen  = input.int(5, "Δ sur N barres", minval = 1, group = grpR)
+persist = input.int(3, "Persistance pour valider une bascule", minval = 1, group = grpR)
+
+dP  = close - close[regLen]
+dOI = oiC - oiC[regLen]
+// 1 nouveaux longs (P↑ OI↑) · 2 nouveaux shorts (P↓ OI↑) · 3 short covering (P↑ OI↓) · 4 liquidation longs (P↓ OI↓)
+int regime = na(dOI) ? 0 : dP >= 0 and dOI >= 0 ? 1 : dP < 0 and dOI >= 0 ? 2 : dP >= 0 ? 3 : 4
+var int run        = 0
+var int lastStable = 0
+run := regime == nz(regime[1]) ? run + 1 : 1
+regChange = false
+if run == persist and regime != 0
+    regChange  := lastStable != 0 and regime != lastStable
+    lastStable := regime
+
+regCol(r) =>
+    r == 1 ? color.green : r == 2 ? color.red : r == 3 ? color.aqua : r == 4 ? color.orange : color.gray
+regTxt(r) =>
+    r == 1 ? "Prix↑ OI↑ : nouveaux longs" : r == 2 ? "Prix↓ OI↑ : nouveaux shorts" : r == 3 ? "Prix↑ OI↓ : short covering" : r == 4 ? "Prix↓ OI↓ : liquidation de longs" : "—"
+
+// ── Rendu ─────────────────────────────────────────────────────────────────────────────────
+isZ = mode == "Pente z"
+histCol = hist >= 0 ? (hist >= nz(hist[1]) ? color.new(color.teal, 20) : color.new(color.teal, 65)) : (hist <= nz(hist[1]) ? color.new(color.red, 20) : color.new(color.red, 65))
+
+plot(isZ ? slopeZ : na, "Pente OI (z)", color = color.blue, linewidth = 2)
+plot(isZ ? flatZ : na, "Bande point mort +", color = color.new(color.gray, 40), style = plot.style_linebr)
+plot(isZ ? -flatZ : na, "Bande point mort −", color = color.new(color.gray, 40), style = plot.style_linebr)
+plot(isZ ? reprZ : na, "Seuil reprise +", color = color.new(color.green, 40), style = plot.style_linebr)
+plot(isZ ? -reprZ : na, "Seuil reprise −", color = color.new(color.red, 40), style = plot.style_linebr)
+plot(isZ ? na : hist, "Histogramme (accélération)", style = plot.style_columns, color = histCol)
+plot(isZ ? na : macd, "MACD OI (%)", color = color.blue, linewidth = 2)
+plot(isZ ? na : sig, "Signal", color = color.orange)
+plot(0, "Zéro", color = color.new(color.gray, 50))
+
+bgcolor(pointMort ? color.new(color.gray, 75) : showReg and regime != 0 ? color.new(regCol(regime), 92) : na)
+
+plotshape(anticipSommet, "Anticipation sommet d'OI", shape.triangledown, location.top, color.orange, size = size.tiny)
+plotshape(anticipCreux, "Anticipation creux d'OI", shape.triangleup, location.bottom, color.orange, size = size.tiny)
+plotshape(inflexSommet, "Inflexion OI ↓ confirmée", shape.xcross, location.top, color.red, size = size.tiny)
+plotshape(inflexCreux, "Inflexion OI ↑ confirmée", shape.xcross, location.bottom, color.green, size = size.tiny)
+plotshape(repriseUp, "Reprise OI ↑ (ouvertures)", shape.arrowup, location.bottom, color.green, size = size.small, text = "R↑")
+plotshape(repriseDn, "Reprise OI ↓ (débouclage)", shape.arrowdown, location.top, color.red, size = size.small, text = "R↓")
+plotshape(regChange, "Bascule de régime", shape.diamond, location.bottom, regCol(regime), size = size.tiny)
+
+var table tb = table.new(position.top_right, 2, 3, border_width = 1)
+if barstate.islast
+    etat = na(oiC) ? "Pas d'OI pour " + oiSym : pointMort ? "Point mort (compression)" : slopeZ >= reprZ ? "OI en expansion" : slopeZ <= -reprZ ? "OI en débouclage" : macd > 0 and hist < 0 ? "OI↑ qui décélère" : macd < 0 and hist > 0 ? "OI↓ qui décélère" : "Neutre"
+    table.cell(tb, 0, 0, "État OI", text_color = chart.fg_color, text_size = size.small)
+    table.cell(tb, 1, 0, etat, text_color = chart.fg_color, text_size = size.small)
+    table.cell(tb, 0, 1, "Régime", text_color = chart.fg_color, text_size = size.small)
+    table.cell(tb, 1, 1, regTxt(lastStable), text_color = regCol(lastStable), text_size = size.small)
+    table.cell(tb, 0, 2, "Pente z", text_color = chart.fg_color, text_size = size.small)
+    table.cell(tb, 1, 2, str.tostring(slopeZ, "#.##"), text_color = chart.fg_color, text_size = size.small)
+
+// ── Alertes ───────────────────────────────────────────────────────────────────────────────
+alertcondition(anticipSommet, "OI : anticipation sommet", "OI monte encore mais décélère")
+alertcondition(anticipCreux, "OI : anticipation creux", "OI baisse encore mais décélère")
+alertcondition(pointMort and not pointMort[1], "OI : entrée en point mort", "Pente d'OI ~ nulle + compression")
+alertcondition(repriseUp, "OI : reprise ↑", "Sortie de point mort : ouvertures de positions")
+alertcondition(repriseDn, "OI : reprise ↓", "Sortie de point mort : débouclage")
+alertcondition(regChange, "OI : bascule de régime", "Changement de comportement prix × OI")
