@@ -251,6 +251,16 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   (2) **delta perp × OI** dit qui frappe : + / OI↓ = shorts qui rachètent au marché ; + / OI↑ =
   longs neufs agressifs ; − / OI↓ = longs qui sortent / liquidés ; − / OI↑ = shorts d'initiative ;
   delta fort à OI stable = rotation (autant de fermetures que d'ouvertures) ;
+  **OI stable ≠ rotation** — un OI plat ne dit pas COMBIEN de positions ont changé de main.
+  Trois mesures distinctes : volume = activité brute ; ΔOI = ouvertures nettes ; delta = qui est
+  agressif (pas qui ouvre). Pour trancher « calme » vs « grosse rotation » : **volume perp ×Rvol**
+  (`_coinalyze_history("ohlcv-history", …)`, champ `v`), **variation de l'OI dans la barre**
+  (high−low des bougies d'OI) et **liquidations** (borne basse des fermetures : liq fortes à OI
+  plat ⇒ au moins autant d'ouvertures). Volume bas + OI qui bouge peu = calme (vente/achat pressé
+  sur carnet mince) ; volume haut + grands allers-retours d'OI ou liq fortes = rotation. **Erreur à
+  ne plus refaire** : BTC 21/11 03h lu « rotation longs/shorts » alors que volume perp ×0.3, OI ±152
+  BTC, 21 BTC liquidés = simple vente pressée ; à 05h (×2.2, 494 BTC liquidés, ΔOI +3) la rotation
+  était, elle, prouvée ;
   (3) **divergence spot vs perp** = signal en soi : hausse menée par le **spot** (vrais acheteurs)
   = plus durable ; hausse menée par le **perp avec OI↓** = squeeze, qui s'épuise avec les shorts ;
   spot vend / perp achète = covering contre une offre réelle. `add_absorption` reste calculé sur
