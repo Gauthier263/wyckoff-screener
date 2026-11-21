@@ -32,6 +32,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `fetch_long_short_ratio` ([ratio, pct_long]), `fetch_liquidations` ([long_liq, short_liq]).
   `fetch_taker_delta()` — **delta agressif par barre** (taker_buy − taker_sell, en coin) depuis
   les klines Binance (col 9 `publicGetKlines`), base du CVD/absorption (proxy **spot**).
+  `fetch_perp_taker_delta()` — **delta agressif PERP** par barre (Binance via Coinalyze
+  `ohlcv-history` : 2·bv − v, en coin), mêmes clé/repli que l'OI. Le perp fait ~80 % du volume.
   Import ccxt paresseux (tests hors-ligne).
 - `screener/features.py` — VSA (`add_features`: spread, CLV, ATR, vol_ratio,
   spread_atr), pivots (`swing_points`), `detect_trading_range` → `TradingRange`.
@@ -238,9 +240,21 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   le per-barre. Désaccord (per-barre >0, abs_w <0) = absorption **locale** dans un mouvement de fond. Plus
   `no_demand`/`no_supply` (prix qui voyage sans flux = l'**autre** divergence). Citer la valeur
   et/ou le flag event par event. Lecture **froide** (cf. tierces) : confirme / affaiblit / renforce une
-  thèse, **ou rien d'exploitable** — ne jamais forcer. **Caveat** : CVD calculé en **spot** (miroir vision ; perp
-  `fapi` 451-bloqué) = proxy du flux ; une divergence **CVD spot vs OI perp** est elle-même
-  lisible (spot achète / perp déboucle). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD
+  thèse, **ou rien d'exploitable** — ne jamais forcer. **CVD SPOT ET PERP — toujours les deux** (Gauthier, 21/11/2026).
+  Le delta spot (`fetch_taker_delta`, miroir vision) ne couvre que ~20 % du volume BTC ; le delta
+  **perp** (`fetch_perp_taker_delta`, Coinalyze) ~80 %. Le spot seul peut donner la direction
+  **INVERSE** : **erreur à ne plus refaire** — BTC 21/11 07h (flush 55 130), CVD spot −447 lu comme
+  « vente absorbée par des acheteurs passifs », alors que le delta perp valait **+5 285** = shorts
+  qui rachètent **au marché** (covering agressif). Et 03h : « vente spot sans le perp » était faux
+  (spot −593, perp −970 à OI stable = rotation longs sortants / shorts entrants). Règles :
+  (1) ne jamais attribuer une poussée au spot ou au perp sans les **deux** deltas ;
+  (2) **delta perp × OI** dit qui frappe : + / OI↓ = shorts qui rachètent au marché ; + / OI↑ =
+  longs neufs agressifs ; − / OI↓ = longs qui sortent / liquidés ; − / OI↑ = shorts d'initiative ;
+  delta fort à OI stable = rotation (autant de fermetures que d'ouvertures) ;
+  (3) **divergence spot vs perp** = signal en soi : hausse menée par le **spot** (vrais acheteurs)
+  = plus durable ; hausse menée par le **perp avec OI↓** = squeeze, qui s'épuise avec les shorts ;
+  spot vend / perp achète = covering contre une offre réelle. `add_absorption` reste calculé sur
+  le spot (historique profond) ; le perp se lit **à côté** (Δ par barre ou cumulé sur le swing). Ex. BTC H8 : rallye 59 131→67 292 = prix +6 236 / CVD
   +1 023 (rallye sans demande agressive → confirme distribution) ; barre SC 58 115 = vente
   agressive (delta −1 822) mais prix qui récupère (absorption au plancher → affaiblit la
   continuation baissière). **Fuseau horaire — OBLIGATOIRE de vérifier** : `publicGetKlines`
@@ -450,7 +464,8 @@ hypothèses du tableau — ou conclure qu'il n'y a rien d'exploitable.
    *absorption* = effort fort rejeté ; *no-demand* = résultat fort sans effort.
    La divergence décisive est souvent **multi-barres** (sur un swing), pas 1 bougie — la signaler
    comme telle (per-barre l'absorption est bruitée). Conclure chaque ligne par l'un des 4 cas :
-   **confirme distrib / confirme accu / affaiblit / rien d'exploitable**. CVD = spot (proxy).
+   **confirme distrib / confirme accu / affaiblit / rien d'exploitable**. Citer delta **spot ET perp**
+   (cf. règle CVD spot et perp) ; un désaccord spot/perp se signale explicitement.
 
 2. **Positionnement — synthèse en sens commun** (funding, ratio L/S, liquidations) :
    ne pas lister séparément. Les lire ensemble pour un sens unique en une ou deux phrases : ex.
