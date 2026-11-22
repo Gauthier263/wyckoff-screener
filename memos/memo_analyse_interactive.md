@@ -51,7 +51,7 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
   `reason`. **L'entrée de Gauthier est un niveau** (`label` « entrée short », `kind` pivot).
 - **Événements** : les barres commentées depuis le dernier point (squeeze, rejet, UT, absorption,
   cassure…) avec `verdict` et `sense` ; libellé maison → `full` + `naming` + `theory`.
-- **Zones `M…`** : les mouvements cités (rebond en rachat de shorts, jambe, compression).
+- **Zones `M…`** : les mouvements cités (rebond porté par des sorties de shorts, jambe, compression).
 - **Texte** (sections `###`, références `{N…}` `{M…}` `{ID}` partout) :
   `### 1. État` (prix, gain/perte de la position, où on est dans la plage) ·
   `### 2. Ce qui a changé` (`[[events]]` + bullets) ·

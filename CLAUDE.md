@@ -161,8 +161,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   - **L'OI sur le rebond DÉSAMBIGUÏSE accumulation vs redistribution — c'est toute la nuance du
     début.** Le prix seul ne distingue pas les deux : il faut lire **QUI porte le rebond** via
     l'OI coin. Décomposer le rebond climax→test en phases :
-    · **prix↑ + OI↓ = short covering** = « rebond effectif » : les shorts du markdown se
-      rachètent, la pression vendeuse s'épuise. **Constructif / AMBIGU — ne confirme PAS la
+    · **prix↑ + OI↓ = short covering** = « rebond effectif » : les shorts du markdown
+      sortent, la pression vendeuse s'épuise. **Constructif / AMBIGU — ne confirme PAS la
       distribution** (penche même vers l'accumulation : le carburant baissier se retire).
     · **prix↑ + OI↑ = nouveaux longs** : demande qui entre. Au **test de la résistance** dans un
       downtrend = **demande piégée** = signature **redistribution** (ces longs deviennent le
@@ -193,6 +193,11 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `wall_index`, `wall_sec`). Les données restent en UTC réel ; on convertit à l'affichage et à la
   lecture des notes. Dans les réponses, écrire l'heure de Paris et son fuseau (« 11h50 CET »).
   **Erreur à ne plus refaire** : le « +2h CEST toute l'année » donnait une heure de trop en hiver.
+- **Vocabulaire des shorts — JAMAIS « les shorts rachètent » / « rachat de shorts »** (Gauthier,
+  22/11/2026). Écrire « **des shorts sortent** », « **des shorts sortent ou sont liquidés** » (quand on
+  ne sait pas trancher) ou « **des shorts sont liquidés** » (quand les liquidations le prouvent).
+  Idem en nom : « sortie de shorts », pas « rachat ». Vaut pour le texte, les notes JSON, les mémos et
+  le code (`theory_table`, docstrings).
 - **Niveaux toujours justifiés** : chaque prix-clé cité (déclencheur, stop, objectif,
   invalidation) doit être **accompagné, entre parenthèses, de la raison qui en fait un niveau
   clé** (ex. « 62 272 (plancher = low du SC, borne basse de la plage) », « 62 500 (haut du coil
@@ -245,10 +250,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   **perp** (`fetch_perp_taker_delta`, Coinalyze) ~80 %. Le spot seul peut donner la direction
   **INVERSE** : **erreur à ne plus refaire** — BTC 21/11 07h (flush 55 130), CVD spot −447 lu comme
   « vente absorbée par des acheteurs passifs », alors que le delta perp valait **+5 285** = shorts
-  qui rachètent **au marché** (covering agressif). Et 03h : « vente spot sans le perp » était faux
+  qui sortent **au marché** (sortie agressive). Et 03h : « vente spot sans le perp » était faux
   (spot −593, perp −970 à OI stable = rotation longs sortants / shorts entrants). Règles :
   (1) ne jamais attribuer une poussée au spot ou au perp sans les **deux** deltas ;
-  (2) **delta perp × OI** dit qui frappe : + / OI↓ = shorts qui rachètent au marché ; + / OI↑ =
+  (2) **delta perp × OI** dit qui frappe : + / OI↓ = shorts qui sortent au marché (ou sont liquidés) ; + / OI↑ =
   longs neufs agressifs ; − / OI↓ = longs qui sortent / liquidés ; − / OI↑ = shorts d'initiative ;
   delta fort à OI stable = rotation (autant de fermetures que d'ouvertures) ;
   **OI stable ≠ rotation** — un OI plat ne dit pas COMBIEN de positions ont changé de main.
