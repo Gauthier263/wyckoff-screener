@@ -138,3 +138,30 @@ def test_2h_maps_to_native_coinalyze_interval():
     assert D._COINALYZE_INTERVAL["2h"] == "2hour"
     assert D._TF_MIN["2h"] == 120
     assert D._TF_FREQ["2h"] == "2h"
+
+
+def test_perp_taker_delta_parsing(monkeypatch):
+    # delta perp = taker_buy − taker_sell = 2·bv − v ; une barre sans `bv` est ignorée.
+    payload = [{"symbol": "BTCUSDT_PERP.A", "history": [
+        {"t": 1_781_860_000, "o": 1, "h": 1, "l": 1, "c": 1, "v": 100.0, "bv": 70.0},
+        {"t": 1_781_863_600, "o": 1, "h": 1, "l": 1, "c": 1, "v": 50.0, "bv": 10.0},
+        {"t": 1_781_867_200, "o": 1, "h": 1, "l": 1, "c": 1, "v": 10.0},
+    ]}]
+    monkeypatch.setattr(D, "_coinalyze_key", lambda: "FAKEKEY")
+    seen = {}
+    import requests
+
+    def fake_get(url, *a, **k):
+        seen["url"] = url
+        return _FakeResp(200, payload)
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    s = D.fetch_perp_taker_delta("BTC/USDT", "1h", limit=3)
+    assert seen["url"].endswith("/ohlcv-history")
+    assert list(s.values) == [40.0, -30.0]
+    assert s.index.tz is not None and s.name == "delta_perp"
+
+
+def test_perp_taker_delta_no_key(monkeypatch):
+    monkeypatch.setattr(D, "_coinalyze_key", lambda: None)
+    assert D.fetch_perp_taker_delta("BTC/USDT", "1h") is None
