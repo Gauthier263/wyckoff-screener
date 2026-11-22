@@ -457,18 +457,18 @@ def _event_narratives(th: Thresholds) -> list[dict]:
             "title": "AR — Automatic Rally (Rallye automatique)",
             "story":
                 "Une fois la vente épuisée au SC, le prix <b>rebondit mécaniquement</b> : plus personne "
-                "pour vendre, les shorts du markdown rachètent leurs positions (short covering). Ce n'est "
+                "pour vendre, les shorts du markdown sortent de leurs positions (short covering). Ce n'est "
                 "PAS de la demande convaincue — c'est un réflexe. L'AR <b>fixe le plafond</b> de la plage. "
                 "Avec le SC, les deux bornes sont posées.",
             "who":
-                "Shorts qui couvrent (rachètent) + quelques acheteurs réflexes. PAS encore d'engagement "
+                "Shorts qui sortent + quelques acheteurs réflexes. PAS encore d'engagement "
                 "directionnel des mains fortes.",
             "indices": [
                 ("Volume", "EN REPLI (< moyenne)", "un rebond réflexe ne mobilise pas de gros volume ; s'il est volumique, c'est un SOS, pas un AR"),
                 ("Spread/ATR", "souvent en repli", "mouvement moins violent que le climax"),
                 ("CLV", "indifférente", "le rebond peut clôturer haut sans signifier de la vraie demande"),
                 ("OI", "↓ short covering : les shorts ferment", "preuve que le rebond est un débouclage, pas de l'argent neuf"),
-                ("CVD", "modéré (covering, pas de demande agressive)", "la hausse est portée par le rachat des shorts (covering), pas par une demande agressive nouvelle"),
+                ("CVD", "modéré (covering, pas de demande agressive)", "la hausse est portée par la sortie des shorts (covering), pas par une demande agressive nouvelle"),
                 ("Tierces", "short liqs possibles sur le rebond", "les shorts trop tôt se font sortir, alimentant le rebond"),
             ],
             "trap": "Un AR à fort volume OU à OI montant n'est PAS un AR : c'est déjà un signe de force "
@@ -825,7 +825,7 @@ def _event_narratives(th: Thresholds) -> list[dict]:
                 "occasion de vendre avant le markdown. L'absence de demande sur ce rebond confirme la "
                 "faiblesse.",
             "who":
-                "Quelques rachats de shorts (faible) vs mains fortes qui pressent. Pas de retour des "
+                "Quelques sorties de shorts (faible) vs mains fortes qui pressent. Pas de retour des "
                 "acheteurs = la voie est libre pour la baisse.",
             "indices": [
                 ("Volume", f"SEC ≤ ×{th.test_vol}", "un rebond faible ne mobilise pas de volume : pas de demande"),

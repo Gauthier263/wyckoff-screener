@@ -502,8 +502,8 @@ def fetch_perp_taker_delta(symbol: str = "BTC/USDT", timeframe: str = "1h", limi
     (mêmes open times que `fetch_ohlcv`). None si pas de clé / API HS.
 
     Complète `fetch_taker_delta` (spot) : le perp fait ~80 % du volume BTC, un CVD spot seul peut
-    donner la direction INVERSE (ex. 21/11 07h : spot −447, perp +5 285 = shorts qui rachètent au
-    marché). Croisé avec l'OI, il dit qui frappe : delta perp + / OI↓ = shorts qui rachètent ;
+    donner la direction INVERSE (ex. 21/11 07h : spot −447, perp +5 285 = shorts qui sortent au
+    marché). Croisé avec l'OI, il dit qui frappe : delta perp + / OI↓ = shorts qui sortent ;
     + / OI↑ = longs neufs agressifs ; − / OI↓ = longs qui sortent ; − / OI↑ = shorts d'initiative."""
     h = _coinalyze_history("ohlcv-history", symbol, timeframe, limit, start, end, exch)
     if not h:

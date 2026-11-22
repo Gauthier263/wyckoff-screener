@@ -236,9 +236,9 @@ CARDS = [
 
 ("f4","amb","F4 · Sur covering / squeeze","— Squeeze-driven breakout",
  [("of","order-flow (lecture OI)")],("amb","selon l'OI"),
- "Cassure <b>brutale</b> à départager : <b>short covering</b> (rachat de shorts, offre qui se retire) ou <b>nouvelle demande</b> (longs qui entrent) ? <b>L'OI en coin tranche</b> — le cas où la lecture OI est décisive.",
+ "Cassure <b>brutale</b> à départager : <b>short covering</b> (sortie de shorts, offre qui se retire) ou <b>nouvelle demande</b> (longs qui entrent) ? <b>L'OI en coin tranche</b> — le cas où la lecture OI est décisive.",
  "<b>covering</b> = prix↑ + <b>OI↓</b> (coin) + pic de CVD puis stagnation → <b>fragile</b> ; <b>nouvelle demande</b> = prix↑ + <b>OI↑</b> + CVD soutenu → <b>durable</b> (= F1). Croiser : short_liq en pic = squeeze forcé ; funding.",
- "Ce sont des <b>shorts CONTRAINTS de se racheter</b> (liquidations en cascade) qui propulsent la cassure — <b>pas de nouvelle demande initiatrice</b>. Le composite peut ne pas être impliqué ; c'est un <b>mouvement mécanique de couverture</b>. Une fois les shorts liquidés, <b>plus personne pour acheter</b> → le prix retombe (redevient R6). Signature : OI en <b>baisse</b>. Après un <b>niveau très shorté</b>, crowd short encombré, funding négatif.",
+ "Ce sont des <b>shorts CONTRAINTS de sortir</b> (liquidations en cascade) qui propulsent la cassure — <b>pas de nouvelle demande initiatrice</b>. Le composite peut ne pas être impliqué ; c'est un <b>mouvement mécanique de couverture</b>. Une fois les shorts liquidés, <b>plus personne pour acheter</b> → le prix retombe (redevient R6). Signature : OI en <b>baisse</b>. Après un <b>niveau très shorté</b>, crowd short encombré, funding négatif.",
  "Souvent covering pur : <b>ambigu — ne confirme PAS un retournement</b> (penche même vers l'accu : le carburant baissier se retire). Ne pas lire haussier trop vite.",
  "Si OI↑ + demande soutenue = vraie continuation (bascule vers F1).",
  "Le covering peut <b>percer</b> mais rarement <b>tenir</b> sans relais de demande.",
@@ -496,7 +496,7 @@ probable quand l'offre revient. C'est l'une des deux divergences effort-vs-résu
   <li>Volume ≥ ×1.3 + CVD↑ FRANC + clôture haute ? → <a href="#f1"><b>F1 En force</b></a></li>
   <li>Cassure puis RETEST à volume SEC qui tient (higher low) ? → <a href="#f2"><b>F2 Retest / BUEC</b></a></li>
   <li>Volume FAIBLE, CVD plat, personne derrière ? → <a href="#f3"><b>F3 Sans demande</b></a> (souvent → R6)</li>
-  <li>OI↓ + pic de CVD puis stagnation (rachat de shorts) ? → <a href="#f4"><b>F4 Squeeze / covering</b></a></li>
+  <li>OI↓ + pic de CVD puis stagnation (sortie de shorts) ? → <a href="#f4"><b>F4 Squeeze / covering</b></a></li>
   <li>Petits corps réguliers, delta+ persistant, pas de climax ? → <a href="#f5"><b>F5 Grinding</b></a></li>
   </ul></li>
 </ul>
@@ -513,7 +513,7 @@ probable quand l'offre revient. C'est l'une des deux divergences effort-vs-résu
 <tr><td class="k">F1 En force</td><td>≥ ×1.3</td><td>↑ FRANC</td><td>cassure large, clôture haute</td><td>haussier</td></tr>
 <tr><td class="k">F2 Retest / BUEC</td><td>cassure forte, retest sec</td><td>plat au retest</td><td>higher low qui tient au-dessus</td><td>haussier (fort)</td></tr>
 <tr><td class="k">F3 Sans demande</td><td>faible</td><td>plat</td><td>cassure sans personne derrière</td><td>suspect</td></tr>
-<tr><td class="k">F4 Squeeze / covering</td><td>pic puis stagne</td><td>pic puis stagne</td><td>OI↓ (rachat de shorts)</td><td>fragile</td></tr>
+<tr><td class="k">F4 Squeeze / covering</td><td>pic puis stagne</td><td>pic puis stagne</td><td>OI↓ (sortie de shorts)</td><td>fragile</td></tr>
 <tr><td class="k">F5 Grinding</td><td>modeste, constant</td><td>+ légère persistante</td><td>grignotage furtif, pas de climax</td><td>ambigu</td></tr>
 </tbody></table>
 

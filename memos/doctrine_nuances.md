@@ -92,10 +92,12 @@ dans la conversation.
   Ça ne dit pas *qui* achète. **Ne jamais écrire « honnête » seul** : l'accoler à l'OI coin de la
   même barre (ou de la barre 5 min qui la contient) :
   · CVD↑ + OI↓ ou plat = achats spot + **shorts qui ferment** : pas de nouveaux longs, la hausse
-    s'épuise quand les rachats s'arrêtent ;
+    s'épuise quand les sorties de shorts s'arrêtent ;
   · CVD↑ + OI↑ = **nouveaux longs** qui entrent : seule vraie demande nouvelle.
-- Formulation imposée : « achat agressif non absorbé, OI plat : rachat de shorts / achats spot,
+- Formulation imposée : « achat agressif non absorbé, OI plat : sortie de shorts / achats spot,
   pas de nouveaux longs » plutôt que « rebond honnête ».
+- **Vocabulaire** : jamais « les shorts rachètent » ; écrire « des shorts sortent », « des shorts
+  sortent ou sont liquidés » ou « des shorts sont liquidés » (Gauthier, 22/11/2026).
 - **Achat spot ≠ nouveau long.** Le spot est sans levier et sans OI : un achat spot n'ouvre aucune
   position mesurée par l'OI. Il peut être (1) une **vraie demande** d'investisseurs (sans levier, non
   liquidable : la plus saine), (2) un **arbitrage / couverture** (achat spot + short perp, souvent
