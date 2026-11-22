@@ -56,6 +56,19 @@ Plus gros markups de week-end : 02/01/2021 +12,5 % (semaine suivante +23 %), 01/
 Le **Rvol(20) masque le creux** du dimanche (0,91 affiché pour 0,47 réel) : sa moyenne est faite
 de barres de week-end. D'où `session.session_rvol` (volume ÷ médiane de la même heure en semaine).
 
+### Détail heure par heure du dimanche soir (1h, 2024 → 2026, volume / range ÷ même heure en semaine)
+
+| Heure (CET) | 15h–20h | 21h | **22h** | **23h** | **00h** | 01h–03h | 04h–09h |
+|---|---|---|---|---|---|---|---|
+| Volume | 0,33–0,44 | 0,55 | **0,86** | **1,36** | **1,30** | 1,22–1,09 | ≈ 1,0–1,1 |
+| Range | 0,42–0,58 | 0,64 | 0,92 | 1,39 | 1,53 | 1,31–1,13 | ≈ 1,0 |
+
+La reprise **commence vers 21h–22h CET** et culmine **de 23h à 01h CET** : réouverture du forex
+(dimanche 17h à New York = 23h CET), ouverture de la semaine en Océanie puis au Japon (Sydney 9h =
+23h CET, Tokyo 9h = 01h CET), réouverture des futures BTC du CME (dimanche 17h à Chicago = 00h CET),
+clôture de la bougie hebdomadaire (00h UTC = 01h CET). Le seuil « 21h CET » des règles ci-dessous est
+le début de la montée ; l'activité pleine arrive une à deux heures plus tard.
+
 ## 5. Fiabilité des cassures (clôture 1h hors de la plage des 24 h)
 
 | Séance de la cassure | n | Suite ≥ 2 ATR en 12 h | Retour dans la plage en 12 h |
