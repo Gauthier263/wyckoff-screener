@@ -1,0 +1,105 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// OI↑ zones — séquences d'ouverture de positions (achats / ventes volontaires)
+//
+// Repère les séquences de N bougies d'Open Interest VERTES consécutives
+// (OI close > OI open ET hausse ≥ seuil %) et pose une bande verticale
+// transparente :
+//   · dans le panneau de l'indicateur (bougies d'OI tracées par le script) ;
+//   · sur le panneau du cours (force_overlay) → couvre aussi le Volume natif
+//     s'il est affiché DANS le panneau du cours (réglage par défaut TradingView).
+// Couleur = sens du prix depuis le début de la séquence :
+//   vert  = OI↑ + prix↑ → nouveaux longs  (achats volontaires)
+//   rouge = OI↑ + prix↓ → nouveaux shorts (ventes volontaires)
+//   gris  = OI↑ + prix plat (|Δprix| < x ATR) → ouverture sans résultat (à lire)
+// OI = symbole TradingView "<EXCHANGE>:<TICKER>.P_OI" (en coin/contrats).
+// Aide à la lecture uniquement — aucun ordre.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OI↑ zones — séquences d'ouverture de positions", shorttitle = "OI↑ zones", overlay = false)
+
+// ── Entrées ─────────────────────────────────────────────────────────────────
+grpOI  = "Open Interest"
+oiUser = input.string("", "Symbole OI (vide = auto)", group = grpOI,
+     tooltip = "Vide : déduit du graphe (BINANCE:BTCUSDT.P ou BINANCE:BTCUSDT → BINANCE:BTCUSDT.P_OI). Sinon saisir p. ex. BINANCE:ETHUSDT.P_OI")
+
+grpSeq  = "Séquence"
+minBars = input.int(2, "Bougies OI vertes consécutives (min.)", minval = 2, maxval = 10, group = grpSeq)
+minPct  = input.float(0.03, "Hausse min. de l'OI par bougie (%)", minval = 0.0, step = 0.01, group = grpSeq,
+     tooltip = "Bougie OI retenue si close > open ET (close−open)/open ≥ ce seuil. 0 = toute bougie verte.")
+flatAtr = input.float(0.3, "Prix « plat » si |Δprix| < x · ATR", minval = 0.0, step = 0.05, group = grpSeq,
+     tooltip = "Δprix = clôture courante − ouverture de la 1re bougie de la séquence.")
+atrLen  = input.int(14, "Longueur ATR", minval = 1, group = grpSeq)
+
+grpVis    = "Affichage"
+showPrice = input.bool(true, "Bandes sur le cours (+ Volume natif du panneau)", group = grpVis)
+showPane  = input.bool(true, "Bandes dans le panneau OI", group = grpVis)
+showOI    = input.bool(true, "Bougies d'OI", group = grpVis)
+colBuy    = input.color(color.new(color.green, 82), "Achats volontaires (OI↑ prix↑)", group = grpVis)
+colSell   = input.color(color.new(color.red,   82), "Ventes volontaires (OI↑ prix↓)", group = grpVis)
+colFlat   = input.color(color.new(color.gray,  82), "OI↑ prix plat",                  group = grpVis)
+colOIup   = input.color(color.new(#26a69a, 0), "Bougie OI ↑", group = grpVis)
+colOIdn   = input.color(color.new(#ef5350, 0), "Bougie OI ↓", group = grpVis)
+
+// ── Open Interest ───────────────────────────────────────────────────────────
+autoSym = str.endswith(syminfo.ticker, ".P") ? syminfo.prefix + ":" + syminfo.ticker + "_OI" : syminfo.prefix + ":" + syminfo.ticker + ".P_OI"
+oiSym   = oiUser != "" ? oiUser : autoSym
+[oiO, oiH, oiL, oiC] = request.security(oiSym, timeframe.period, [open, high, low, close], ignore_invalid_symbol = true)
+
+oiPct = oiO > 0 ? (oiC - oiO) / oiO * 100.0 : na
+isUp  = not na(oiPct) and oiC > oiO and oiPct >= minPct
+
+// ── Séquence ────────────────────────────────────────────────────────────────
+var int   run     = 0
+var float seqOpen = na
+run := isUp ? run + 1 : 0
+if run == 1
+    seqOpen := open
+
+atr    = ta.atr(atrLen)
+dPx    = close - seqOpen
+dir    = run == 0 ? 0 : dPx > flatAtr * atr ? 1 : dPx < -flatAtr * atr ? -1 : 0
+seqCol = dir == 1 ? colBuy : dir == -1 ? colSell : colFlat
+active  = run >= minBars
+confirm = run == minBars          // la séquence atteint le minimum : on colore aussi les bougies précédentes
+
+cNow = active ? seqCol : na
+bgcolor(showPane  ? cNow : na, title = "Bande OI↑ (panneau OI)")
+bgcolor(showPrice ? cNow : na, title = "Bande OI↑ (cours)", force_overlay = true)
+
+// Rétro-coloration des (minBars−1) premières bougies de la séquence, à la confirmation.
+// Pine n'accepte qu'un offset constant → un appel par décalage (minBars ≤ 10).
+retro(int i) => confirm and minBars > i ? seqCol : na
+bgcolor(showPane  ? retro(1) : na, offset = -1, editable = false)
+bgcolor(showPrice ? retro(1) : na, offset = -1, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(2) : na, offset = -2, editable = false)
+bgcolor(showPrice ? retro(2) : na, offset = -2, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(3) : na, offset = -3, editable = false)
+bgcolor(showPrice ? retro(3) : na, offset = -3, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(4) : na, offset = -4, editable = false)
+bgcolor(showPrice ? retro(4) : na, offset = -4, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(5) : na, offset = -5, editable = false)
+bgcolor(showPrice ? retro(5) : na, offset = -5, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(6) : na, offset = -6, editable = false)
+bgcolor(showPrice ? retro(6) : na, offset = -6, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(7) : na, offset = -7, editable = false)
+bgcolor(showPrice ? retro(7) : na, offset = -7, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(8) : na, offset = -8, editable = false)
+bgcolor(showPrice ? retro(8) : na, offset = -8, editable = false, force_overlay = true)
+bgcolor(showPane  ? retro(9) : na, offset = -9, editable = false)
+bgcolor(showPrice ? retro(9) : na, offset = -9, editable = false, force_overlay = true)
+
+// ── Bougies d'OI (panneau de l'indicateur) ──────────────────────────────────
+candleCol = oiC >= oiO ? colOIup : colOIdn
+plotcandle(showOI ? oiO : na, oiH, oiL, oiC, "OI", color = candleCol, wickcolor = candleCol, bordercolor = candleCol)
+plot(oiPct, "ΔOI bougie (%)", display = display.data_window)
+plot(run,   "Bougies OI↑ consécutives", display = display.data_window)
+
+// ── Message si OI indisponible ──────────────────────────────────────────────
+var table msg = table.new(position.top_right, 1, 1)
+if barstate.islast and na(oiC)
+    table.cell(msg, 0, 0, "OI introuvable : " + oiSym + "\nRenseigner « Symbole OI »", text_color = color.white, bgcolor = color.new(color.red, 20), text_size = size.small)
+
+// ── Alertes (créer l'alerte avec « Une fois par clôture de barre ») ─────────
+alertcondition(confirm,              "Séquence OI↑ (toutes)",            "{{ticker}} {{interval}} : nouvelle séquence d'OI↑")
+alertcondition(confirm and dir == 1,  "Séquence OI↑ — achats volontaires", "{{ticker}} {{interval}} : OI↑ + prix↑ (nouveaux longs)")
+alertcondition(confirm and dir == -1, "Séquence OI↑ — ventes volontaires", "{{ticker}} {{interval}} : OI↑ + prix↓ (nouveaux shorts)")

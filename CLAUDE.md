@@ -103,6 +103,10 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   `M1…`, événements discrétionnaires, texte ; modèle **`examples/notes_btc_15m_reference.json`**, heures en
   heure de Paris). `build_model` est pur (testé hors-ligne). CLI : `python -m screener.interactive
   --symbol BTC/USDT --timeframe 1h --notes notes.json` ou `cli --window --html [--notes]`.
+- `tradingview/oi_up_zones.pine` — **indicateur TradingView (Pine v6)** : bandes verticales transparentes
+  sur les séquences de ≥ N bougies d'OI vertes (seuil % min), dans le panneau OI (bougies `.P_OI` tracées
+  par le script) **et** sur le cours (`force_overlay`, couvre le Volume natif placé dans le panneau du cours).
+  Couleur = sens du prix sur la séquence (vert nouveaux longs / rouge nouveaux shorts / gris plat). Alertes.
 - `screener/cli.py` — orchestration + sortie tableau/CSV ; `--mtf` → run_mtf,
   `--window [N]` → run_window (table avec colonnes théorie + volume/spread→thèse),
   `--chart` génère le PNG.
