@@ -87,6 +87,16 @@ dans la conversation.
   = débouclage forcé, pas de demande neuve → « tentative », possible upthrust. Ex. BTC 2h 04/11 16h :
   ×4.00, 3.42 ATR, OI −1.86 %, 976 BTC de shorts liquidés → upthrust / LPSY 3D confirmé le 05/11.
 
+### « Honnête » ne veut pas dire « nouvelle demande » (Gauthier, 20 et 22/11/2026)
+- « Honnête » (absorption < 0) dit seulement que le prix a suivi l'effort agressif **sur le spot**.
+  Ça ne dit pas *qui* achète. **Ne jamais écrire « honnête » seul** : l'accoler à l'OI coin de la
+  même barre (ou de la barre 5 min qui la contient) :
+  · CVD↑ + OI↓ ou plat = achats spot + **shorts qui ferment** : pas de nouveaux longs, la hausse
+    s'épuise quand les rachats s'arrêtent ;
+  · CVD↑ + OI↑ = **nouveaux longs** qui entrent : seule vraie demande nouvelle.
+- Formulation imposée : « achat agressif non absorbé, OI plat : rachat de shorts / achats spot,
+  pas de nouveaux longs » plutôt que « rebond honnête ».
+
 ## 4 · Tierces (CVD, funding, L/S, liquidations)
 
 - **Lire ensemble `absorption` + `delta_z` + `clv` quand ils se contredisent** : le signe d'`absorption`
