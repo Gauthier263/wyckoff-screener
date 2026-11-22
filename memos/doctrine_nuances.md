@@ -96,6 +96,12 @@ dans la conversation.
   · CVD↑ + OI↑ = **nouveaux longs** qui entrent : seule vraie demande nouvelle.
 - Formulation imposée : « achat agressif non absorbé, OI plat : rachat de shorts / achats spot,
   pas de nouveaux longs » plutôt que « rebond honnête ».
+- **Achat spot ≠ nouveau long.** Le spot est sans levier et sans OI : un achat spot n'ouvre aucune
+  position mesurée par l'OI. Il peut être (1) une **vraie demande** d'investisseurs (sans levier, non
+  liquidable : la plus saine), (2) un **arbitrage / couverture** (achat spot + short perp, souvent
+  quand le funding est positif) : neutre, et qui fait *monter* l'OI perp sans demande directionnelle,
+  (3) des teneurs de marché. Nos données ne les séparent pas : le dire, et regarder funding + OI
+  avant de parler de « demande ».
 
 ## 4 · Tierces (CVD, funding, L/S, liquidations)
 
