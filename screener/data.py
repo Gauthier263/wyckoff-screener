@@ -495,6 +495,28 @@ def fetch_liquidations(symbol: str = "BTC/USDT", timeframe: str = "15m", limit: 
     return df if len(df) else None
 
 
+def fetch_perp_taker_delta(symbol: str = "BTC/USDT", timeframe: str = "1h", limit: int = 300,
+                           start=None, end=None, exch: str = "A") -> "pd.Series | None":
+    """Delta agressif **perp** par barre (taker_buy − taker_sell, en coin), Binance via Coinalyze
+    (`ohlcv-history` : `v` volume, `bv` volume acheteur taker → delta = 2·bv − v). Index ts UTC
+    (mêmes open times que `fetch_ohlcv`). None si pas de clé / API HS.
+
+    Complète `fetch_taker_delta` (spot) : le perp fait ~80 % du volume BTC, un CVD spot seul peut
+    donner la direction INVERSE (ex. 21/11 07h : spot −447, perp +5 285 = shorts qui rachètent au
+    marché). Croisé avec l'OI, il dit qui frappe : delta perp + / OI↓ = shorts qui rachètent ;
+    + / OI↑ = longs neufs agressifs ; − / OI↓ = longs qui sortent ; − / OI↑ = shorts d'initiative."""
+    h = _coinalyze_history("ohlcv-history", symbol, timeframe, limit, start, end, exch)
+    if not h:
+        return None
+    rows = {pd.to_datetime(x["t"], unit="s", utc=True): 2.0 * float(x["bv"]) - float(x["v"])
+            for x in h if "bv" in x and "v" in x}
+    if not rows:
+        return None
+    s = pd.Series(rows, dtype=float).sort_index()
+    s.name = "delta_perp"
+    return s
+
+
 def _aggregate_oi(symbol: str, timeframe: str, limit: int, source: str,
                   start=None, end=None) -> "pd.Series | None":
     """Série (USD) de l'OI multi-venues, alignée sur l'union des horodatages.

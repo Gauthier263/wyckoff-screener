@@ -100,6 +100,7 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
 |---|---|---|
 | Bougies prix | `get_exchange('binance').fetch_ohlcv('BTC/USDT', tf, limit=300)` | Spot Binance (miroir vision). `add_features` → vol_ratio, spread_atr, clv, atr, vol_ma |
 | CVD / absorption | `fetch_taker_delta(sym, tf, 300)` → `add_absorption(df, delta.reindex(df.index))` | Spot (proxy). Colonnes delta, delta_z, absorption, absorption_w, no_demand/no_supply |
+| Delta perp | `fetch_perp_taker_delta(sym, tf, limit)` | Binance perp via Coinalyze (~80 % du volume). **Toujours à côté du spot** : citer les deux deltas par événement / mouvement |
 | OI coin (bougies) | `fetch_open_interest_ohlc(sym, tf, limit)` | **Coin, jamais USD.** 2h/6h/12h supportés |
 | Funding | `fetch_funding_rate(sym, tf, limit)` | Coinalyze |
 | Ratio L/S comptes | `fetch_long_short_ratio(sym, tf, limit)` → ratio, pct_long | Compte des **comptes**, pas des montants |
