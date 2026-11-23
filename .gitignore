@@ -10,3 +10,6 @@ tableau_rappel_theorie.html
 .venv/
 *.parquet
 .claude/settings.local.json
+
+# Journal des trades : données personnelles, hors du dépôt public (cf. screener/journal.py)
+journal/trades.csv

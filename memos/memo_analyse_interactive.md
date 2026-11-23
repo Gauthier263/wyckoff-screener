@@ -77,6 +77,15 @@ comportements de rendu que la page d'analyse ; seul le contenu est allégé.
   actif et TF, republiée de même. La TF peut changer d'une actualisation à l'autre sur la même page.
 - **Fil** : le lien + la réponse courte habituelle (état, signal attendu, action) ; le détail
   et les clics sont dans la page.
+- **En-tête obligatoire (A8, 23/11)** : première ligne du suivi (fil et page, dans
+  `subtitle` ou en tête de « Lecture à froid ») = `structure_tf(...).header()` ; un niveau
+  interne (< 1 ATR de structure) est marqué tel quel dans son `reason`.
+- **Garde-fou (A1, 23/11)** : si une entrée est annoncée ou proposée, la ligne
+  `Garde-fou : …` vient **juste après l'en-tête**, avant la lecture à froid (fil) ; dans la page,
+  en tête de `### 2. Position`, points en défaut en bullets (valeur + seuil). Rouge = alerte en
+  clair, pas de refus. Les prix « point mort » et « partiel » deviennent des niveaux `N…`.
+- **Journal (A7, 23/11)** : entrée / sortie annoncée → `python -m screener.journal add|close`
+  dans la foulée ; une ligne dans le fil le confirme (« noté au journal, trade n° … »).
 
 ---
 

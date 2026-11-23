@@ -109,6 +109,17 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
 - `screener/session.py` — **séance** (week-end / reprise du lundi) : `session_of(ts_utc)`,
   `is_thin`, `session_rvol(df)` (volume ÷ médiane de la même heure UTC en semaine ; le Rvol(20)
   masque le creux du week-end). Usage **quand utile uniquement** : `memos/weekend_btc.md` §7.
+- `screener/guard.py` — **garde-fou avant un trade (A1) + unité de temps de structure (A8)**,
+  issus du post-mortem des shorts du 22/11. `structure_tf(frames, start, end)` : TF où la plage
+  du climax fait ≥ 5 ATR **et** 20–80 bougies (la plus proche de 50 si plusieurs) ;
+  `StructureTF.header()` = ligne d'en-tête, `is_internal(span)` = niveau < 1 ATR de structure.
+  `check_trade(...)` : verdict **vert / orange / rouge** sur 9 points (cadre, niveau, position,
+  séance, stop ≥ 0,5 ATR au-delà de l'invalidation et pas collé à l'extrême 24 h, gain/risque ≥ 2,
+  tentatives ≤ 2, protection du gain (point mort +1 R, partiel +2 R), plan miroir). Rouge = un
+  point critique (cadre, niveau, stop, gain/risque, tentatives) en défaut. Seuils en tête du module.
+- `screener/journal.py` — **journal des trades (A7)** : CSV `journal/trades.csv` (heures de
+  Paris), `add` / `close` / `attempts_today` (→ point « tentatives » du garde-fou) /
+  `weekly_summary`. CLI `python -m screener.journal add|close|list|week`.
 - `screener/theory_table.py` — `build_theory_html` : mémo « Mémo théorie » (**HTML
   cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
   ses seuils de validité (vol×, spread ATR, clôture) **+ le comportement d'OI attendu**.
@@ -188,6 +199,25 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   (ex. « le tableau penche distribution, MAIS funding négatif + crowd déjà short = carburant
   haussier latent, la thèse est fragilisée »). Ne jamais tordre les tierces pour forcer le
   consensus : une divergence tierce **est** un signal, pas un bruit à gommer.
+- **Actions A1, A7, A8 ACTIVÉES** (Gauthier, 23/11/2026, après le dossier « Erreurs et takeaways
+  du short du dimanche 22/11 ») :
+  - **A8 — unité de structure déclarée** : en tête de **chaque** analyse et **chaque** suivi
+    (fil ou page), la ligne `structure_tf(...).header()` : TF qui commande + son ATR + la plage de
+    structure. Tout niveau tiré d'une plage < 1 ATR de cette TF est signalé « **niveau interne, ne
+    pas trader seul** ». Les TF basses (5m/15m) restent pour le *timing*, jamais pour fixer seules
+    entrée et stop. **Erreur à ne plus refaire** : 22/11, plage 5 min 60 464–60 965 (501 pts) =
+    0,8 ATR 1h, stops à 0,2–0,3 ATR 1h → balayés par le spring de 03h et la poussée de 04h.
+  - **A1 — garde-fou** : dès que Gauthier annonce une entrée (« je suis short à… », « je veux
+    renforcer ») ou que je propose une entrée, **avant le reste**, une ligne
+    `Garde-fou : VERT/ORANGE/ROUGE (n/9) — en défaut : …` via `guard.check_trade`, puis les points
+    en défaut avec leur valeur et leur seuil, et les prix de protection (point mort +1 R, partiel
+    +2 R). **Rouge = alerte, pas refus** (aide à la décision ; Gauthier tranche) : le dire en tête,
+    sans adoucir. Tentatives lues dans le journal (`journal.attempts_today`). Taille de position :
+    pas tant que le risque par trade n'est pas fixé par Gauthier.
+  - **A7 — journal** : chaque trade annoncé (entrée, stop, sortie) est **noté dans le journal**
+    (`screener.journal`) avec la raison, le verdict du garde-fou à l'entrée et, à la sortie, la
+    leçon. **Bilan hebdomadaire** (`weekly_summary`) proposé à la première analyse ou au premier suivi
+    de la semaine (lundi).
 - **Heure = heure de PARIS, jamais un décalage fixe** (demande de Gauthier, 20/11/2026). CET (UTC+1)
   de fin octobre à fin mars, CEST (UTC+2) l'été : `screener/clock.py` (`fmt`, `label`, `parse`,
   `wall_index`, `wall_sec`). Les données restent en UTC réel ; on convertit à l'affichage et à la
