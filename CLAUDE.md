@@ -119,7 +119,8 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   point critique (cadre, niveau, stop, gain/risque, tentatives) en défaut. Seuils en tête du module.
 - `screener/journal.py` — **journal des trades (A7)** : CSV `journal/trades.csv` (heures de
   Paris), `add` / `close` / `attempts_today` (→ point « tentatives » du garde-fou) /
-  `weekly_summary`. CLI `python -m screener.journal add|close|list|week`.
+  `weekly_summary`. CLI `python -m screener.journal add|close|list|week`. **Versionné** dans le
+  dépôt (public : choix de Gauthier, 23/11) → commit + push après chaque `add`/`close`.
 - `screener/theory_table.py` — `build_theory_html` : mémo « Mémo théorie » (**HTML
   cliquable**) listant, pour accumulation ET distribution, le rôle de chaque événement et
   ses seuils de validité (vol×, spread ATR, clôture) **+ le comportement d'OI attendu**.
