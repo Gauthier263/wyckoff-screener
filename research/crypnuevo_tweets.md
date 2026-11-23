@@ -378,3 +378,364 @@ Conventions graphes : sauf mention, « TradingView, BTCUSDT Binance ». Couleur 
 - Prévision : range 60-79k pour un mois ; LTF : rotation vers 65k (short ~70k), invalidation > 71k → long 73-74k. Or : long 4 400s, TP 4 700, max drop 1W50EMA.
 - Outils / concepts : range extremes only, LTF rotation, acceptance invalidation, wick 50 %/100 % (or), EMAs catch up, 1W50EMA.
 
+## 2026-03-24 13:02 UTC — https://x.com/CrypNuevo/status/2036428519345926569
+- Texte : $GOLD / $XAU: I believe the bottom for Gold is in around the 1W50EMA ($4100). Price didn't hit it exactly but left a long downside wick likely to fill. As the 1W50EMA rises, it should align with the full wick fill - that's where price likely completes the move and retests it.
+- Graphes : XAUUSD 1D (OANDA) : « 50% of the wick » ~4 320, « 100% of the wick » ~4 100 (lignes jaunes) ; « 1W50EMA » violette ~4 050 montante ; prix 4 381.
+- Prévision : bottom de l'or ~4 100 = remplissage 100 % de la mèche + retest de la 1W50EMA.
+- Outils / concepts : wick fill 100 %, 1W50EMA support, confluence.
+
+## 2026-03-27 12:33 UTC — https://x.com/CrypNuevo/status/2037508373793447966
+- Texte : $BTC update: Price is rotating towards our $65k level for the week. On the higher timeframe, this could still likely develop a big boring range throughout April too. At least, that's where I see Price Action going for now. Swing traders will need to stay patient.
+- Graphes : (1) BTC 8h 27/03 : « SWING TRADE » 79k (short) / 60k (long, petite zone grisée ~60,5-61,5k) ; 8h50EMA ~70k ; prix 66 590 ; même projection pointillée que le 22/03 (60,5k fin mars → 71k → chop avril → sweep ~59k début mai → ~77k). (2) = graphe 4h du 22/03.
+- Prévision : rotation vers 65k ; gros range ennuyeux en avril.
+- Outils / concepts : range, patience swing.
+
+## 2026-04-05 18:53 UTC — https://x.com/CrypNuevo/status/2040865374485299674 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: Difficult conditions to trade as Price Action is basically driven by the US-Iran war and Trump's tweets. Therefore, I'm only looking to trade the extremes of this range. For now, I'm favoring the range lows to hit first, where I'll look for longs. ↓(1/5)
+  2. There are some HTF liquidations between $64k-$64.5k. This adds fuel a move lower. I don't see conclusive data on LTF liquidations. Note: LTF liquidations are usually more reliable than HTF liquidations because the positions are less likely to be closed (less time has passed).
+  3. $GOLD / $XAU: Potential rejection at the 1D50EMA and, depending A LOT of the coming news, price could revisit the lows around $4100 where I'd expect price to form the bottom. That's what the chart tells me but... what needs to happen for gold to drop another -10% again?
+  4. Another week that requires patience and monitoring the situation in Middle East. Trump keeps moving the deadline while hoping to reach a deal (now it's Tuesday 8:00 PM ET time). And if they don't reach a deal, will the US carry out its threat to bomb power plants and bridges?
+  5. New Blofin trading competition … (promo).
+- Graphes :
+  - (1) BTC 1D : 1D50EMA ~70,5k ; lignes 79k (haut) et ~60k (bas, « SWING TRADE » zone grisée ~60,5-62k) ; prix 67 285 ; projection pointillée : chute vers ~61k mi-avril, rebond ~70k, oscillation 63-70k, sweep ~59,5k fin mai, puis montée ~77k.
+  - (2) Hyblock heatmap (lookback 1 mois, 15 min, 05/04) : bande jaune encadrée en rouge 63,7-64,6k (longs) ; bandes plus faibles ~72-73,5k.
+  - (3) XAUUSD 4h : rejet sur la 1D50EMA (ligne jaune ~4 800) ; chemin : baisse vers zone grisée « 1W50EMA + long wick fill » ~4 100-4 200 (~8-9 avril) puis rallye vers ~5 000.
+- Prévision : range lows d'abord (liquidations HTF 64-64,5k), longs en bas de range ; or : rejet 1D50EMA, bottom ~4 100.
+- Outils / concepts : range extremes, HTF vs LTF liquidations (LTF plus fiables), 1D50EMA rejet, 1W50EMA + wick fill.
+
+## 2026-04-12 21:57 UTC — https://x.com/CrypNuevo/status/2043448381671092296 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: It's the clearest chart in a long time: Nothing to do here at mid-range - wait for price to trade at one of the extremes, probably this week or the next. • I'll look for swing shorts at $79k-$80k • I'll look for swing longs at $61k-$59k ↓(1/4)
+  2. I suppose that the HTF liquidations at $64k will probably pull price to the bottom of the range first. But the key here is to be patient and not care which level comes first. There isn't a reward worth the risk for opening a position here at the mid-range, it's too uncertain.
+  3. $GOLD / $XAU: I'm still looking at the 1W long wick around the 1W50EMA. Chart says that we could revisit $4,100 but we need the news to trigger the move. It'd be a shocking -13% move. Gold is acting different in this war, it pumps in peace talks and drops in escalation news.
+  4. $CL: Based on the latest US-Iran news, the negotiations are not going well and crude oil futures should open up tonight and pump at the start of the week. I've speculated and opened a long in Blofin ($CLUSDT is the ticker) … (lien ref)
+  5. I know this Price Action in Bitcoin is not fun and, in fact, it's very boring. It's also exhausting for us all to constantly follow the news. But try to remain patient, trade other assets meanwhile. If you become patient, you'll overtrade and make mistakes. Wait for key levels.
+- Graphes :
+  - (1) BTC 1D + EMA (1D50EMA 70 756) : « SWING TRADE » short à 79k (flèche de rejet vers ~72k) et long zone grisée ~60,5-61,5k ; prix 71 303 ; projection pointillée : descente vers ~60,5k (début mai), chop 64-69k, sweep ~59k (fin mai), puis ~77k (juin).
+  - (2) Hyblock heatmap (1 mois, 15 min, 12/04) : forte bande ~64-64,5k ; bandes 72,5-74k partiellement touchées.
+  - (3a) XAUUSD 4h : rejet sous la 1D50EMA ~4 780 ; chemin vers zone « 1W50EMA + long wick fill » ~4 150-4 200 (~20 avril) puis rallye ~5 300. (3b) XAUUSD 1W : flèche « Long wick 1W » (~4 100, semaine du 23/03) ; EMAs.
+  - (4) CL (Light Crude futures NYMEX) 12h : prix ~95,6 sur l'EMA ~95 ; flèche haussière vers ~108.
+- Prévision : BTC swing short 79-80k / swing long 61-59k ; rien au mid-range ; probablement bas de range d'abord (liquidations 64k). Or : retour 4 100 si news. Pétrole : long à l'ouverture des futures.
+- Outils / concepts : mid-range = no trade, range extremes, HTF liquidations comme aimant, 1W long wick + 1W50EMA, trading de l'ouverture des futures du dimanche.
+
+## 2026-04-12 22:04 UTC — https://x.com/CrypNuevo/status/2043450104682561916
+- Texte (réponse à @hazamathetrader) : ???? It's the same analysis as this week, I didn't trade Bitcoin - just waiting for range highs or range lows to hit. "Therefore, I'm only looking to trade the extremes of this range. For now, I'm favoring the range lows to hit first, where I'll look for longs."
+- Graphes : capture de son tweet du 05/04.
+- Prévision : inchangée (extrêmes du range).
+- Outils / concepts : range extremes.
+
+## 2026-04-19 19:07 UTC — https://x.com/CrypNuevo/status/2045942267458822397 (fil « Sunday update », 4 tweets)
+- Texte :
+  1. $BTC Sunday update: Strait of Hormuz fully closed, Iran rejected taking part in Round 2 of negociations and Trump is trapped in this war again. Feels like a dead-end so my take is that we'll see some further escalation before de-escalation. Just trade the range. ↓(1/4)
+  2. I filled my smallest short order at $78k, and if price pushes to $80k, I'll fill some more. I expect that Bitcoin will continue trading in this range for the next month, although it's unknown how much it'll pump when the war is fully over. So for now, I'm trading the range.
+  3. $GOLD / $XAU: This uncertainty and escalation of the conflict could likely push oil up and gold down. Gold has a long wick to the downside that makes me think that we'll likely fill it at some point. If/when it fills it, I'll go full size swing long again. Until then, caution.
+  4. $CL: Based on the latest US-Iran news, crude oil futures should open up tonight and pump at the start of the week. I've speculated and already opened a new long in Blofin ($CLUSDT is the ticker) before the futures market open … (lien ref)
+- Graphes :
+  - (1) BTC 1D : 1D50EMA ~72k ; « SWING TRADE » 79k (flèche de rejet) et ~60k (zone grisée) ; prix 75 050 ; projection pointillée : rejet à 79k → ~61k (mi-mai) → chop → sweep ~59,5k (fin juin) → ~77k (juillet).
+  - (3a) XAUUSD 1D : deux ellipses orange (canaux de reprise après les longues mèches de février ~4 400 et de mars ~4 100), étiquettes « Long wick ». (3b) XAUUSD 1D : 1D50EMA ~4 800, « Liquidity trendline » orange montante ; chemin : cassure de la trendline → zone « 1W50EMA + long wick fill » ~4 150 (début mai) → rallye ~5 300.
+  - (4) CL 12h : flèche haussière (même logique que le 12/04).
+- Prévision : BTC reste dans le range un mois ; short partiel 78k, ajout 80k. Or : remplissage de la mèche puis long full size. Pétrole : long.
+- Outils / concepts : range trading, scaling in (ordres échelonnés), liquidity trendline, wick fill, 1W50EMA.
+
+## 2026-04-21 18:18 UTC — https://x.com/CrypNuevo/status/2046654894820467110
+- Texte : $GOLD / $XAU: Gold has lost the 1D50EMA and it's already going for the liquidity trapped below the trendline. We'll see if it's a fake out or not. If it drops back to $4500, it'll make the retest to our ambitious level $4100 much more likely.
+- Graphes : (1) XAUUSD 4h 21/04 : 1D50EMA perdue, « Liquidity trendline » cassée, chemin de baisse ; zone « 1W50EMA + long wick fill » ~4 150-4 200 puis grande flèche haussière ~5 300 ; « Long wick » sur le creux de mars. (2) = graphe 1D du 19/04.
+- Prévision : retour à 4 500 → retest 4 100 plus probable.
+- Outils / concepts : liquidity below trendline, 1D50EMA perdue, fake-out.
+
+## 2026-04-22 10:06 UTC — https://x.com/CrypNuevo/status/2046893451342471586
+- Texte : $BTC update: I'm looking to short a deviation above the range highs, in the area between $79k-$81k where we could see price losing momentum and forming a local top. Overall, I'm expecting price to stay in this range for some more time.
+- Graphes : BTC 8h + EMA (73 849) : « SWING TRADE » zone 79,5-81k au-dessus de la ligne des range highs ~79,2k ; chemin : mèche ~80,5-81k puis chute vers ~73k ; prix 78 043 ; bas de range 60 150.
+- Prévision : short d'une déviation au-dessus des range highs (79-81k).
+- Outils / concepts : range high deviation, perte de momentum, local top.
+
+## 2026-04-22 16:49 UTC — https://x.com/CrypNuevo/status/2046994701069275434
+- Texte : $CL before and after 3 days later: +11% since our Sunday evening call. Traded in Blofin a few hours before the Futures market open when we had all the info and news that were going to trigger that move. Use exchanges in your favor and trade in Blofin … (lien ref)
+- Graphes : (1) CL 4h « avant » : chute vers ~88 puis flèche de retour vers une zone ~95-97 ; (2) « après » (+11 %, non détaillé) ; (3) = graphe CL du 19/04.
+- Prévision : bilan (+11 %).
+- Outils / concepts : trading du week-end avant l'ouverture des futures (news).
+
+## 2026-04-22 22:02 UTC — https://x.com/CrypNuevo/status/2047073460577313145
+- Texte : Am I the only one tired of constantly monitoring US-Iran news? It's making trading more difficult since it's depending a lot on Trump's tweets and announcements. Having fun on futures open on Sundays tho. Hoping that this conflict ends soon and we all can trade more comfortably
+- Graphes : aucun. Prévision : —. Outils / concepts : marché piloté par les news.
+
+## 2026-04-26 22:01 UTC — https://x.com/CrypNuevo/status/2048522919110660603 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: I've been patiently waiting for this setup to happen since 15th March. Now, price is really close to hit my area for a swing trade attempt ($80k-$81k). Based on the idea that we could range for another month, we could see a deviation here. ↓(1/5)
+  2. This week will be very eventful and volatile. Not only because the US-Iran news but we also have FOMC on Wednesday. The interest rate decision will be almost irrelevant, the market is pricing at 99% UNCHANGED rates. But Jerome Powell's pess conference could bring volatility.
+  3. High time frame liquidations: In confluence to our swing trade idea, we see an interesting amount of liquidations at $80k and at $70k. Price could take the upside liquidations first in a range highs deviation, before going for the lower ones at $70k mid-range.
+  4. $GOLD is following our ambitious projection so far. If we get a retest of $4100-$4200 anytime over the next 2 months, I'll take a full size long from there. It'd be the clearest swing trade of the year imo since it'd be filling a long wick and retesting the 1W50EMA support.
+  5. I trade on Blofin because it's an all-in-one exchange … (promo).
+- Graphes :
+  - (1) BTC 8h + EMA (~75,8k) : zone « SWING TRADE » 79-81k (encadré) au-dessus de la ligne ~79,2k ; chemin : mèche ~81k puis chute vers ~72k ; zone basse ~59,5-61,5k (fin mai-juin).
+  - (3) Hyblock heatmap (1 mois, 15 min, 26/04) : deux cadres rouges : ~79,7-80k (shorts) et ~70-70,4k (longs).
+  - (4) XAUUSD 1D = graphe du 19/04 (1D50EMA, liquidity trendline, cible 1W50EMA + wick fill ~4 150) ; second graphe or (non détaillé).
+- Prévision : déviation au-dessus des range highs (80-81k) pour prendre les liquidations, puis vers 70k (mid-range). FOMC mercredi. Or : long full size sur retest 4 100-4 200 sous 2 mois.
+- Outils / concepts : range high deviation, HTF liquidations des deux côtés (80k / 70k), mid-range cible, FOMC.
+
+## 2026-04-30 21:37 UTC — https://x.com/CrypNuevo/status/2049966383153254892
+- Texte : $BTC update: Price pushed higher to our zone and made a new local high this week $79.5k. I'm positioned to the downside but I still have a few orders that didn't trigger between $80k-$81kk. On Sunday we'll analyse if price can make a new high before reversing or if that was it
+- Graphes : (1) BTC 1D + 1D50EMA (73 670) : zone « SWING TRADE » 79-81k ; plus haut local 79,5k ; chemin de rejet vers ~71,5k ; zone basse 59,6-61k (fin mai-juin) ; prix 76 360. (2) = graphe 8h du 26/04.
+- Prévision : short en place ; ordres restants 80-81k.
+- Outils / concepts : local top, scaling.
+
+## 2026-05-01 18:46 UTC — https://x.com/CrypNuevo/status/2050285631486513456 (fil hors marché crypto, 6 tweets)
+- Texte : Imagine you have $45,000 today. You have two choices for the next 25 years: A) Leave it in the bank: inflation melts it down to roughly $18,000 purchasing power B) Move it into a buy-to-rent property investment: it turns into $377,000 … (suite : levier et temps, « positive debt », hypothèque fixe vs loyers indexés, optimisation fiscale via @CriptoLegal_Es, résultat 25 ans : valeur 284 000 $, cashflow 93 000 $, total 377 000 $).
+- Graphes : visuels de simulation immobilière (non détaillés, hors marché).
+- Prévision : —. Outils : —.
+
+## 2026-05-01 18:55 UTC — https://x.com/CrypNuevo/status/2050287893210345614
+- Texte (réponse à @Rory_Shamrock, hors marché) : appartment* sorry. Most markets have those prices for 1 or even 2 bedroom flats. Just don't look at New York, Barcelona, London, etc.
+- Graphes : aucun. Prévision : —. Outils : —.
+
+## 2026-05-01 19:22 UTC — https://x.com/CrypNuevo/status/2050294842320703893
+- Texte (réponse à @Mehdonarika, hors marché) : I buy you that reasoning in a specific case like Japan where the birth rate is going down and inmigration is very limited. But for example in Europe, population decline from low birth rates is already being offset, and in some cases even exceeded, by immigration.
+- Graphes : aucun. Prévision : —. Outils : —.
+
+## 2026-05-06 11:01 UTC — https://x.com/CrypNuevo/status/2051980550164955312
+- Texte : $BTC update: Price pushed up to a new high and hit retail's short stop-losses. Although price is overextended, I don't see momentum shifting just yet. I'm sidelined for now waiting for a trade: A) Signs of exhaustion: short. For this I need to pay attention to the volume. I do really want to see one last big green candle with a lot of volume which would indicate that the MM is selling most of his position. And that's when red candles will follow to restore balance in the chart and correct to the 4H50EMA to fix the current price overextension. B) Sideways consolidation at 1H/4H EMAs: long to 1W50EMA. "Acceptance above an area" comes from a solid retest/consolidation of said area. I don't want to long and that the case A happens straight after. So for that I need to see price stop pushing higher and simply HOLD here, wait for EMAs to catch up to price and then it can continue running up in a sustanaible way. If this happens, it could take days and form a trade for next week. Conclusion: Personally, mostly waiting for A) case to happen to trade again this week since it could happen today or tomorrow. Ideally it continues pushing straight higher without any exhaustion signs and it will overextend price even more so the short will be more atractive and worth it when we see those signs at higher prices. Case B) should take longer to form and it's interesting, but again, probably for Friday or next week. Not a trade for today or tomorrow like potentially case A). I'll keep you updated!
+- Graphes : (1) BTC 1D du 03/05 (Sunday update non retrouvé par la recherche) : « Range highs » zone 79,3-81,5k, « Range lows » 60 150 ; 1D50EMA ~74,2k et EMA longue ~86k ; « Wait » ; scénario rouge « Acceptance back inside the range? Swing short. » vers la zone bleue ~71-73,3k ; scénario vert « Acceptance above $81k-$82k? Scalp long. » vers ~86k. (2) même graphe le 06/05 : prix 82 247 au-dessus des range highs.
+- Prévision : A) signes d'épuisement (grosse bougie verte à fort volume) → short vers la 4h50EMA ; B) consolidation sur les EMA 1h/4h → long vers la 1W50EMA. Attente.
+- Outils / concepts : overextension, exhaustion volume (MM qui distribue), EMAs catch up, acceptance = retest/consolidation, stop hunt des shorts retail.
+
+## 2026-05-06 14:10 UTC — https://x.com/CrypNuevo/status/2052028107469599125
+- Texte : $CL: Crude Oil dropped 10% since our short call on Sunday night. Closed my short trade and I'll look for a possible new >$100 entry to short it again. In Blofin you can trade it at the weekend before the futures open, great advantage of this exchange. (cite : « I'm done with longing crude oil - I believe Trump will likely end this war very shortly, in 1-2 weeks… »)
+- Graphes : (1) CL 1D : trois sommets numérotés 1 (~118), 2 (~113), 3 (~110) (three taps), chemin de baisse vers une zone orange ~68-71 (gap) début juin ; (2) graphe de résultat (non détaillé).
+- Prévision : pétrole : nouveau short au-dessus de 100.
+- Outils / concepts : three taps (sommet), gap fill, catalyseur fin de guerre.
+
+## 2026-05-10 19:56 UTC — https://x.com/CrypNuevo/status/2053564775813025879 (fil « Sunday update », 4 tweets)
+- Texte :
+  1. $BTC Sunday update: We waited for the price to settle and now we have clearer Price Action. Price has found acceptance above $81k and the EMAs have caught up. Therefore, we're expecting price to potentially push higher to $84k-$85k next week. ↓(1/4)
+  2. As a trader, if I think that price could make a new local high, then I must look for lower entries. That would ideally be at the 4h50ema, virtually matching the CME gap that Bitcoin is creating over the weekend. Invalidation is acceptance back into the range below $79k.
+  3. There are liquidations on both sides. Although there are more to the downside, the current upside momentum could easily trigger the short liquidations at $83.2k first. Probably short liquidations first, and then we'll analyse if long liquidations could be the next target.
+  4. $CL: We're expecting Crude Oil prices to drop as soon as the US-Iran conflict ends - so we're favoring shorts in this trend. Prediction markets are forecasting stability for tomorrow, so I won't open shorts ahead of the futures opening and I'll short a future spike towards $100
+- Graphes :
+  - (1a) = graphe 1D du 03/05. (1b) BTC 1D 10/05 : prix 81 296 dans la zone des range highs ; chemin : chop puis « Acceptance above $81k-$82k? Scalp long. » vers l'EMA longue ~86k.
+  - (2a) BTC 4h : zone 79,3-81,3k ; 4h50EMA ~80k ; chemin : creux sur l'EMA (~80k) puis montée vers une ligne à 85k ; croix (invalidation) sous 79k. (2b) watchlist TradingView : BTCUSDT 81 465 vs BTC1! (CME) 80 385 → gap CME du week-end.
+  - (3) Hyblock heatmap LTF (7 jours, 5 min, 10/05) : bande de shorts ~83k (82,9-83,2k) ; bandes de longs 78,5-79,2k et ~77,2k.
+  - (4) CL 4h : trois sommets 1-2-3, petit rebond (jaune) puis chute vers la zone ~67-70 ; second graphe CL (non détaillé).
+- Prévision : acceptance > 81k → 84-85k (1W50EMA) ; entrée long sur la 4h50EMA ≈ gap CME ; invalidation = retour sous 79k. Liquidations shorts 83,2k d'abord.
+- Outils / concepts : acceptance above level, EMAs caught up, 4h50EMA entry, CME gap, LTF liquidations, invalidation.
+
+## 2026-05-13 17:54 UTC — https://x.com/CrypNuevo/status/2054621413156266119
+- Texte : $BTC update: Bitcoin is at the most important level. If it holds the range highs here, then it'll push towards the 1W50EMA at $84k-$85k. But a failure to hold this level could trigger a rotation back to the mid-range, potentially exposing range lows if momentum doesn't shift. (cite un post « BREAKING: Our traders forecast Bitcoin will crash to $60,000 this year »)
+- Graphes : (1) BTC 1D 13/05 : prix 79 420 sur la zone des range highs (79,3-81,5k) ; 1D50EMA ~76,5k ; EMA longue ~86k ; Range lows ~60,2k. (2) logo Bitcoin du post cité (marché de prédiction).
+- Prévision : tenir les range highs → 84-85k (1W50EMA) ; échec → mid-range puis range lows.
+- Outils / concepts : S/R flip sur range highs, 1W50EMA, mid-range rotation.
+
+## 2026-05-18 09:19 UTC — https://x.com/CrypNuevo/status/2056303543997399497
+- Texte (hors marché) : I had a fantastic weekend in Barcelona, enjoying @MotoGP and the city! I can't wait to watch another race soon. I'll be back posting charts this evening
+- Graphes : photos personnelles (non détaillées). Prévision : —. Outils : —.
+
+## 2026-05-18 09:24 UTC — https://x.com/CrypNuevo/status/2056305029762494581
+- Texte (promo) : By the way, using the KAST card to pay in crypto for real life expenses like travelling is a great option. You even get a 1.5% cashback with the free standard card. (lien ref)
+- Graphes : visuel promo. Prévision : —. Outils : —.
+
+## 2026-05-19 14:49 UTC — https://x.com/CrypNuevo/status/2056749023470465140
+- Texte : $BTC update: Now that it's confirmed that Bitcoin only deviated above the range highs (we're back inside the range), I'm sticking to the previous BTC Sunday update analysis. The retrace of the Liquidity Pool at $71k is probable. A retest & rejection at $79k is possible. (cite le Sunday update du 17/05, non retrouvé par la recherche : « Price is testing the resistance of the range highs… »)
+- Graphes : (1) BTC 12h 19/05 : déviation au-dessus des range highs (mèche ~82,5k) puis retour dans le range ; « RETEST? » zone orange ~78,5-79,3k ; chemin : retest puis chute dans la zone bleue « Liquidity Pool (LP) » ~71-73,3k ; zone range lows ~60k (fin mai-juin). (2) BTC 12h du 03/05 : « SWING TRADE » au-dessus de ~81,5k puis chute vers la LP 71-73,3k.
+- Prévision : retracement probable vers la liquidity pool 71k ; retest/rejet 79k possible.
+- Outils / concepts : range high deviation confirmée, liquidity pool, retest & rejection.
+
+## 2026-05-19 14:52 UTC — https://x.com/CrypNuevo/status/2056749766654951569
+- Texte (promo) : If anyone wants to lock in some extra rewards, Blofin is starting a trading competition today. It's a great non-KYC option that I've been trading on for the past years. I suggest checking it out and taking advantage of the volume.
+- Graphes : aucun. Prévision : —. Outils : —.
+
+## 2026-05-20 17:33 UTC — https://x.com/CrypNuevo/status/2057152673703481443
+- Texte : I can humbly acknowledge that this Bitcoin price action hasn't suited me as well as usual. I did well patiently waiting for price to reach one of the range extremes, but this time, at range highs - where I usually perform best - I ended up mixing a few signals that prevented me from trading it with my usual confidence. However, as an experienced trader, I recognized this early enough and shifted my focus mainly toward Gold and Oil this month (50% Gold – 40% CL – 10% BTC). Interestingly enough, I still managed to maintain a 100% win rate this month, and it ended up being the best performing 30-day period of the year for the investors' copytrading portfolio with +10% up.
+- Graphes : statistiques copy trading (non détaillées).
+- Prévision : —.
+- Outils / concepts : allocation multi-actifs, discipline.
+
+## 2026-05-20 17:44 UTC — https://x.com/CrypNuevo/status/2057155429289890190
+- Texte (réponse à @omzcharts) : Glad to see I'm not the only one, thanks Omz! I agree, in the bigger picture, this is over the last 90 days and only 53% of my trades were on Bitcoin which is just very odd compared to my usual 85%-90% allocation.
+- Graphes : capture de statistiques (non détaillée). Prévision : —. Outils : —.
+
+## 2026-05-20 19:56 UTC — https://x.com/CrypNuevo/status/2057188695724187689
+- Texte : $CL: The kind of news I like. Just 10 days ago, we analysed a spike from $94 to ≥$100. In that move, I built a short position and I'll scale in higher even if this news fails and price spikes again, because I believe a peace deal will happen soon in Trump's best interests. (cite « BREAKING: US is in "final stages" of negotiations with Iran »)
+- Graphes : graphes CL avant/après (non détaillés).
+- Prévision : pétrole short, scaling plus haut si spike.
+- Outils / concepts : scaling in, catalyseur paix.
+
+## 2026-05-21 22:49 UTC — https://x.com/CrypNuevo/status/2057594557089366448
+- Texte : $BTC update: Exploring this scenario in detail I noticed some liquidations appearing in the $79.4k area which matches the range highs. Then, I drew my execution trigger and my invalidation - always prepared for potential setups so I know how to react.
+- Graphes : (1) BTC 1D + 1D50EMA (76 806) : « RETEST? » zone orange 78,5-79,3k ; annotation « Execution: wait/add size once price breaks below 1D50EMA after retesting range highs first » ; « Invalidation: price to push above the range highs ($80k) » (flèche rouge vers le haut) ; cible « Liquidity Pool (LP) » 71-73,3k ; range lows ~60k. Prix 77 644. (2) Hyblock heatmap LTF (7 jours, 5 min, 21/05) : flèches rouges sur les bandes ~79,5k (forte) et ~78,4k. (3) = graphe 12h du 19/05.
+- Prévision : retest des range highs (liquidations 79,4k) puis short ; ajout sous la 1D50EMA ; cible LP 71-73k ; invalidation > 80k.
+- Outils / concepts : execution trigger, invalidation, 1D50EMA break, liquidation cluster = range highs, liquidity pool.
+
+## 2026-05-22 12:19 UTC — https://x.com/CrypNuevo/status/2057798541347545294
+- Texte : Last 90 days performance for transparency: • 34/34 • +16.60% Not forcing much, just letting the setups come to our levels and executing and scaling positions with patience. Planned trades + low leverage is the way. Let's see what the next few months bring, feeling good.
+- Graphes : capture de performance (non détaillée).
+- Prévision : —. Outils / concepts : planned trades, low leverage, scaling.
+
+## 2026-05-22 13:03 UTC — https://x.com/CrypNuevo/status/2057809701543317715
+- Texte (réponse à @Mgdioz) : It's the exchange interface with direct automatic data from the trades, and the investors have access to that interface too
+- Graphes : aucun. Prévision : —. Outils : —.
+
+## 2026-05-22 13:14 UTC — https://x.com/CrypNuevo/status/2057812285083545931
+- Texte (réponse à @CobbleColbs) : If it's possible it can be done. And if they were BE/early profits it wouldn't be up +16%. Just some good 3 months locked-in, usually it would be around 85%-90%, and of course it's hard that it'll be 100% in the next new 3 months too.
+- Graphes : aucun. Prévision : —. Outils : —.
+
+## 2026-05-22 13:20 UTC — https://x.com/CrypNuevo/status/2057813798661087508
+- Texte (réponse à @akashku74072411) : I always trade with more than one entry, usually 2, 3 or 4 entries. I start with just 15%-25% total portfolio size in the first order and then I scale into the position with 70% max. I'm willing to temporarily stay in a losing trade if I'm still confident and scaling as planned
+- Graphes : aucun.
+- Prévision : —.
+- Outils / concepts : scaling (2-4 entrées, 15-25 % puis 70 % max).
+
+## 2026-05-28 12:22 UTC — https://x.com/CrypNuevo/status/2059973500794704341
+- Texte : $GOLD / $XAU: Perfectly following the projection +1 month later. It's the swing trade that I'm more interested in across all markets at the moment, so I'm hoping that it eventually hits my buy zone. Fill the wick + 1W50EMA retest.
+- Graphes : (1) = graphe 1D du 19/04 (ellipses) ; (2-4) graphes or mis à jour (même projection vers la zone 1W50EMA + wick fill ~4 150, non détaillés) ; (5) = graphe du 19/04.
+- Prévision : or : achat zone wick fill + 1W50EMA.
+- Outils / concepts : wick fill, 1W50EMA.
+
+## 2026-05-31 21:12 UTC — https://x.com/CrypNuevo/status/2061194079246201028 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: This is the trade that I'll try to get this week: I see a long wick to the downside between $73k-$72.5k - price tends to retrace these type of long wick imbalances. So I'll favor and look for longs in that zone if it hits. But, to what target? ↓(1/5)
+  2. Into $75k. There is a CME Gap exactly at $75.4k - the last one EVER. CME Bitcoin futures market will trade 24/7 from now so we won't see any more new Fri-Mon gaps. They usually get filled within one week and, for being the last one, traders will probably trade towards it.
+  3. So I'm looking for a W pattern. It's a double-bottom structure that usually happens to hit long stop losses before reversing price back up. Price has dropped 10% in the last 20 days, so we could see soon the trend changing to sideaways/consolidation or even a relief rally.
+  4. One of the signs that we see are these wicks to the downside but price not progressing any further. Looks like MMs don't intend, at least for now, to break through that zone and they're building longs there. So I'll be interested to long if we revisit that area with a new wick
+  5. If anyone wants to get some passive rewards … (promo Blofin).
+- Graphes :
+  - (1) BTC 1h + 1h50EMA (~73,9k) : « 50% wick » 72 791,61 et « 100% wick » 72 512,49 ; prix 73 600.
+  - (2) BTC CME futures (BTC1!) 15 min : zone « CME GAP » ~74,8-75,4k (haut 75 405).
+  - (3a) BTC 1h : même graphe + chemin : creux ~72,7k (entre 50 % et 100 % de la mèche) puis montée vers 75,4k. (3b) BTC 4h : W dessiné : premier creux ~72,3k, rebond, second creux sur les lignes 50 %/100 % de mèche, puis montée ~75,4k ; 4h50EMA ~75k.
+  - (4) BTC 12h + EMA (~76,5k) : rectangle « Wicks to the downside but price not progressing any further » ~72,6-73,5k ; flèche vers ~75,5k.
+- Prévision : long 73-72,5k (wick fill) en W, cible gap CME 75,4k (dernier gap, rempli sous ~1 semaine).
+- Outils / concepts : long wick imbalance (50 %/100 %), CME gap, W pattern (stop hunt des longs), wicks sans progression = MM qui accumulent.
+
+## 2026-06-03 12:11 UTC — https://x.com/CrypNuevo/status/2062145223501709612
+- Texte : $BTC update: My last setup was wrong, sorry - price broke through that $72k area due to US-Iran escalation news. Bitcoin is at a key support now and the 4h50EMA is very overextended so we should get a quick recovery to $70k-$71k. That's what I'm trading at the moment. If that recovery takes place and then price falls again, we must pay attention to this current support because if it breaks, then price will trade towards the range lows. Still struggling to trade this BTC Price Action more than usual, but I'm sure I'll get back to my usual performance soon.
+- Graphes : BTC 1D + EMA courte (~72k) : « Range highs » ~79,3k ; « Support » pointillé orange ~65,8k ; « Range lows » ~60k (zone 59,5-61k) ; prix 67 084. Chemin : rebond à ~71k, rechute, cercle rouge « ? » sur cassure du support ~65,3k, descente aux range lows (fin juin), puis rallye vers ~80k (début juillet).
+- Prévision : rebond rapide 70-71k (sur-extension sous la 4h50EMA) ; si le support casse → range lows.
+- Outils / concepts : erreur assumée / invalidation, overextension vs 4h50EMA, support clé, range lows.
+
+## 2026-06-07 16:22 UTC — https://x.com/CrypNuevo/status/2063657770243555470 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: Price is back at the range lows of this 4-month range. I'm expecting a strong bounce here, not because it's a range since all of them eventually break, but because this drop was too sharp (-25% in 4 weeks) and is extremely overextended. ↓(1/5)
+  2. This volatile move down has practically hit all the long liquidations. In HTF, I think that given the current pessimistic market sentiment, short liquidations is what will fuel price next and those are at $80k, the range highs. So I think price will trade toward the range highs
+  3. This was an scenario I consistently mapped out 3-4 weeks ago so the possibility was always in the back of my mind - although the execution was bad. From here we should directly go to the mid-range at $70k, then maybe drop back to range lows before finally pushing to range highs.
+  4. This is my projection for the next 2 months (June-July): A potential Three Taps Pattern is forming here imo; just be mindful when/if we reach $69k-$70k from here since a potential retest of the range lows could happen after. And I'll look for +$80k after the possible retest.
+  5. If anyone wants to get some passive rewards … (promo Blofin).
+- Graphes :
+  - (1) BTC 1D + EMA courte (~65,6k) : « Range highs » ~79,3k ; « Range lows » ~60,2k (zone 59,3-61,5k) ; mèche ~59k ; prix 62 361 ; flèche vers ~79k (juillet).
+  - (2) Hyblock heatmap (1 mois, 15 min, 07/06) : « Liquidations hit! » (cadres ~64,7k et ~62k) ; « THE CURRENT EXISTING LIQUIDATIONS ARE HERE » cadre ~78,5-80,5k.
+  - (3a) = graphe 1D du 19/04. (3b) BTC 1D : range highs ~79,5k / lows ~60,2k avec arcs aux deux creux (février et juin) ; projection : montée ~70k (mid-range), retour aux range lows (mi-juillet), puis ~80k (fin juillet).
+  - (4) BTC 1D : « Range highs » ~79,3k, « Mid range » pointillé ~69,2k, « Range lows » ~60,2k ; cercles orange « Low Forms » (février), « Low Swept (Deviation) » (juin ~59k), « Low Retest » (mi-juillet) ; flèche « Recovery from overextension » vers le mid-range (fin juin), retour au retest, puis flèche vers ~89k (août).
+- Prévision : fort rebond (sur-extension -25 % en 4 semaines) vers le mid-range 70k, possible retest des range lows, puis > 80k (short liquidations aux range highs). Horizon juin-juillet.
+- Outils / concepts : overextension, liquidations longs consommées / shorts à 80k, Three Taps Pattern, deviation des range lows, mid-range, sentiment contrarian.
+
+## 2026-06-09 09:27 UTC — https://x.com/CrypNuevo/status/2064278256308601204
+- Texte : $GOLD / $XAU: I've been forecasting and waiting for this -11% drop in Gold over the last 1.5 months. It's finally here and I'm buying here (1W50EMA + wick fill). Most traders were calling a move in the opposite direction, and now are expecting more downside perfect!!
+- Graphes : (1) = graphe 1D du 19/04. (2) XAUUSD 1D 09/06 : 1D50EMA, liquidity trendline, baisse mesurée -11,4 % ; prix ~4 300 dans la zone « 1W50EMA + long wick fill » ~4 250-4 330 ; flèche haussière ~5 500. (3) = graphe du 19/04.
+- Prévision : achat de l'or 1W50EMA + wick fill.
+- Outils / concepts : wick fill, 1W50EMA, sentiment contrarian.
+
+## 2026-06-12 08:44 UTC — https://x.com/CrypNuevo/status/2065354472868520003 (2 tweets, promo)
+- Texte : I've just created a free VIP Telegram where I'll share all my Altcoin charts, educational content like a course and some tools I created. Requirements … (ref Blofin) / And you can also combine it with this new Blofin campaign: Deposit $500, get $100 …
+- Graphes : visuel promo. Prévision : —. Outils : —.
+
+## 2026-06-14 22:02 UTC — https://x.com/CrypNuevo/status/2066280050085777618 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: Still seeing a recovery to the mid-range $69k. From there, I'll look for signs of momentum decreasing and a potential rejection to close my long and set orders again at range lows for a possible Three Taps pattern. ↓(1/5)
+  2. These are some previous examples of this Three Taps Pattern: Second and third tap can be either a retest or a deviation, the order doesn't matter. In terms of liquidity, the deviation is to efficiently hit stop losses and trick breakout traders. Common range behaviour.
+  3. $GOLD / $XAUT: Swing long orders filled between $4250 and $4150 as I publicly set them 2 months ago when price was at $4800. We saw a little extension wicking down a bit lower but it's closing above the weekly candle above the 1W50EMA so I'm still sticking to the same analysis.
+  4. $CL (Crude Oil): A bit less interested in this one since I'm already positioned in this one and it's going well. Looking to add if it spikes up to $96-$98 but I really doubt it can happen. I see it going down lower and filling that gap (TP) anytime from now on. A nice one!
+  5. And that's it guys … (promo Telegram/Blofin).
+- Graphes :
+  - (1) BTC 1D 14/06 : même dessin Three Taps (Low Forms / Low Swept (Deviation) / Low Retest), mid-range ~69,2k, prix 63 958 ; EMA longue ~83k.
+  - (2) Exemples de Three Taps : BTC 8h (nov. 2022, ~15,6k) : taps 1-2-3 au même plancher, le 3e en déviation sous le niveau, puis rallye ; BTC 1h (~31,8k) : taps 1-2-3 au plafond, le 2e en déviation au-dessus, puis chute ; BTC 1h (~21,5k) : taps 1-2 (déviation)-3 au plancher puis rallye.
+  - (3) XAUT 1W + 1W50EMA : zone « Orders filled » ~4 150-4 250 ; flèche vers ~5 200.
+  - (4) CL 1D : trois sommets 1-2-3 avec trendline descendante rouge ; zone orange « GAP » ~67-70 ; chemin de baisse vers ~68 (fin juin) ; prix ~84.
+- Prévision : BTC : recovery jusqu'au mid-range 69k, rejet, nouveaux ordres en range lows (3e tap). Or : longs remplis 4 250-4 150. Pétrole : TP au remplissage du gap.
+- Outils / concepts : Three Taps Pattern (retest/déviation), mid-range, gap fill, 1W50EMA.
+
+## 2026-06-17 12:47 UTC — https://x.com/CrypNuevo/status/2067227628109480397
+- Texte (promo) : Sharing a whole 4-weeks trading course for free here. We start on Friday! Easy requirements … (ref Blofin)
+- Graphes : visuel promo. Prévision : —. Outils : —.
+
+## 2026-06-20 08:36 UTC — https://x.com/CrypNuevo/status/2068251663291342986
+- Texte : $BTC update: Nice +12% recovery (vs 15% I expected). Price was very overextended and we always see some kind of recovery to the EMAs. That might have been it. But, if price can reclaim $64k next week, then it's very likely that price makes a new local high (current is $67.3k)
+- Graphes : (1) = graphe 1D du 07/06 (Three Taps). (2) BTC 1D 20/06 : recovery jusqu'à ~67,3k puis retour à 63 452 ; même dessin.
+- Prévision : reclaim de 64k → nouveau plus haut local (> 67,3k).
+- Outils / concepts : recovery to EMAs, reclaim level.
+
+## 2026-06-20 15:56 UTC — https://x.com/CrypNuevo/status/2068362237215986015
+- Texte : $CL update: We're so close to complete this $102 → $68 setup in Crude Oil. Along with Gold, it's has been my most traded asset in Q2.
+- Graphes : (1) CL 1D (trois sommets → zone gap ~68-71) ; (2) mise à jour (non détaillée).
+- Prévision : pétrole proche de la cible 68.
+- Outils / concepts : three taps, gap fill.
+
+## 2026-06-21 15:35 UTC — https://x.com/CrypNuevo/status/2068719477789765845 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: Difficult to read the current LTF price action and this is an scenario that I'll be paying attention to: Acceptance above $64.5k will open the path to make a new local high, which is what I'm slightly leaning more towards. Let me show you my HTF. ↓(1/5)
+  2. This is my HTF projection: It's hard to tell if that recovery pump from the overextension is finished or not. So the key here is to stay fluid and just be prepared in case we find acceptance above $64.5k. The break-sign to test $60k range lows would be losing $62.2k, too late.
+  3. So I do see a better trade, with a longer run, to the upside. If it comes. It's a week to stay both patient and ready for the opportunity - if it doesn't trigger, I just won't trade it. Maybe we could see a false move to the downside on Monday to trick bearish market sentiment.
+  4. Also, if we get the three taps patten in this range, the third hit should ideally come later and not this close, almost inmediately, after the second hit. Otherwise, it won't draw in enough liquidity for a reversal and a lower drop would become more likely in that case.
+  5. Sharing my whole 4-weeks trading course for free … (promo).
+- Graphes :
+  - (1) BTC 1h + 1h50EMA : « Local resistance » 64,5k (orange) ; cercle bleu « Wait for this » (acceptance au-dessus) ; chemin : creux ~63,3k (faux mouvement du lundi), cassure de 64,5k, montée ~68k, chop, pic sur « HTF resistance (mid-range) » ~69k (pointillé), puis retour ~65,8k.
+  - (2) BTC 1D + 1D50EMA (~69,3k ≈ mid-range) : dessin Three Taps ; prix 64 208.
+- Prévision : acceptance > 64,5k → nouveau plus haut local vers le mid-range 69k ; perte de 62,2k → test 60k. Faux mouvement baissier possible lundi. 3e tap idéalement plus tard.
+- Outils / concepts : acceptance above local resistance, faux mouvement du lundi, Three Taps timing (liquidité), mid-range HTF resistance.
+
+## 2026-06-22 11:12 UTC — https://x.com/CrypNuevo/status/2069015740108140774
+- Texte : $BTC update: So far, so good. Positive vibes. We had the potential Monday's false move exactly to our level and price is now going to test the local resistance next. Breaking past that resistance in the NY session would increase the chances for this projection to be correct.
+- Graphes : (1) = graphe 1h du 21/06. (2) BTC 1h 22/06 : faux mouvement réalisé (petite zone ~63,4k), prix ~64,3k sous la résistance 64,5k. (3) = graphe du 21/06.
+- Prévision : cassure de 64,5k en session NY = projection renforcée.
+- Outils / concepts : Monday false move, session NY.
+
+## 2026-06-22 14:19 UTC — https://x.com/CrypNuevo/status/2069062627104301104
+- Texte (hors marché) : Happy to announce that I'm launching @VettedLabs with a close friend! We'll break down crypto projects, help you avoid potential rug pulls and criticize unethical practices. Here you can read my review and experience of this year's @BTCPrague. Appreciate the follow!
+- Graphes : visuels VettedLabs / BTC Prague (non détaillés). Prévision : —. Outils : —.
+
+## 2026-06-25 18:38 UTC — https://x.com/CrypNuevo/status/2070215020684665080
+- Texte : $BTC Nailed! Jokes aside, no trade since we didn't get any retest in the blue circle, price broke below that level so we didn't get the support/resistance (S/R) flip we needed to open a position. Time to wait for the next trade. I remain hesitant to open a long here even if it's range lows because I'm not convinced by the timing so I don't trust it right now- I expected the third tap a bit later.
+- Graphes : (1) BTC 1h 25/06 : cassure sous la « Local resistance » 64,5k sans retest dans le cercle bleu ; chute à 59 523 (mèche ~58,7k). (2) = graphe 1h du 22/06.
+- Prévision : pas de trade (pas de S/R flip) ; hésitant à longer les range lows (timing du 3e tap trop tôt).
+- Outils / concepts : S/R flip requis, timing du Three Taps.
+
+## 2026-06-26 12:32 UTC — https://x.com/CrypNuevo/status/2070485322459238614
+- Texte : $CL completed! From +$100s to $70: a 30% drop in 2 months. Very happy with the analysis and result of this setup that was a mix of geopolitical news and a gap or imbalance in price. At least I got this one right - maybe crude oil is my new edge
+- Graphes : graphes CL avant/après (gap rempli ~70, non détaillés).
+- Prévision : bilan pétrole (-30 %).
+- Outils / concepts : gap/imbalance fill, géopolitique.
+
+## 2026-06-28 20:25 UTC — https://x.com/CrypNuevo/status/2071329035167089111 (fil « Sunday update », 4 tweets)
+- Texte :
+  1. $BTC Sunday update: Seeing some wicks to the downside but price not progressing any further, which could mean long positions building up. The market will react to new US-Iran tensions tomorrow - holding tomorrow will substantially increase the chances of a recovery. ↓(1/4)
+  2. I still don't see it clear, so the key here is to stay fluid and patient. Acceptance above $61k will add confidence in this idea. So we need market holding on Monday and reclaiming $61k this week. For me, only then it makes sense to consider longing to reduce significant risk.
+  3. If that plays out, we'll complete this projection from 3 weeks ago. Invalidation is acceptance (not just a wick) below $57k because that would dismiss the idea of an deviation, and would trigger a new leg down to $52k.
+  4. Sharing my whole 4-weeks trading course for free … (promo).
+- Graphes :
+  - (1) BTCUSD 1D + 1D50EMA (~67k) : rectangles d'exemples passés où des mèches sans progression ont précédé un retournement (février ~71-72k → baisse ; fin mars ~65,5k → hausse ; mai ~82-82,5k → baisse ; fin mai ~77,5-78k → baisse) ; rectangle actuel ~58-59,9k, ligne 59 887,63 ; prix 59 570.
+  - (3a) = graphe 1D du 07/06 (Three Taps). (3b) BTC 1D 28/06 : relabel « Low Forms » (février), « Low Retest » (début juin), « Low Swept (Deviation) » (fin juin ~58k) ; « HTF resistance (mid-range) » ~69,3k ; flèche vers les range highs ~79k.
+- Prévision : tenir lundi + reclaim de 61k → long ; invalidation = acceptance (clôture, pas mèche) sous 57k → jambe vers 52k.
+- Outils / concepts : wicks sans progression = accumulation MM, acceptance vs wick, deviation des range lows, Three Taps, invalidation.
+
+## 2026-06-30 16:14 UTC — https://x.com/CrypNuevo/status/2071990791363273171
+- Texte (hors marché) : An absolutely essential read for those tempted to ape in this new KOL memecoin wave. Don't become their exit liquidity. Providing helpful analyses to protect crypto investors at @VettedLabs. (cite un article VettedLabs sur les memecoins de KOL)
+- Graphes : visuels de l'article (non détaillés). Prévision : —. Outils : —.
+
+## 2026-07-02 22:25 UTC — https://x.com/CrypNuevo/status/2072809005320425714
+- Texte : $BTC update: Good reaction so far from our long wick zone. We got many long wicks to the downside and price not falling through only told us that MMs were building long positions - we never got acceptance below $57k. If price holds $61k, I'm expecting price to reach $65k next.
+- Graphes : (1) BTC 1D 02/07 : même graphe de rectangles d'exemples ; prix 61 528, flèche haussière depuis le rectangle 58-59,9k. (2) = graphe du 28/06.
+- Prévision : tenir 61k → 65k.
+- Outils / concepts : long wick zone, accumulation MM, acceptance.
+
+## 2026-07-05 17:04 UTC — https://x.com/CrypNuevo/status/2073815257332490577 (fil « Sunday update », 5 tweets)
+- Texte :
+  1. $BTC Sunday update: It seems that I'm getting the flow back in Bitcoin and our projection is going well so far 1 month later. I'm mostly interested in the mid-range as a main target since it'll be a strong resistance for a TP. This is what I expect from this week: ↓(1/5)
+  2. There is an interesting accumulated amount of long liquidations, and the market usually rebalances this liquidity. So it's likely that at the start of the week we see either a sideways move or small retrace. It'll be a controlled move as long as we can hold the 4h50EMA ($61.5k).
+  3. The key behind this move was the multiple long wicks to the downside at support without price falling through. It's a common reversal sign that needs to be sustained by next weeks' PA. It's my main scenario at the moment, but Bitcoin feels fragile so I'm open to this idea too
+  4. There is a 1D long wick that I'm not paying too much attention to now - the range is holding OK so far. But, we need to be aware that if price finds acceptance below it, then it'll head directly to this long wick between $51k-$49k. That's the invalidation and bias change point.
+  5. Thank you for reading me another Sunday …
+- Graphes :
+  - (1a) = graphe 1D du 07/06. (1b) BTC 1D 05/07 : Three Taps étiqueté (Low Forms / Low Retest / Low Swept (Deviation)), prix ~62,6k, flèche vers ~79k via « HTF resistance (mid-range) » ~69k.
+  - (2a) Hyblock « Liquidation Levels » BTCUSDT Binance perp (05/07) : 443 niveaux de liquidation longs vs 67 shorts ; lignes de longs 57,5-62k (rose/orange), shorts 63,5-65k (bleu) ; panneau Delta encadré : « $14B worth of long liquidations, so 2 options: sideways or small retrace » (delta cumulé vert ~14 Md$). (2b) BTC 4h : « Sideways » ~62,5k puis hausse ~65,4k ; 4h50EMA ~61,5k ; mid-range ~69k pointillé. (2c) BTC 4h : « Retrace » vers ~61,5k puis hausse ~65k.
+  - (3) BTC 8h + 8h50EMA (~62k) : rectangle « Many wicks but price not progressing any further = MMs building long positions at lowest prices » 57,75-59,9k ; flèche haussière.
+  - (4a) BTC 1D 2024 : mèche du 05/08/2024 avec « 50% WICK » ~51,3k et « 100% WICK » ~48,9k. (4b) BTC 1W + 1W50EMA (~81k) : « Range highs » ~80k, « Mid range » ~70k, « Range lows » ~60k ; « Deviation? » au creux actuel ; chemin « Risk » : acceptance sous le range → 50 % de la mèche ~51k (100 % ~49k).
+- Prévision : début de semaine sideways ou petit retracement (rééquilibrage des 14 Md$ de longs) tant que la 4h50EMA (61,5k) tient ; cible principale mid-range ~69-70k. Invalidation / changement de biais : acceptance sous les range lows → 51-49k.
+- Outils / concepts : Hyblock Liquidation Levels + Delta liquidations, rééquilibrage de liquidité, 4h50EMA, wicks sans progression, 1D long wick 2024 (50 %/100 %), invalidation.
+
