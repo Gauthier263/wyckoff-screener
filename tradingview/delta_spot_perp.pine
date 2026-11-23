@@ -1,0 +1,102 @@
+// Delta agressif SPOT vs PERP sur un même panneau (TradingView, Pine v6).
+// Marche sur n'importe quel graphe (BTCUSDT spot, BTCUSDT.P, autre échange) :
+// les deux deltas sont toujours demandés sur les symboles en entrée, pas sur le graphe.
+//
+// Méthode : Pine n'expose pas le taker_buy de Binance. Le delta est reconstruit
+// en intrabar (request.security_lower_tf) : volume d'une bougie intrabar haussière = achat,
+// baissière = vente (doji : clôture vs clôture précédente). C'est la méthode du
+// "Volume Delta" natif de TradingView.
+// Contrôle vs le vrai delta taker Binance (spot, 1m→1h, 18 h) : corrélation 0.92,
+// même signe 89 % des barres, mais amplitude ~5× trop forte → comparer en z-score (σ),
+// pas les valeurs brutes avec celles du screener Python.
+//@version=6
+indicator("Delta Spot vs Perp", shorttitle = "Δ Spot/Perp", overlay = false, format = format.volume)
+
+// ── Entrées ─────────────────────────────────────────────────────────────
+spotSym  = input.symbol("BINANCE:BTCUSDT",   "Spot")
+perpSym  = input.symbol("BINANCE:BTCUSDT.P", "Perp")
+ltfIn    = input.timeframe("", "TF intrabar (vide = auto)")
+mode     = input.string("Delta par barre", "Affichage", options = ["Delta par barre", "CVD (cumulé)"])
+scaleIn  = input.string("z-score (σ)", "Échelle", options = ["z-score (σ)", "Brut (coin)"],
+     tooltip = "Le perp fait ~80 % du volume : en brut il écrase le spot. Le z-score met les deux sur la même échelle.")
+zLen     = input.int(50, "Fenêtre z-score", minval = 10)
+resetIn  = input.string("Jour", "Remise à zéro du CVD", options = ["Jamais", "Jour", "Semaine"])
+showSpot = input.bool(true, "Afficher spot")
+showPerp = input.bool(true, "Afficher perp")
+divZ     = input.float(1.0, "Divergence : |z| mini des deux", minval = 0.0, step = 0.1)
+showTab  = input.bool(true, "Tableau dernière barre")
+
+// ── TF intrabar automatique (~60 intrabars / barre max) ─────────────────
+autoLtf() =>
+    s = timeframe.in_seconds()
+    s <= 3600 ? "1" : s <= 14400 ? "5" : s <= 86400 ? "15" : "60"
+ltf = ltfIn == "" ? autoLtf() : ltfIn
+
+// ── Delta intrabar ──────────────────────────────────────────────────────
+barDelta() =>
+    close > open ? volume : close < open ? -volume :
+         close > nz(close[1], close) ? volume : close < nz(close[1], close) ? -volume : 0.0
+
+sumArr(array<float> a) =>
+    a.size() > 0 ? a.sum() : na
+
+dSpot = sumArr(request.security_lower_tf(spotSym, ltf, barDelta(), ignore_invalid_symbol = true))
+dPerp = sumArr(request.security_lower_tf(perpSym, ltf, barDelta(), ignore_invalid_symbol = true))
+
+// ── z-score (même idée que delta_z de features.add_absorption) ──────────
+zOf(x) =>
+    sd = ta.stdev(nz(x), zLen)
+    sd > 0 ? (nz(x) - ta.sma(nz(x), zLen)) / sd : 0.0
+zSpot = zOf(dSpot)
+zPerp = zOf(dPerp)
+useZ  = scaleIn == "z-score (σ)"
+vSpot = useZ ? zSpot : dSpot
+vPerp = useZ ? zPerp : dPerp
+
+// ── CVD avec remise à zéro ──────────────────────────────────────────────
+newPeriod = resetIn == "Jour" ? timeframe.change("D") : resetIn == "Semaine" ? timeframe.change("W") : false
+var float cvdSpot = 0.0
+var float cvdPerp = 0.0
+if newPeriod
+    cvdSpot := 0.0
+    cvdPerp := 0.0
+cvdSpot += nz(vSpot)
+cvdPerp += nz(vPerp)
+
+// ── Tracé ───────────────────────────────────────────────────────────────
+isBar = mode == "Delta par barre"
+cPerpUp = color.new(#26a69a, 55)
+cPerpDn = color.new(#ef5350, 55)
+cSpotUp = #00796b
+cSpotDn = #b71c1c
+
+plot(isBar and showPerp ? vPerp : na, "Δ perp", style = plot.style_columns,
+     color = nz(vPerp) >= 0 ? cPerpUp : cPerpDn)
+plot(isBar and showSpot ? vSpot : na, "Δ spot", style = plot.style_histogram, linewidth = 4,
+     color = nz(vSpot) >= 0 ? cSpotUp : cSpotDn)
+
+plot(not isBar and showPerp ? cvdPerp : na, "CVD perp", color = #7e57c2, linewidth = 2)
+plot(not isBar and showSpot ? cvdSpot : na, "CVD spot", color = #f7931a, linewidth = 2)
+hline(0, "Zéro", color = color.new(color.gray, 50))
+
+// Divergence spot / perp : signes opposés, les deux significatifs (en σ)
+diverge = math.sign(zSpot) != math.sign(zPerp) and math.abs(zSpot) >= divZ and math.abs(zPerp) >= divZ
+bgcolor(diverge ? color.new(color.orange, 85) : na, title = "Divergence spot/perp")
+alertcondition(diverge, "Divergence spot/perp", "Delta spot et perp de signes opposés")
+
+// ── Tableau ─────────────────────────────────────────────────────────────
+var table t = table.new(position.top_right, 3, 4, bgcolor = color.new(color.gray, 90), border_width = 1)
+if showTab and barstate.islast
+    tot = math.abs(nz(dSpot)) + math.abs(nz(dPerp))
+    t.cell(0, 0, "",      text_size = size.small)
+    t.cell(1, 0, "Spot",  text_size = size.small)
+    t.cell(2, 0, "Perp",  text_size = size.small)
+    t.cell(0, 1, "Δ coin", text_size = size.small)
+    t.cell(1, 1, str.tostring(dSpot, format.volume), text_size = size.small, text_color = nz(dSpot) >= 0 ? cSpotUp : cSpotDn)
+    t.cell(2, 1, str.tostring(dPerp, format.volume), text_size = size.small, text_color = nz(dPerp) >= 0 ? cSpotUp : cSpotDn)
+    t.cell(0, 2, "Δ σ",   text_size = size.small)
+    t.cell(1, 2, str.tostring(zSpot, "#.##"), text_size = size.small)
+    t.cell(2, 2, str.tostring(zPerp, "#.##"), text_size = size.small)
+    t.cell(0, 3, "Part |Δ|", text_size = size.small)
+    t.cell(1, 3, tot > 0 ? str.tostring(100 * math.abs(nz(dSpot)) / tot, "#") + " %" : "–", text_size = size.small)
+    t.cell(2, 3, tot > 0 ? str.tostring(100 * math.abs(nz(dPerp)) / tot, "#") + " %" : "–", text_size = size.small)
