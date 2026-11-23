@@ -1,0 +1,134 @@
+// CVD SPOT et PERP en bougies (OHLC), deltas par barre en option — Pine v6.
+// Marche sur n'importe quel graphe (BTCUSDT spot, BTCUSDT.P…) : les deux flux sont
+// demandés sur les symboles en entrée.
+//
+// Bougie de CVD = trajet du CVD PENDANT la barre, reconstruit en intrabar :
+//   open = CVD à la clôture précédente (0 à chaque remise à zéro), close = open + Δ barre,
+//   high/low = extrêmes du CVD cumulé intrabar par intrabar.
+// Mèche longue = flux agressif qui a poussé puis s'est retourné dans la barre.
+//
+// Delta intrabar : bougie intrabar haussière = achat, baissière = vente (doji : clôture vs
+// clôture précédente) — Pine n'expose pas le taker_buy Binance. Contrôle vs le vrai delta
+// taker (spot, 1m→1h) : corr. 0.92, même signe 89 %, amplitude ~5× → lire le SENS et les
+// divergences, pas les valeurs brutes du screener Python.
+//@version=6
+indicator("CVD Spot/Perp (bougies)", shorttitle = "CVD bougies", overlay = false, format = format.volume)
+
+// ── Entrées ─────────────────────────────────────────────────────────────
+spotSym   = input.symbol("BINANCE:BTCUSDT",   "Spot")
+perpSym   = input.symbol("BINANCE:BTCUSDT.P", "Perp")
+showWhich = input.string("Les deux", "Bougies CVD", options = ["Les deux", "Spot", "Perp", "Aucune"],
+     tooltip = "Pour deux panneaux séparés : ajouter l'indicateur deux fois (Spot / Perp).")
+ltfIn     = input.timeframe("", "TF intrabar (vide = auto)")
+scaleIn   = input.string("Normalisé (σ)", "Échelle", options = ["Normalisé (σ)", "Brut (coin)"],
+     tooltip = "Normalisé : chaque delta est divisé par l'écart-type du delta par barre (fenêtre ci-dessous). Sans ça le perp (~80 % du volume) écrase le spot.")
+zLen      = input.int(50, "Fenêtre σ", minval = 10)
+resetIn   = input.string("Jour", "Remise à zéro du CVD", options = ["Jamais", "Jour", "Semaine"])
+
+grpD      = "Deltas (option)"
+showDS    = input.bool(false, "Δ spot par barre (colonnes)", group = grpD)
+showDP    = input.bool(false, "Δ perp par barre (colonnes)", group = grpD)
+showDiv   = input.bool(true,  "Fond : divergence spot / perp", group = grpD)
+divZ      = input.float(1.0,  "Divergence : |Δ σ| mini des deux", minval = 0.0, step = 0.1, group = grpD)
+showTab   = input.bool(true,  "Tableau dernière barre", group = grpD)
+
+// ── TF intrabar automatique ─────────────────────────────────────────────
+autoLtf() =>
+    s = timeframe.in_seconds()
+    s <= 3600 ? "1" : s <= 14400 ? "5" : s <= 86400 ? "15" : "60"
+ltf = ltfIn == "" ? autoLtf() : ltfIn
+
+// ── Delta intrabar ──────────────────────────────────────────────────────
+barDelta() =>
+    close > open ? volume : close < open ? -volume :
+         close > nz(close[1], close) ? volume : close < nz(close[1], close) ? -volume : 0.0
+
+aS = request.security_lower_tf(spotSym, ltf, barDelta(), ignore_invalid_symbol = true)
+aP = request.security_lower_tf(perpSym, ltf, barDelta(), ignore_invalid_symbol = true)
+dS = aS.size() > 0 ? aS.sum() : na
+dP = aP.size() > 0 ? aP.sum() : na
+
+// σ du delta par barre, mesuré jusqu'à la barre précédente (pas de dépendance à la barre en cours)
+sdS = ta.stdev(nz(dS), zLen)[1]
+sdP = ta.stdev(nz(dP), zLen)[1]
+useZ = scaleIn == "Normalisé (σ)"
+okS  = not useZ or nz(sdS) > 0
+okP  = not useZ or nz(sdP) > 0
+kS   = useZ and okS ? 1.0 / sdS : 1.0
+kP   = useZ and okP ? 1.0 / sdP : 1.0
+
+// ── Bougie de CVD ───────────────────────────────────────────────────────
+cvdCandle(array<float> a, float base, float k) =>
+    float c = base
+    float h = base
+    float l = base
+    if a.size() > 0
+        for x in a
+            c += nz(x) * k
+            h := math.max(h, c)
+            l := math.min(l, c)
+    [base, h, l, c]
+
+newPeriod = resetIn == "Jour" ? timeframe.change("D") : resetIn == "Semaine" ? timeframe.change("W") : false
+var float cvdS = 0.0
+var float cvdP = 0.0
+baseS = newPeriod ? 0.0 : cvdS
+baseP = newPeriod ? 0.0 : cvdP
+[oS, hS, lS, cS] = cvdCandle(aS, baseS, kS)
+[oP, hP, lP, cP] = cvdCandle(aP, baseP, kP)
+if okS
+    cvdS := cS
+if okP
+    cvdP := cP
+
+// ── Tracé ───────────────────────────────────────────────────────────────
+cSpotUp = #00796b
+cSpotDn = #b71c1c
+cPerpUp = #26a69a
+cPerpDn = #ef5350
+
+drawS = (showWhich == "Les deux" or showWhich == "Spot") and okS
+drawP = (showWhich == "Les deux" or showWhich == "Perp") and okP
+
+// Perp : corps transparent + bordure (derrière) ; spot : plein (devant)
+plotcandle(drawP ? oP : na, drawP ? hP : na, drawP ? lP : na, drawP ? cP : na, "CVD perp",
+     color = color.new(cP >= oP ? cPerpUp : cPerpDn, 80),
+     wickcolor = color.new(cP >= oP ? cPerpUp : cPerpDn, 30),
+     bordercolor = cP >= oP ? cPerpUp : cPerpDn)
+plotcandle(drawS ? oS : na, drawS ? hS : na, drawS ? lS : na, drawS ? cS : na, "CVD spot",
+     color = cS >= oS ? cSpotUp : cSpotDn, wickcolor = cS >= oS ? cSpotUp : cSpotDn,
+     bordercolor = cS >= oS ? cSpotUp : cSpotDn)
+
+// Deltas par barre (option), même échelle que les bougies
+vS = okS ? nz(dS) * kS : na
+vP = okP ? nz(dP) * kP : na
+plot(showDP ? vP : na, "Δ perp", style = plot.style_columns, color = color.new(vP >= 0 ? cPerpUp : cPerpDn, 55))
+plot(showDS ? vS : na, "Δ spot", style = plot.style_histogram, linewidth = 4, color = vS >= 0 ? cSpotUp : cSpotDn)
+hline(0, "Zéro", color = color.new(color.gray, 50))
+
+// Divergence : deltas de signes opposés, tous deux ≥ divZ σ
+zS = nz(sdS) > 0 ? nz(dS) / sdS : 0.0
+zP = nz(sdP) > 0 ? nz(dP) / sdP : 0.0
+diverge = math.sign(zS) != math.sign(zP) and math.abs(zS) >= divZ and math.abs(zP) >= divZ
+bgcolor(showDiv and diverge ? color.new(color.orange, 85) : na, title = "Divergence spot/perp")
+alertcondition(diverge, "Divergence spot/perp", "Delta spot et perp de signes opposés")
+
+// ── Tableau ─────────────────────────────────────────────────────────────
+var table t = table.new(position.top_right, 3, 5, bgcolor = color.new(color.gray, 90), border_width = 1)
+if showTab and barstate.islast
+    tot = math.abs(nz(dS)) + math.abs(nz(dP))
+    t.cell(0, 0, "",         text_size = size.small)
+    t.cell(1, 0, "Spot",     text_size = size.small)
+    t.cell(2, 0, "Perp",     text_size = size.small)
+    t.cell(0, 1, "CVD",      text_size = size.small)
+    t.cell(1, 1, str.tostring(cvdS, useZ ? "#.##" : format.volume), text_size = size.small)
+    t.cell(2, 1, str.tostring(cvdP, useZ ? "#.##" : format.volume), text_size = size.small)
+    t.cell(0, 2, "Δ coin",   text_size = size.small)
+    t.cell(1, 2, str.tostring(dS, format.volume), text_size = size.small, text_color = nz(dS) >= 0 ? cSpotUp : cSpotDn)
+    t.cell(2, 2, str.tostring(dP, format.volume), text_size = size.small, text_color = nz(dP) >= 0 ? cSpotUp : cSpotDn)
+    t.cell(0, 3, "Δ σ",      text_size = size.small)
+    t.cell(1, 3, str.tostring(zS, "#.##"), text_size = size.small)
+    t.cell(2, 3, str.tostring(zP, "#.##"), text_size = size.small)
+    t.cell(0, 4, "Part |Δ|", text_size = size.small)
+    t.cell(1, 4, tot > 0 ? str.tostring(100 * math.abs(nz(dS)) / tot, "#") + " %" : "–", text_size = size.small)
+    t.cell(2, 4, tot > 0 ? str.tostring(100 * math.abs(nz(dP)) / tot, "#") + " %" : "–", text_size = size.small)
