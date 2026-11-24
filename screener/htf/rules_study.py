@@ -55,12 +55,40 @@ def _rate(mask: pd.Series) -> str:
 
 # --------------------------------------------------------------------- mèches
 
-def study_wicks(df: pd.DataFrame, min_atr: float = 1.0, atr_period: int = 14,
-                horizon: int = 60) -> pd.DataFrame:
-    """Taux de remplissage des longues mèches, par taille, dans un horizon donné.
+def study_wick_precedence(df: pd.DataFrame, min_atr: float = 1.0, atr_period: int = 14,
+                          target_atr: float = 2.0, horizon: int = 120,
+                          level: str = "half", control_offset: int = 40) -> pd.DataFrame:
+    """La règle réelle de CrypNuevo : le retracement de la mèche **précède** le mouvement.
 
-    Une mèche est comptée seulement si l'historique offre `horizon` barres après elle :
-    sans quoi on compterait comme « non remplie » une mèche qui n'a pas eu le temps.
+    Ce n'est pas « la mèche finira par être remplie » — ça, c'est seulement dire que le
+    prix revient sur ses pas. C'est une règle d'**ordre des événements**, conditionnelle au
+    scénario :
+
+    > Dans une hypothèse d'accumulation, si le prix doit monter, il ne montera pas avant
+    > d'avoir retracé 50 % (ou 100 %) de la mèche basse. Inversement en distribution.
+
+    On mesure donc, pour chaque longue mèche, lequel des deux arrive en premier :
+
+    - **A**, le retracement : le prix revient toucher le niveau 50 % (ou 100 %) de la mèche
+      — pour une mèche **basse**, en redescendant ; pour une mèche **haute**, en remontant ;
+    - **B**, le mouvement directionnel : le prix progresse de `target_atr` ATR dans le sens
+      attendu par le scénario — vers le **haut** après une mèche basse (accumulation), vers
+      le **bas** après une mèche haute (distribution).
+
+    La règle est vraie si A précède B nettement plus souvent que l'inverse. Encore faut-il
+    un **témoin** valable. Un niveau « à la même distance, côté opposé » ne convient pas
+    ici : pour une mèche basse, il retombe exactement sur le niveau testé. Le témoin est
+    donc une **barre ordinaire antérieure** (sans longue mèche), à laquelle on applique le
+    même écart relatif, exprimé en ATR. Si la mèche n'apporte rien, une barre quelconque
+    donne le même ordre pour un niveau placé aussi loin.
+
+    `dist_atr` rapporte cet écart : pour une mèche de 1 à 1,5 ATR, le niveau 50 % n'est
+    qu'à une fraction d'ATR du cours, donc touché presque immédiatement. La règle n'a de
+    portée que si le niveau est **loin**.
+
+    Les barres où A et B surviennent toutes deux sont comptées à part (`indéterminé`) :
+    sans données intra-barre, on ne peut pas savoir laquelle est venue en premier, et
+    trancher au hasard fausserait le résultat.
     """
     a = atr(df, atr_period)
     body_hi = df[["open", "close"]].max(axis=1)
@@ -75,52 +103,106 @@ def study_wicks(df: pd.DataFrame, min_atr: float = 1.0, atr_period: int = 14,
             if not np.isfinite(r) or r < min_atr:
                 continue
             base, tip = float(base_s.iloc[i]), float(tip_s.iloc[i])
-            half = 0.5 * (base + tip)
-            fut = df.iloc[i + 1:i + 1 + horizon]
-            if direction == "haute":
-                hit_half = fut.index[fut["high"] >= half]
-                hit_full = fut.index[fut["high"] >= tip]
-            else:
-                hit_half = fut.index[fut["low"] <= half]
-                hit_full = fut.index[fut["low"] <= tip]
-            # Témoin : un niveau fictif à la MÊME distance, du côté opposé au corps.
-            # Sans lui, un taux de remplissage élevé mesurerait seulement le fait que le
-            # prix revient sur ses pas — c'est-à-dire la volatilité, pas la mèche.
+            retrace = 0.5 * (base + tip) if level == "half" else tip
             close = float(df["close"].iloc[i])
-            d_half, d_full = abs(close - half), abs(close - tip)
-            if direction == "haute":
-                sham_half = fut.index[fut["low"] <= close - d_half]
-                sham_full = fut.index[fut["low"] <= close - d_full]
+            span = float(a.iloc[i])
+            if not np.isfinite(span) or span <= 0:
+                continue
+            fut = df.iloc[i + 1:i + 1 + horizon]
+            if fut.empty:
+                continue
+
+            dist_atr = abs(close - retrace) / span
+            if direction == "basse":
+                # accumulation : retracer vers le bas, puis monter
+                hit_a = fut["low"] <= retrace
+                hit_b = fut["high"] >= close + target_atr * span
             else:
-                sham_half = fut.index[fut["high"] >= close + d_half]
-                sham_full = fut.index[fut["high"] >= close + d_full]
-            rows.append({
-                "direction": direction, "at": df.index[i], "atr_ratio": r,
-                "half": len(hit_half) > 0, "full": len(hit_full) > 0,
-                "témoin 50 %": len(sham_half) > 0, "témoin 100 %": len(sham_full) > 0,
-                "bars_to_half": (int(df.index.get_loc(hit_half[0]) - i)
-                                 if len(hit_half) else None),
-                "bars_to_full": (int(df.index.get_loc(hit_full[0]) - i)
-                                 if len(hit_full) else None),
-            })
+                # distribution : retracer vers le haut, puis descendre
+                hit_a = fut["high"] >= retrace
+                hit_b = fut["low"] <= close - target_atr * span
+
+            ia = int(np.argmax(hit_a.to_numpy())) if hit_a.any() else None
+            ib = int(np.argmax(hit_b.to_numpy())) if hit_b.any() else None
+
+            # Témoin : une barre ordinaire antérieure, sans longue mèche, avec le même
+            # écart relatif et la même cible. Elle contrôle à la fois la distance et la
+            # période de marché.
+            isham = ishamb = None
+            j = i - control_offset
+            if j >= atr_period and float(ratio_s.iloc[j]) < min_atr:
+                cj, sj = float(df["close"].iloc[j]), float(a.iloc[j])
+                if np.isfinite(sj) and sj > 0:
+                    fj = df.iloc[j + 1:j + 1 + horizon]
+                    if not fj.empty:
+                        if direction == "basse":
+                            sa = fj["low"] <= cj - dist_atr * sj
+                            sb = fj["high"] >= cj + target_atr * sj
+                        else:
+                            sa = fj["high"] >= cj + dist_atr * sj
+                            sb = fj["low"] <= cj - target_atr * sj
+                        isham = int(np.argmax(sa.to_numpy())) if sa.any() else None
+                        ishamb = int(np.argmax(sb.to_numpy())) if sb.any() else None
+
+            if ib is None:
+                verdict = "pas de mouvement"          # le scénario ne s'est pas réalisé
+            elif ia is None:
+                verdict = "mouvement sans retracement"
+            elif ia < ib:
+                verdict = "retracement d'abord"
+            elif ia > ib:
+                verdict = "mouvement d'abord"
+            else:
+                verdict = "indéterminé"               # même barre : on ne tranche pas
+
+            if ishamb is None:
+                verdict_sham = "pas de mouvement"
+            elif isham is None:
+                verdict_sham = "mouvement sans retracement"
+            elif isham < ishamb:
+                verdict_sham = "retracement d'abord"
+            elif isham > ishamb:
+                verdict_sham = "mouvement d'abord"
+            else:
+                verdict_sham = "indéterminé"
+
+            rows.append({"direction": direction, "at": df.index[i], "atr_ratio": r,
+                         "dist_atr": dist_atr, "verdict": verdict, "témoin": verdict_sham,
+                         "barres_retracement": ia, "barres_mouvement": ib})
     return pd.DataFrame(rows)
 
 
-def summarise_wicks(w: pd.DataFrame) -> pd.DataFrame:
+def summarise_precedence(w: pd.DataFrame) -> pd.DataFrame:
+    """Part des cas où le retracement précède le mouvement, mèche contre témoin.
+
+    Seuls les cas où le mouvement a eu lieu **et** où l'ordre est tranchable entrent dans
+    le calcul : les « pas de mouvement » ne disent rien de la règle, et les « indéterminé »
+    ne sont pas départageables sans données intra-barre.
+    """
     if w.empty:
         return pd.DataFrame()
-    bins = [1.0, 1.5, 2.0, 3.0, np.inf]
-    labels = ["1-1.5 ATR", "1.5-2 ATR", "2-3 ATR", ">3 ATR"]
+    bins = [1.0, 1.5, 2.0, np.inf]
+    labels = ["1-1.5 ATR", "1.5-2 ATR", ">2 ATR"]
     w = w.assign(taille=pd.cut(w["atr_ratio"], bins, labels=labels, right=False))
+    tranchable = {"retracement d'abord", "mouvement d'abord", "mouvement sans retracement"}
     out = []
     for (direction, taille), g in w.groupby(["direction", "taille"], observed=True):
-        half = g["half"]
+        dec = g[g["verdict"].isin(tranchable)]
+        dec_s = g[g["témoin"].isin(tranchable)]
+        if dec.empty:
+            continue
         out.append({
-            "mèche": direction, "taille": str(taille), "n": len(g),
-            "remplie 50 %": _rate(half), "témoin 50 %": _rate(g["témoin 50 %"]),
-            "remplie 100 %": _rate(g["full"]), "témoin 100 %": _rate(g["témoin 100 %"]),
-            "barres méd.": (int(g.loc[half, "bars_to_half"].median())
-                            if half.any() else None),
+            "mèche": direction, "scénario": ("accumulation" if direction == "basse"
+                                             else "distribution"),
+            "taille": str(taille), "n": len(dec),
+            "écart (ATR)": round(float(g["dist_atr"].median()), 2),
+            "retracement d'abord": _rate(dec["verdict"] == "retracement d'abord"),
+            "témoin": _rate(dec_s["témoin"] == "retracement d'abord"),
+            "barres méd.": (int(dec.loc[dec["verdict"] == "retracement d'abord",
+                                        "barres_retracement"].median())
+                            if (dec["verdict"] == "retracement d'abord").any() else None),
+            "sans mouvement": int((g["verdict"] == "pas de mouvement").sum()),
+            "indéterminé": int((g["verdict"] == "indéterminé").sum()),
         })
     return pd.DataFrame(out)
 
@@ -253,12 +335,18 @@ def load(symbol: str = "BTC/USDT", timeframe: str = "4h", years: float = 3.0):
     return fetch_ohlcv_range(D.get_exchange("binance"), symbol, timeframe, start, end)
 
 
-def report(df: pd.DataFrame, horizon: int, label: str = "") -> None:
+def report(df: pd.DataFrame, horizon: int, label: str = "", level: str = "half",
+           only_wicks: bool = False) -> None:
     print(f"--- {label} : {len(df)} bougies, du {df.index[0]:%Y-%m-%d} "
           f"au {df.index[-1]:%Y-%m-%d} ---")
-    w = summarise_wicks(study_wicks(df, horizon=horizon))
-    print("\n1. Remplissage des longues mèches")
+    w = summarise_precedence(study_wick_precedence(df, horizon=max(horizon, 120),
+                                                   level=level))
+    print(f"\n1. Mèches : le retracement ({'50 %' if level == 'half' else '100 %'}) "
+          "précède-t-il le mouvement ?")
     print(w.to_string(index=False) if not w.empty else "  (aucun cas)")
+    if only_wicks:
+        print()
+        return
     d = summarise_deviations(study_deviations(df, horizon=horizon))
     print("\n2. Déviation de range contre cassure installée")
     print(d.to_string(index=False) if not d.empty else "  (aucun cas)")
@@ -274,6 +362,9 @@ def main():
     ap.add_argument("--timeframe", default="4h")
     ap.add_argument("--years", type=float, default=3.0)
     ap.add_argument("--horizon", type=int, default=60)
+    ap.add_argument("--level", default="half", choices=("half", "full"),
+                    help="niveau de retracement testé : 50 %% ou 100 %% de la mèche")
+    ap.add_argument("--only-wicks", action="store_true")
     ap.add_argument("--split", type=int, default=0,
                     help="découper l'historique en N sous-périodes et les comparer : "
                          "une règle qui ne tient que sur une moitié n'est pas une règle")
@@ -284,9 +375,9 @@ def main():
         bounds = np.linspace(0, len(df), args.split + 1).astype(int)
         for k in range(args.split):
             report(df.iloc[bounds[k]:bounds[k + 1]], args.horizon,
-                   f"période {k + 1}/{args.split}")
+                   f"période {k + 1}/{args.split}", args.level, args.only_wicks)
     else:
-        report(df, args.horizon, "ensemble")
+        report(df, args.horizon, "ensemble", args.level, args.only_wicks)
 
 
 if __name__ == "__main__":

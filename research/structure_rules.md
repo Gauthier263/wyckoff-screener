@@ -12,10 +12,11 @@ corrigés, dans l'ordre d'importance :
 1. **Observations indépendantes.** J'échantillonnais tous les 6 barres avec un horizon de
    60 : deux observations voisines partageaient 54 barres de futur sur 60. Le « n = 331 »
    valait une trentaine d'observations réelles. Le pas vaut désormais l'horizon.
-2. **Groupe témoin pour les mèches.** Dire « 88 % des mèches se remplissent » ne prouve
-   rien tant qu'on ne sait pas à quelle fréquence un niveau *quelconque*, à la même
-   distance, est touché dans le même délai. Le témoin est un niveau fictif placé à la même
-   distance du prix, du côté opposé.
+2. **La règle des mèches était mal formulée, puis mal contrôlée.** Elle ne dit pas « la
+   mèche sera remplie » mais « le retracement **précède** le mouvement ». Mesurer le simple
+   remplissage ne testait pas la règle. Et le premier témoin construit pour elle était
+   bogué : « même distance, côté opposé » retombait exactement sur le niveau testé, d'où
+   deux colonnes identiques. Le témoin est désormais une barre ordinaire antérieure.
 3. **Biais de construction sur l'acceptance.** « Après une mèche seule, le prix repasse le
    niveau dans 100 % des cas » était un artefact : une mèche seule se définit par
    l'absence de clôture au-delà, donc le prix est déjà en deçà au moment du test et
@@ -28,30 +29,56 @@ Un bug a aussi été corrigé au passage : le test « le milieu est-il atteint �
 `or` et un ternaire `if/else` dans une seule expression. Il donnait le bon résultat par
 accident de précédence, mais aurait cassé à la première modification.
 
-## 1. Remplissage des mèches — pas d'avantage mesurable
+## 1. Mèches : le retracement précède-t-il le mouvement ?
 
-« Long wicks tend to fill sooner rather than later, at least the 50 % level. » C'est sa
-stratégie préférée, citée dans 48 des 158 entrées du relevé.
+**La règle, correctement énoncée.** Ce n'est pas « la mèche finira par être remplie » — ça,
+c'est seulement dire que le prix revient sur ses pas. C'est une règle d'**ordre des
+événements**, conditionnelle au scénario :
 
-**ETH 4h, 6 ans — le plus gros échantillon disponible :**
+> Dans une hypothèse d'accumulation, si le prix doit monter, il ne montera pas avant
+> d'avoir retracé 50 % ou 100 % de la mèche basse. Inversement en distribution.
 
-| Mèche | Taille | n | Remplie 50 % | Témoin 50 % |
-|---|---|---|---|---|
-| basse | 1–1,5 ATR | **224** | 0,88 [0,83–0,92] | 0,86 [0,81–0,90] |
-| haute | 1–1,5 ATR | **122** | 0,93 [0,88–0,97] | 0,89 [0,82–0,93] |
-| basse | 1,5–2 ATR | 33 | 0,88 [0,73–0,95] | 0,76 [0,59–0,87] |
-| haute | 1,5–2 ATR | 21 | 0,90 [0,71–0,97] | 0,67 [0,45–0,83] |
+**Comment elle est mesurée.** Pour chaque longue mèche, on regarde lequel arrive en premier :
+**A**, le retour du prix sur le niveau 50 % (ou 100 %) de la mèche ; **B**, un mouvement de
+2 ATR dans le sens du scénario (vers le haut après une mèche basse, vers le bas après une
+mèche haute). Seuls les cas où **B a eu lieu** entrent dans le calcul : la question est bien
+« parmi les fois où le prix est parti, combien ont d'abord retracé ? ».
 
-**Verdict : non confirmée pour les mèches courantes.** Sur les deux catégories à fort
-effectif (n = 224 et 122), l'écart avec le témoin est de 2 à 4 points et les intervalles se
-superposent presque entièrement. Viser le 50 % d'une mèche ne vaut pas mieux que viser un
-niveau pris au hasard à la même distance. Le taux de 88 % ne dit rien d'autre que « le prix
-revient souvent sur ses pas ». Sur BTC, le témoin fait même légèrement **mieux** que la
-mèche (0,93 contre 0,88 ; 0,88 contre 0,84).
+**Le témoin** est une barre ordinaire antérieure, sans longue mèche, à laquelle on applique
+le même écart en ATR et la même cible. Il contrôle à la fois la distance et la période.
+(Un témoin « même distance, côté opposé » ne convient pas : pour une mèche basse, il
+retombe exactement sur le niveau testé.)
 
-**Une piste, pas une règle : les mèches hautes de 1,5 à 2 ATR.** BTC donne 1,00 contre un
-témoin à 0,76 (n = 17), ETH donne 0,90 contre 0,67 (n = 21). Deux actifs indépendants, même
-sens, même ampleur — mais 38 cas au total. À surveiller, pas à exploiter.
+**Résultats agrégés — 36 mesures sur BTC et ETH, en 1h et 4h, aux deux niveaux :**
+
+| Catégorie | Mesures | n cumulé | Taux observé | Témoin | Écart médian | Écarts positifs |
+|---|---|---|---|---|---|---|
+| Petites mèches, 1–1,5 ATR | 12 | 3 016 | 0,57 | — | +0,03 | 9/12 |
+| Grandes mèches, ≥ 1,5 ATR | 24 | 789 | 0,43 | — | +0,05 | **14/24** |
+| ≥ 1,5 ATR, niveau **50 %** | | | **0,56** | 0,51 | +0,03 | |
+| ≥ 1,5 ATR, niveau **100 %** | | | **0,36** | 0,26 | +0,07 | |
+
+**Verdict : la règle ne tient pas telle qu'énoncée.**
+
+- Au niveau **50 %**, le retracement précède le mouvement dans 56 % des cas. Donc **44 % du
+  temps, le prix part sans retracer**. Ce n'est pas « il ne montera pas avant ».
+- Au niveau **100 %**, c'est 36 % : le prix part sans avoir retracé la mèche entière dans
+  presque **deux cas sur trois**.
+
+**Mais un petit effet existe.** L'écart avec le témoin est positif dans 14 mesures sur 24
+pour les grandes mèches, écart médian de +3 à +7 points. Le signe est constant, l'ampleur
+est faible, et 14 sur 24 ne se distingue pas de pile ou face.
+
+**Mise en garde sur la lecture des tableaux détaillés.** Certaines cellules isolées
+affichent de gros écarts (BTC 1h, mèches basses > 2 ATR : +30 points ; ETH 1h, mèches
+hautes > 2 ATR : +23). Elles reposent sur 15 à 30 cas et disparaissent à l'agrégation.
+Les citer séparément serait du tri a posteriori — la faute même que le groupe témoin est
+censé prévenir.
+
+**Conséquence pour le skill.** Après une longue mèche, annoncer « le prix ira d'abord
+chercher le 50 % » est une prévision à 56 %, à peine mieux que rien. Annoncer le 100 % est
+une prévision fausse deux fois sur trois. Le niveau peut être tracé comme repère ; aucune
+probabilité ne doit lui être attachée dans une analyse.
 
 ## 2. Déviation de range — confirmée sur ETH, instable sur l'historique BTC
 
@@ -98,7 +125,8 @@ cassure, pas un signal directionnel.
 2. **Déviation** : critère de premier rang, avec sa statistique et sa réserve affichées
    (instable sur BTC 2020–2023).
 3. **Mèches** : repère graphique sans objectif probabiliste. Le niveau 50 % peut être
-   tracé, mais on ne dira pas qu'il est « probable ».
+   tracé ; on ne dira pas qu'il est « probable », et surtout pas que le prix doit y passer
+   avant de partir.
 
 ## Limites qui subsistent
 
