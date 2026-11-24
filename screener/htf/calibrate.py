@@ -96,7 +96,7 @@ def fit_leverage_tiers(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None
     """
     pred = predicted_burn(df, oi, delta, leverages, **kw)
     levs = list(leverages)
-    tiers, unlev, fit = {}, {}, {}
+    tiers, fit = {}, {}
     for side in ("long", "short"):
         A = np.column_stack([pred[l][side].reindex(observed.index).fillna(0.0).to_numpy()
                              for l in levs])
@@ -108,14 +108,48 @@ def fit_leverage_tiers(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None
         total = float(w.sum())
         if total <= 0 or fit[side] < min_fit:
             tiers[side] = dict(L.DEFAULT_LEVERAGE_TIERS)
-            unlev[side] = 0.45
             continue
-        share = float(np.clip(total, 0.0, 1.0))
-        tiers[side] = {lev: float(wi / total * share)
-                       for lev, wi in zip(levs, w) if wi > 0}
-        unlev[side] = 1.0 - share
+        # Les poids sont normalisés à 1 : le NNLS donne la **forme** de la distribution des
+        # leviers, jamais son niveau absolu. Les bourses sous-déclarent leurs liquidations
+        # (Binance n'en diffuse qu'un échantillon), donc la somme brute ne mesure rien.
+        tiers[side] = {lev: float(wi / total) for lev, wi in zip(levs, w) if wi > 0}
+    unlev = fit_unlevered_frac(df, oi, delta, tiers, **kw)
     weak = [s for s in ("long", "short") if fit[s] < min_fit]
     status = ("ajusté sur les liquidations observées" if not weak else
               "ajustement trop faible, valeurs par défaut conservées pour : "
               + ", ".join(weak))
     return {"tiers": tiers, "unlevered_frac": unlev, "fit": fit, "status": status}
+
+
+def fit_unlevered_frac(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None",
+                       tiers: dict, lo: float = 0.0, hi: float = 0.95,
+                       iters: int = 12, **kw) -> float:
+    """Part non liquidable déduite d'une **contrainte dure** : la masse du profil reconstruit
+    doit valoir l'OI courant.
+
+    Sans elle, tout le carnet porte un levier, un mouvement de 26 % le liquide en entier et
+    il ne reste qu'un résidu (2 BTC sur 93 611 au 15/11) : les amas lus ne sont alors que du
+    bruit. Recherche par bissection, la masse restante croissant avec la part non liquidable.
+    """
+    if oi is None or len(oi.dropna()) == 0:
+        return 0.45
+    target = float(oi.dropna().iloc[-1])
+    kw.pop("leverage_tiers", None)
+    kw.pop("unlevered_frac", None)
+
+    def mass(u):
+        try:
+            return float(L.build_map(df, oi, delta, leverage_tiers=tiers,
+                                     unlevered_frac=u, **kw)["positions"].sum())
+        except Exception:
+            return 0.0
+
+    if mass(hi) < target:          # même tout non liquidable ne suffit pas
+        return hi
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        if mass(mid) < target:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)

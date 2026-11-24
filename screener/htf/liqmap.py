@@ -77,6 +77,7 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
               step_pct: float = 0.001, half_life_bars: float = 240.0,
               close_proximity_atr: float = 1.5, churn_frac: float = 0.01,
               drift_frac: float = 0.05, unlevered_frac: float = 0.45,
+              seed_bars: int = 0, profit_pull: float = 3.0, profit_scale: float = 0.10,
               leverage_tiers: "dict | None" = None) -> dict:
     """Carte des positions ouvertes et des liquidations estimées.
 
@@ -95,6 +96,15 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
     soldée volontairement.
     `leverage_tiers` : soit `{levier: poids}`, soit `{"long": {...}, "short": {...}}` pour
     des profils distincts par côté — c'est ce que produit `calibrate.fit_leverage_tiers`.
+    `seed_bars` : nombre de barres de **préchauffage** servant à amorcer le carnet avec
+    l'OI déjà ouvert au début de la fenêtre, réparti au prorata du volume de ces barres.
+    Sans amorçage, on ne reconstruit que le *flux* de la fenêtre et non le *stock* : la
+    masse du profil tombe alors à quelques milliers de BTC pour un OI réel de 92 000, et
+    les amas lus ne sont plus que du bruit.
+    `profit_pull` / `profit_scale` : force et échelle de la prise de profit. Une position
+    en gain de `profit_scale` (10 % par défaut) est `1 + profit_pull` fois plus susceptible
+    d'être soldée qu'une position à l'équilibre. Sans ce terme, les shorts ouverts très haut
+    survivent à toute la baisse et forment de faux murs loin au-dessus du marché.
     `unlevered_frac` : nombre, ou `{"long": x, "short": y}`. Part des positions **sans
     niveau de liquidation atteignable** —
     cross margin largement collatéralisé, couverture, teneur de marché. Les positions
@@ -157,7 +167,31 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
     vol = df["volume"] if "volume" in df.columns else pd.Series(1.0, index=df.index)
     prev_oi = None
 
-    for i in range(len(df)):
+    start_i = 0
+    seed = int(np.clip(seed_bars, 0, max(len(df) - 2, 0)))
+    if seed > 0:
+        head = df.iloc[:seed]
+        oi0 = oi.iloc[:seed].dropna()
+        if len(oi0):
+            w0 = np.zeros(n)
+            hv = head["volume"] if "volume" in head.columns else pd.Series(1.0, index=head.index)
+            for j in range(seed):
+                r = head.iloc[j]
+                a, b = sorted((_bucket(grid, r["low"]), _bucket(grid, r["high"])))
+                sp = np.arange(a, b + 1)
+                w0[sp] += float(hv.iloc[j]) / len(sp)
+            if w0.sum() > 0:
+                add0 = float(oi0.iloc[-1]) * w0 / w0.sum()
+                for s_ in ("long", "short"):
+                    for k, L_ in enumerate(levs):
+                        w_ = by_side[s_].get(L_, 0.0)
+                        if w_:
+                            book[s_][k] += add0 * 0.5 * w_
+                    safe += add0 * 0.5 * unlev[s_]
+        start_i = seed
+        prev_oi = float(oi.iloc[:seed].dropna().iloc[-1]) if len(oi0) else None
+
+    for i in range(start_i, len(df)):
         row = df.iloc[i]
         cur = oi.iloc[i]
         if not np.isfinite(cur):
@@ -190,22 +224,42 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
         opened_qty = max(d_oi, 0.0) + churn
         closed_qty = max(-d_oi, 0.0) + churn
 
-        # 2. fermetures volontaires : près du prix d'abord, plus une dérive uniforme.
+        # 2. fermetures volontaires : près du prix, en gain, et une dérive uniforme.
         if closed_qty > 0 and total > 0:
             prox = np.exp(-0.5 * ((grid - row["close"])
                                   / (max(float(atr.iloc[i]), 1e-9) * close_proximity_atr)) ** 2)
             aged = np.minimum(1.0 + age / max(half_life_bars, 1e-9), 2.0)
-            w = positions * ((1.0 - drift_frac) * prox + drift_frac) * aged
-            if w.sum() <= 0:
-                w = positions.copy()
-            take = np.minimum(positions, closed_qty * w / w.sum())
+            # gain latent, par côté : un short ouvert à 86k avec le prix à 59k est très en
+            # profit et finit par être soldé. Sans ce terme, il resterait indéfiniment dans
+            # le carnet et formerait un faux mur loin au-dessus du marché.
+            px = float(row["close"])
+            pnl = {"long": (px - grid) / np.maximum(grid, 1e-9),
+                   "short": (grid - px) / np.maximum(grid, 1e-9)}
+            w_side, taken = {}, {}
+            for s_ in ("long", "short"):
+                pull = 1.0 + profit_pull * np.clip(pnl[s_] / max(profit_scale, 1e-9), 0.0, 3.0)
+                base = book[s_].sum(axis=0)
+                w_side[s_] = base * ((1.0 - drift_frac) * prox + drift_frac) * aged * pull
+            w_safe = safe * ((1.0 - drift_frac) * prox + drift_frac) * aged
+            wtot = sum(w_side.values()) + w_safe
+            denom = float(wtot.sum())
+            if denom <= 0:
+                wtot = positions.copy()
+                w_side = {s_: book[s_].sum(axis=0) for s_ in ("long", "short")}
+                w_safe = safe.copy()
+                denom = float(wtot.sum()) or 1.0
+            for s_ in ("long", "short"):
+                base = book[s_].sum(axis=0)
+                take = np.minimum(base, closed_qty * w_side[s_] / denom)
+                with np.errstate(invalid="ignore", divide="ignore"):
+                    keep = np.where(base > 0, 1.0 - take / np.maximum(base, 1e-12), 1.0)
+                book[s_] *= keep
+            take_s = np.minimum(safe, closed_qty * w_safe / denom)
             with np.errstate(invalid="ignore", divide="ignore"):
-                keep = np.where(positions > 0, 1.0 - take / np.maximum(positions, 1e-12), 1.0)
-            for s in ("long", "short"):
-                book[s] *= keep                       # même proportion à tous les leviers
-            safe *= keep
-            age = age * keep
-            positions = positions * keep
+                keep_s = np.where(safe > 0, 1.0 - take_s / np.maximum(safe, 1e-12), 1.0)
+            safe = safe - take_s
+            positions = book["long"].sum(axis=0) + book["short"].sum(axis=0) + safe
+            age = age * np.where(positions > 0, 1.0, 0.0)
 
         # 3. ouvertures, déposées sur les niveaux traversés par la barre.
         if opened_qty > 0:

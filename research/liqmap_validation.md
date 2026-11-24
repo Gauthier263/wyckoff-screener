@@ -47,8 +47,28 @@ déséquilibre. Changer le lookback (7, 14 ou 30 jours) n'y change rien.
    pas corrigé. Un déséquilibre de notre carte ne vaut pas son « delta liquidations ».
 4. Ne **pas** citer la thin air : trop large.
 
-## Pistes pour le côté opposé, non traitées
+## Tentative de correction du côté haut — résultat négatif, et pourquoi
 
-- Compter les **niveaux** distincts plutôt que les quantités, comme lui.
-- Attribuer l'initiative autrement que par le delta agressif seul (ratio long/short, funding).
-- Agréger plusieurs bourses (Bybit, OKX) plutôt que Binance seule.
+Trois pistes ont été creusées pour retrouver son aimant à 66k du 22/11. Deux défauts réels
+du modèle ont été trouvés et corrigés au passage, mais le repère reste manqué.
+
+1. **Compter les niveaux plutôt que les quantités** (il annonce 606 niveaux de shorts contre
+   144 de longs au 15/11). Notre carte en donne 304 contre 145 : le **rapport** est du bon
+   ordre, mais les niveaux portent des quantités si faibles que le classement des amas n'en
+   est pas changé.
+2. **Amorcer le carnet** (`seed_bars`). Défaut réel : le modèle partait d'un carnet vide et
+   ne reconstruisait que le *flux* de la fenêtre, pas le *stock*. La masse du profil tombait
+   à 2 519 BTC pour un OI réel de 93 611 — les amas lus n'étaient alors que du bruit.
+   Corrigé : avec amorçage, la masse remonte à 51 000–67 000 BTC. **Mais** le stock amorcé
+   en octobre (prix 82–86k) n'est ensuite ni assez liquidé ni assez soldé, et forme un faux
+   mur à 81–86k alors que le prix traite à 59k. Les murs, eux, deviennent faux.
+3. **Prise de profit** (`profit_pull`). Deuxième défaut réel : un short ouvert à 86k restait
+   indéfiniment en carnet avec le prix à 59k, alors qu'une telle position est soldée. Le
+   terme a été ajouté ; il ne suffit pas à vider le haut, parce que le volume de
+   renouvellement est calé sur le volume **spot** (environ cinq fois plus faible que le perp).
+
+Conclusion : l'amorçage du stock et le taux de renouvellement sont deux hypothèses opposées
+qu'on ne peut pas identifier séparément sur trois points de référence sans sur-ajuster. Les
+deux options restent dans le code, **désactivées par défaut** (`seed_bars=0`), et le réglage
+par défaut est celui qui est validé ci-dessus. À reprendre avec un volume perp et un jeu de
+cartes de référence plus large.
