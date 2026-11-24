@@ -29,6 +29,30 @@ from ..features import atr
 from . import structure as S
 
 
+def wilson(k: int, n: int, z: float = 1.96) -> tuple:
+    """Intervalle de confiance à 95 % d'une proportion (méthode de Wilson) — pur.
+
+    Un taux sans son intervalle n'est pas un résultat : 1,00 sur 2 cas et 0,88 sur 128
+    s'affichent pareil et ne valent pas la même chose.
+    """
+    if n <= 0:
+        return (float("nan"), float("nan"))
+    p = k / n
+    d = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / d
+    marge = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return (max(0.0, centre - marge), min(1.0, centre + marge))
+
+
+def _rate(mask: pd.Series) -> str:
+    """« 0,88 [0,81-0,93] » — le taux et son intervalle, toujours ensemble."""
+    k, n = int(mask.sum()), int(len(mask))
+    if n == 0:
+        return "-"
+    lo, hi = wilson(k, n)
+    return f"{k / n:.2f} [{lo:.2f}-{hi:.2f}]"
+
+
 # --------------------------------------------------------------------- mèches
 
 def study_wicks(df: pd.DataFrame, min_atr: float = 1.0, atr_period: int = 14,
@@ -93,21 +117,17 @@ def summarise_wicks(w: pd.DataFrame) -> pd.DataFrame:
         half = g["half"]
         out.append({
             "mèche": direction, "taille": str(taille), "n": len(g),
-            "remplie 50 %": round(float(half.mean()), 2),
-            "témoin 50 %": round(float(g["témoin 50 %"].mean()), 2),
-            "remplie 100 %": round(float(g["full"].mean()), 2),
-            "témoin 100 %": round(float(g["témoin 100 %"].mean()), 2),
+            "remplie 50 %": _rate(half), "témoin 50 %": _rate(g["témoin 50 %"]),
+            "remplie 100 %": _rate(g["full"]), "témoin 100 %": _rate(g["témoin 100 %"]),
             "barres méd.": (int(g.loc[half, "bars_to_half"].median())
                             if half.any() else None),
-            "100 % | 50 %": (round(float(g.loc[half, "full"].mean()), 2)
-                             if half.any() else None),
         })
     return pd.DataFrame(out)
 
 
 # --------------------------------------------------------------------- déviations
 
-def study_deviations(df: pd.DataFrame, window: int = 180, step: int = 6,
+def study_deviations(df: pd.DataFrame, window: int = 180, step: "int | None" = None,
                      horizon: int = 60, max_bars_out: int = 10) -> pd.DataFrame:
     """Après une déviation de range, le prix rejoint-il le milieu du range ?
 
@@ -115,6 +135,11 @@ def study_deviations(df: pd.DataFrame, window: int = 180, step: int = 6,
     déviation ne fait pas mieux, la règle « une sortie suivie d'un retour est un signal de
     réévaluation » ne vaut rien.
     """
+    # Le pas doit valoir au moins l'horizon : avec un pas plus court, deux observations
+    # partagent presque tout leur futur et ne sont donc pas indépendantes. Un pas de 6 sur
+    # un horizon de 60 gonflait l'effectif d'un facteur dix et donnait une fausse
+    # confiance.
+    step = int(step or horizon)
     rows = []
     for i in range(window, len(df) - horizon, step):
         hist = df.iloc[i - window:i]
@@ -129,9 +154,13 @@ def study_deviations(df: pd.DataFrame, window: int = 180, step: int = 6,
         if dev is None and not installed:
             continue
         fut = df.iloc[i:i + horizon]
-        reached_mid = bool((fut["high"] >= rng.mid).any() and (fut["low"] <= rng.mid).any()
-                           or (fut["high"] >= rng.mid).any() if df["close"].iloc[i] < rng.mid
-                           else (fut["low"] <= rng.mid).any())
+        # « rejoindre le milieu » dépend du côté d'où l'on vient : sous le milieu il faut
+        # monter jusqu'à lui, au-dessus il faut y redescendre. (L'écriture condensée
+        # précédente dépendait de la précédence de `and`/`or`/`if`, illisible et fragile.)
+        if float(df["close"].iloc[i]) < rng.mid:
+            reached_mid = bool((fut["high"] >= rng.mid).any())
+        else:
+            reached_mid = bool((fut["low"] <= rng.mid).any())
         rows.append({
             "at": df.index[i],
             "cas": ("déviation " + dev.side) if dev is not None else "cassure installée",
@@ -148,21 +177,27 @@ def summarise_deviations(d: pd.DataFrame) -> pd.DataFrame:
     out = []
     for cas, g in d.groupby("cas"):
         out.append({"cas": cas, "n": len(g),
-                    "milieu atteint": round(float(g["mid atteint"].mean()), 2),
+                    "milieu atteint": _rate(g["mid atteint"]),
                     "rendement médian %": round(float(g["rendement %"].median()), 2)})
     return pd.DataFrame(out)
 
 
 # --------------------------------------------------------------------- acceptance
 
-def study_acceptance(df: pd.DataFrame, window: int = 180, step: int = 6,
+def study_acceptance(df: pd.DataFrame, window: int = 180, step: "int | None" = None,
                      horizon: int = 30, min_closes: int = 2) -> pd.DataFrame:
     """Une acceptance (clôtures au-delà) tient-elle mieux qu'une simple mèche ?
 
     Pour chaque borne de range, on classe l'état courant en « acceptance » ou « mèche
     seule », puis on regarde ce que fait le prix ensuite. C'est le test de la règle qui
     manquait le 22/11 : « jamais sur une mèche ».
+
+    Les deux états sont comparés sur la **même** question, posée de façon symétrique :
+    où se trouve le prix à la fin de l'horizon ? Demander « est-il revenu en deçà ? »
+    donnait 100 % aux mèches seules par pure construction, puisque celles-ci se
+    définissent précisément par l'absence de clôture au-delà.
     """
+    step = int(step or horizon)      # cf. study_deviations : indépendance des observations
     rows = []
     for i in range(window, len(df) - horizon, step):
         hist = df.iloc[i - window:i]
@@ -181,12 +216,17 @@ def study_acceptance(df: pd.DataFrame, window: int = 180, step: int = 6,
             target = ref * (1.01 if side == "above" else 0.99)
             went_on = bool((fut["high"] >= target).any() if side == "above"
                            else (fut["low"] <= target).any())
-            back = bool((fut["close"] < level).any() if side == "above"
-                        else (fut["close"] > level).any())
+            # « Est revenu » était biaisé par construction : une mèche seule signifie
+            # justement qu'aucune clôture n'a eu lieu au-delà, donc le prix est DÉJÀ en
+            # deçà au moment du test et « revient » mécaniquement dès la première barre.
+            # D'où un 1,00 systématique qui ne mesurait rien. On compare plutôt, pour les
+            # deux états, où se trouve le prix à la FIN de l'horizon.
+            end = float(fut["close"].iloc[-1])
+            beyond_end = bool(end > level if side == "above" else end < level)
             rows.append({"at": df.index[i], "côté": side,
                          "état": "acceptance" if a["accepted"] else "mèche seule",
-                         "a continué": went_on, "est revenu": back,
-                         "rendement %": float(fut["close"].iloc[-1] / ref - 1.0) * 100})
+                         "a continué": went_on, "au-delà à la fin": beyond_end,
+                         "rendement %": float(end / ref - 1.0) * 100})
     return pd.DataFrame(rows)
 
 
@@ -196,8 +236,8 @@ def summarise_acceptance(a: pd.DataFrame) -> pd.DataFrame:
     out = []
     for (etat, cote), g in a.groupby(["état", "côté"]):
         out.append({"état": etat, "côté": cote, "n": len(g),
-                    "a continué": round(float(g["a continué"].mean()), 2),
-                    "est revenu": round(float(g["est revenu"].mean()), 2),
+                    "a continué": _rate(g["a continué"]),
+                    "au-delà à la fin": _rate(g["au-delà à la fin"]),
                     "rendement médian %": round(float(g["rendement %"].median()), 2)})
     return pd.DataFrame(out)
 
@@ -205,6 +245,7 @@ def summarise_acceptance(a: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------- CLI
 
 def load(symbol: str = "BTC/USDT", timeframe: str = "4h", years: float = 3.0):
+    """OHLCV sur `years` années, paginé."""
     from .. import data as D
     from .replay import fetch_ohlcv_range
     end = pd.Timestamp.now(tz="UTC")
@@ -212,22 +253,40 @@ def load(symbol: str = "BTC/USDT", timeframe: str = "4h", years: float = 3.0):
     return fetch_ohlcv_range(D.get_exchange("binance"), symbol, timeframe, start, end)
 
 
+def report(df: pd.DataFrame, horizon: int, label: str = "") -> None:
+    print(f"--- {label} : {len(df)} bougies, du {df.index[0]:%Y-%m-%d} "
+          f"au {df.index[-1]:%Y-%m-%d} ---")
+    w = summarise_wicks(study_wicks(df, horizon=horizon))
+    print("\n1. Remplissage des longues mèches")
+    print(w.to_string(index=False) if not w.empty else "  (aucun cas)")
+    d = summarise_deviations(study_deviations(df, horizon=horizon))
+    print("\n2. Déviation de range contre cassure installée")
+    print(d.to_string(index=False) if not d.empty else "  (aucun cas)")
+    a = summarise_acceptance(study_acceptance(df))
+    print("\n3. Acceptance contre mèche seule")
+    print(a.to_string(index=False) if not a.empty else "  (aucun cas)")
+    print()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--symbol", default="BTC/USDT")
     ap.add_argument("--timeframe", default="4h")
     ap.add_argument("--years", type=float, default=3.0)
     ap.add_argument("--horizon", type=int, default=60)
+    ap.add_argument("--split", type=int, default=0,
+                    help="découper l'historique en N sous-périodes et les comparer : "
+                         "une règle qui ne tient que sur une moitié n'est pas une règle")
     args = ap.parse_args()
-    df = load(timeframe=args.timeframe, years=args.years)
-    print(f"{len(df)} bougies {args.timeframe}, du {df.index[0]:%Y-%m-%d} "
-          f"au {df.index[-1]:%Y-%m-%d}\n")
-
-    print("=== 1. Remplissage des longues mèches ===")
-    print(summarise_wicks(study_wicks(df, horizon=args.horizon)).to_string(index=False))
-    print("\n=== 2. Déviation de range contre cassure installée ===")
-    print(summarise_deviations(study_deviations(df, horizon=args.horizon)).to_string(index=False))
-    print("\n=== 3. Acceptance contre mèche seule ===")
-    print(summarise_acceptance(study_acceptance(df)).to_string(index=False))
+    df = load(args.symbol, args.timeframe, args.years)
+    print(f"{args.symbol} {args.timeframe}\n")
+    if args.split and args.split > 1:
+        bounds = np.linspace(0, len(df), args.split + 1).astype(int)
+        for k in range(args.split):
+            report(df.iloc[bounds[k]:bounds[k + 1]], args.horizon,
+                   f"période {k + 1}/{args.split}")
+    else:
+        report(df, args.horizon, "ensemble")
 
 
 if __name__ == "__main__":

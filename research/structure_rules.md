@@ -1,104 +1,112 @@
-# Les règles de structure, mesurées — et une qui ne tient pas
+# Les règles de structure, mesurées — et quatre corrections de méthode
 
-Chaque règle reprise de CrypNuevo est une affirmation statistique déguisée. Mesurée sur
-l'historique BTC complet avec `python -m screener.htf.rules_study`, en 4h sur 3 ans
-(6 570 bougies) et en 1D sur 6 ans (2 190 bougies).
+Chaque règle reprise de CrypNuevo est une affirmation statistique déguisée. Mesurée avec
+`python -m screener.htf.rules_study`, sur BTC 4h (2020–2026, coupé en deux sous-périodes)
+et sur **ETH 4h** (2020–2026, 13 140 bougies) comme jeu de contrôle indépendant.
 
-**Le point de méthode qui décide de tout : le groupe témoin.** Dire « 88 % des mèches se
-remplissent » ne prouve rien tant qu'on ne sait pas à quelle fréquence un niveau
-*quelconque*, à la même distance, est touché dans le même délai. Sans témoin, on mesure la
-volatilité du marché et on l'attribue à la figure. Pour chaque mèche, le témoin est un
-niveau fictif placé à la **même distance du prix, du côté opposé**.
+## Les quatre corrections qui ont changé les résultats
 
-## 1. Remplissage des mèches — la règle ne tient pas
+La première version de cette étude donnait des chiffres flatteurs et faux. Ce qui les a
+corrigés, dans l'ordre d'importance :
+
+1. **Observations indépendantes.** J'échantillonnais tous les 6 barres avec un horizon de
+   60 : deux observations voisines partageaient 54 barres de futur sur 60. Le « n = 331 »
+   valait une trentaine d'observations réelles. Le pas vaut désormais l'horizon.
+2. **Groupe témoin pour les mèches.** Dire « 88 % des mèches se remplissent » ne prouve
+   rien tant qu'on ne sait pas à quelle fréquence un niveau *quelconque*, à la même
+   distance, est touché dans le même délai. Le témoin est un niveau fictif placé à la même
+   distance du prix, du côté opposé.
+3. **Biais de construction sur l'acceptance.** « Après une mèche seule, le prix repasse le
+   niveau dans 100 % des cas » était un artefact : une mèche seule se définit par
+   l'absence de clôture au-delà, donc le prix est déjà en deçà au moment du test et
+   « revient » dès la première barre. Les deux états sont maintenant comparés sur la même
+   question, posée symétriquement : où est le prix à la fin de l'horizon ?
+4. **Intervalles de confiance (Wilson) partout.** « 1,00 » sur deux cas s'affiche
+   `1.00 [0.34-1.00]`, ce qui le disqualifie à la lecture.
+
+Un bug a aussi été corrigé au passage : le test « le milieu est-il atteint » mêlait `and`,
+`or` et un ternaire `if/else` dans une seule expression. Il donnait le bon résultat par
+accident de précédence, mais aurait cassé à la première modification.
+
+## 1. Remplissage des mèches — pas d'avantage mesurable
 
 « Long wicks tend to fill sooner rather than later, at least the 50 % level. » C'est sa
 stratégie préférée, citée dans 48 des 158 entrées du relevé.
 
-**En 4h, horizon 60 barres :**
+**ETH 4h, 6 ans — le plus gros échantillon disponible :**
 
-| Mèche | Taille | n | Remplie 50 % | **Témoin 50 %** | Remplie 100 % | **Témoin 100 %** |
-|---|---|---|---|---|---|---|
-| basse | 1–1,5 ATR | 128 | 0,88 | **0,93** | 0,79 | **0,84** |
-| basse | 1,5–2 ATR | 17 | 0,88 | 0,88 | 0,71 | 0,71 |
-| haute | 1–1,5 ATR | 82 | 0,84 | **0,88** | 0,72 | **0,82** |
-| haute | 1,5–2 ATR | 17 | 1,00 | 0,76 | 1,00 | 0,65 |
-
-**En 1D, horizon 30 barres :**
-
-| Mèche | Taille | n | Remplie 50 % | Témoin 50 % | Remplie 100 % | Témoin 100 % |
-|---|---|---|---|---|---|---|
-| basse | 1–1,5 ATR | 21 | 0,86 | 0,76 | 0,67 | 0,67 |
-| basse | 1,5–2 ATR | 11 | 0,91 | 0,82 | 0,55 | **0,73** |
-| haute | 1–1,5 ATR | 20 | 1,00 | 0,80 | 0,85 | 0,55 |
-
-**Verdict : non confirmée.** Sur les deux seules catégories où l'échantillon est suffisant
-(mèches de 1 à 1,5 ATR, n = 128 et 82 en 4h), le taux de remplissage est **inférieur au
-témoin**. Autrement dit, viser le 50 % d'une mèche ne vaut pas mieux que viser un niveau
-pris au hasard à la même distance — et un peu moins bien. Le taux élevé en valeur absolue
-(84 à 88 %) ne dit rien d'autre que « le prix revient souvent sur ses pas en 60 barres ».
-
-Les catégories où la mèche semble battre le témoin (hautes de 1,5 à 2 ATR en 4h : 1,00
-contre 0,76 ; hautes en 1D : 1,00 contre 0,80) comptent 17 et 20 cas. C'est trop peu pour
-en faire une règle, et l'asymétrie haut/bas n'a pas d'explication mécanique évidente.
-
-**Conséquence pour le skill** : ne pas construire le biais sur le remplissage des mèches,
-ni citer un objectif « 50 % de la mèche » comme s'il était probable. On peut mentionner le
-niveau comme repère graphique, en disant qu'il n'a pas d'avantage mesuré.
-
-## 2. Déviation de range — la règle la plus solide
-
-Une sortie du range suivie d'un retour dedans, contre une sortie qui s'installe.
-
-| Cas | n (4h) | Milieu atteint | n (1D) | Milieu atteint |
+| Mèche | Taille | n | Remplie 50 % | Témoin 50 % |
 |---|---|---|---|---|
-| Cassure installée | 331 | **0,32** | 151 | **0,17** |
-| Déviation sous le plancher | 147 | **0,70** | 74 | **0,55** |
-| Déviation au-dessus du plafond | 131 | **0,63** | 51 | 0,43 |
+| basse | 1–1,5 ATR | **224** | 0,88 [0,83–0,92] | 0,86 [0,81–0,90] |
+| haute | 1–1,5 ATR | **122** | 0,93 [0,88–0,97] | 0,89 [0,82–0,93] |
+| basse | 1,5–2 ATR | 33 | 0,88 [0,73–0,95] | 0,76 [0,59–0,87] |
+| haute | 1,5–2 ATR | 21 | 0,90 [0,71–0,97] | 0,67 [0,45–0,83] |
 
-**Verdict : confirmée, et nettement.** Après une déviation, le prix rejoint le milieu du
-range deux fois plus souvent qu'après une cassure installée, sur les deux timeframes et
-avec des effectifs suffisants. C'est exactement la lecture qui manquait le 22/11 : la mèche
-à 55 130 sortait sous le plancher annuel puis y revenait.
+**Verdict : non confirmée pour les mèches courantes.** Sur les deux catégories à fort
+effectif (n = 224 et 122), l'écart avec le témoin est de 2 à 4 points et les intervalles se
+superposent presque entièrement. Viser le 50 % d'une mèche ne vaut pas mieux que viser un
+niveau pris au hasard à la même distance. Le taux de 88 % ne dit rien d'autre que « le prix
+revient souvent sur ses pas ». Sur BTC, le témoin fait même légèrement **mieux** que la
+mèche (0,93 contre 0,88 ; 0,88 contre 0,84).
 
-En 1D, le rendement médian d'une déviation sous le plancher est de +1,96 % à 30 jours,
-contre −0,53 % pour une déviation au-dessus du plafond : l'asymétrie va dans le sens d'un
-marché haussier sur la période, à ne pas prendre pour une loi.
+**Une piste, pas une règle : les mèches hautes de 1,5 à 2 ATR.** BTC donne 1,00 contre un
+témoin à 0,76 (n = 17), ETH donne 0,90 contre 0,67 (n = 21). Deux actifs indépendants, même
+sens, même ampleur — mais 38 cas au total. À surveiller, pas à exploiter.
 
-## 3. Acceptance — confirmée, mais pas pour la raison attendue
+## 2. Déviation de range — confirmée sur ETH, instable sur l'historique BTC
 
-| État | Côté | n (4h) | A continué | **Est revenu** |
+| Jeu | Cassure installée | Déviation haute | Déviation basse |
+|---|---|---|---|
+| BTC 2020–2023 | 0,44 [0,30–0,60] n=36 | 0,56 [0,34–0,75] n=18 | 0,53 [0,31–0,74] n=17 |
+| BTC 2023–2026 | 0,29 [0,15–0,47] n=28 | 0,67 [0,44–0,84] n=18 | 0,67 [0,42–0,85] n=15 |
+| **ETH 2020–2026** | **0,22 [0,15–0,32] n=86** | **0,63 [0,48–0,76] n=41** | **0,68 [0,50–0,81] n=31** |
+
+**Verdict : confirmée, avec une réserve.** Sur ETH, où l'échantillon est trois fois plus
+grand, l'écart est franc et les intervalles sont disjoints : après une déviation, le prix
+rejoint le milieu du range trois fois plus souvent qu'après une cassure installée. Sur BTC
+récent, même ordre de grandeur.
+
+**Mais elle ne tient pas sur BTC 2020–2023** : 0,53 et 0,56 contre 0,44, intervalles
+largement chevauchants. Une règle qui échoue sur une moitié de l'historique ne peut pas
+être présentée comme une loi. Qu'elle se généralise à un autre actif est un meilleur
+argument que sa tenue sur deux périodes du même actif — cela reste un faisceau, pas une
+preuve.
+
+## 3. Acceptance — confirmée, et c'est le résultat le plus stable
+
+Où se trouve le prix à la fin de l'horizon, selon qu'il y a eu acceptance ou simple mèche :
+
+| Jeu | Acceptance (au-dessus) | Mèche seule (au-dessus) | Acceptance (en dessous) | Mèche seule (en dessous) |
 |---|---|---|---|---|
-| Acceptance | au-dessus | 224 | 0,81 | **0,34** |
-| Mèche seule | au-dessus | 40 | 0,78 | **1,00** |
-| Acceptance | en dessous | 156 | 0,89 | **0,40** |
-| Mèche seule | en dessous | 56 | 0,86 | **1,00** |
+| BTC 2020–2023 | 0,70 [0,55–0,82] n=40 | 0,45 [0,21–0,72] n=11 | 0,76 [0,63–0,86] n=51 | 0,50 [0,22–0,78] n=8 |
+| BTC 2023–2026 | 0,79 [0,65–0,89] n=43 | 0,29 [0,08–0,64] n=7 | 0,72 [0,54–0,85] n=29 | 0,31 [0,13–0,58] n=13 |
+| ETH 2020–2026 | 0,85 [0,77–0,90] n=118 | 0,14 [0,04–0,40] n=14 | 0,84 [0,75–0,90] n=99 | 0,21 [0,09–0,43] n=19 |
 
-**Verdict : confirmée, mais son utilité n'est pas celle qu'on croit.** L'acceptance ne
-prédit pas mieux la **continuation** qu'une simple mèche : 81 % contre 78 %, écart
-négligeable. En revanche, après une mèche seule, le prix repasse le niveau dans **100 %**
-des cas, contre 34 à 40 % après une acceptance.
+**Verdict : confirmée sur les trois jeux.** Après une acceptance, le prix est encore du bon
+côté 7 à 8,5 fois sur 10 ; après une simple mèche, 1,4 à 5 fois sur 10. Les intervalles sont
+disjoints sur BTC récent et sur ETH. C'est la règle la plus robuste des trois.
 
-Autrement dit : l'acceptance ne dit pas « ça va monter », elle dit « ça ne va pas revenir
-tout de suite ». C'est un **filtre anti-faux-signal**, pas un signal directionnel. La règle
-« jamais sur une mèche » est donc juste, pour une raison plus précise que l'intuition.
-
-À noter : en 4h, le rendement médian après une acceptance au-dessus est **négatif**
-(−0,68 % à 30 barres). Accepter au-dessus d'un plafond ne garantit nullement la poursuite
-de la hausse.
+Attention cependant : l'acceptance dit « le niveau est franchi pour de bon », pas « le prix
+va continuer dans ce sens ». Le rendement médian après une acceptance au-dessus d'un
+plafond est **négatif** sur BTC (−1,52 % et −0,67 %). C'est un filtre de validité de
+cassure, pas un signal directionnel.
 
 ## Ce que ces mesures changent pour le skill
 
-1. **Déviation** : critère de premier rang, avec sa statistique affichée.
-2. **Acceptance** : critère de confirmation, présenté comme filtre et non comme direction.
-3. **Mèches** : rétrogradées au rang de repère graphique, sans objectif probabiliste.
+1. **Acceptance** : critère de confirmation de premier rang, le mieux établi. Présenté
+   comme filtre de validité, jamais comme direction.
+2. **Déviation** : critère de premier rang, avec sa statistique et sa réserve affichées
+   (instable sur BTC 2020–2023).
+3. **Mèches** : repère graphique sans objectif probabiliste. Le niveau 50 % peut être
+   tracé, mais on ne dira pas qu'il est « probable ».
 
-## Limites
+## Limites qui subsistent
 
-- Un seul actif, une seule période. BTC 2020–2026 contient deux marchés haussiers et deux
-  krachs ; rien ne dit que ces taux tiennent ailleurs.
-- La détection de range (`structure.find_range`) a ses propres paramètres ; d'autres
-  réglages donneraient d'autres effectifs. Les écarts mesurés sont assez larges pour y
-  résister, mais pas les cas à moins de trente observations.
+- Deux actifs seulement, très corrélés : ETH n'est pas un contrôle totalement indépendant
+  de BTC.
+- La détection de range a ses propres paramètres ; d'autres réglages donneraient d'autres
+  effectifs. Les écarts mesurés y résistent, mais pas les catégories à moins de trente cas.
 - Le témoin des mèches est symétrique en distance, pas en contexte : il ne tient pas compte
   du fait qu'une mèche se forme après un mouvement, donc dans un état de marché particulier.
+- Aucune correction pour les tests multiples : en mesurant trois règles sur plusieurs
+  catégories, un écart apparent sur un petit effectif peut n'être que du bruit.

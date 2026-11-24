@@ -188,3 +188,27 @@ def test_ema_state_detecte_la_surextension():
     assert st2["above"] is False and st2["stretch_atr"] < 0
 
     assert S.ema_state(_ohlc([1.0] * 10), period=50)["ema"] is None
+
+
+# ----------------------------------------------------------------- étude des règles
+
+def test_wilson_encadre_la_proportion():
+    """Un taux sans son intervalle n'est pas un résultat : 1,00 sur 2 cas ne vaut pas
+    1,00 sur 200."""
+    from screener.htf.rules_study import wilson
+    lo, hi = wilson(113, 128)
+    assert lo < 113 / 128 < hi and hi - lo < 0.15
+    lo2, hi2 = wilson(2, 2)
+    assert lo2 < 0.4 and hi2 == 1.0          # deux cas n'excluent presque rien
+    assert all(np.isnan(x) for x in wilson(0, 0))
+
+
+def test_study_deviations_echantillonne_sans_chevauchement():
+    """Un pas plus court que l'horizon fait partager leur futur à deux observations et
+    gonfle l'effectif : le pas par défaut vaut donc l'horizon."""
+    import inspect
+
+    from screener.htf import rules_study as R
+    src = inspect.getsource(R.study_deviations)
+    assert "step = int(step or horizon)" in src
+    assert inspect.signature(R.study_deviations).parameters["step"].default is None
