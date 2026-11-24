@@ -93,7 +93,10 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
     `drift_frac` : part des fermetures répartie uniformément sur tout le carnet, le reste
     étant concentré près du prix. Sans elle, une position loin du prix ne serait jamais
     soldée volontairement.
-    `unlevered_frac` : part des positions **sans niveau de liquidation atteignable** —
+    `leverage_tiers` : soit `{levier: poids}`, soit `{"long": {...}, "short": {...}}` pour
+    des profils distincts par côté — c'est ce que produit `calibrate.fit_leverage_tiers`.
+    `unlevered_frac` : nombre, ou `{"long": x, "short": y}`. Part des positions **sans
+    niveau de liquidation atteignable** —
     cross margin largement collatéralisé, couverture, teneur de marché. Les positions
     réelles lues sur Hyperliquid le confirment : les gros comptes en cross affichent des
     prix de liquidation très éloignés du marché. Sans ce palier, tout ce qui est loin du
@@ -121,17 +124,34 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
     if n == 0:
         raise ValueError("grille de prix vide")
 
-    unlev = float(np.clip(unlevered_frac, 0.0, 1.0))
-    tiers = {L_: w * (1.0 - unlev) for L_, w in tiers.items()}
-    levs = sorted(tiers)
+    # `leverage_tiers` accepte un dict unique (mêmes paliers des deux côtés) ou
+    # {"long": {...}, "short": {...}} : les longs et les shorts n'ont pas le même profil de
+    # levier, et les confondre déplace les amas (vérifié sur le 22/11).
+    if set(tiers) == {"long", "short"}:
+        by_side = {s: dict(tiers[s]) for s in ("long", "short")}
+    else:
+        by_side = {"long": dict(tiers), "short": dict(tiers)}
+    if isinstance(unlevered_frac, dict):
+        unlev = {s: float(np.clip(unlevered_frac.get(s, 0.0), 0.0, 1.0))
+                 for s in ("long", "short")}
+    else:
+        u = float(np.clip(unlevered_frac, 0.0, 1.0))
+        unlev = {"long": u, "short": u}
+    by_side = {s: {L_: w * (1.0 - unlev[s]) for L_, w in by_side[s].items()}
+               for s in ("long", "short")}
+    levs = sorted(set(by_side["long"]) | set(by_side["short"]))
     # carnet[side][k] : quantité ouverte au niveau d'entrée i, au levier levs[k]
     book = {"long": np.zeros((len(levs), n)), "short": np.zeros((len(levs), n))}
     # positions sans liquidation atteignable, suivies à part (elles ne brûlent jamais)
     safe = np.zeros(n)
     age = np.zeros(n)
     burned = {"long": 0.0, "short": 0.0}
+    # série temporelle du carburant brûlé par barre et par côté : c'est elle qu'on confronte
+    # aux liquidations réellement exécutées pour calibrer la distribution des leviers.
+    burn_ts = {"long": np.zeros(len(df)), "short": np.zeros(len(df))}
     shifts = {"long": np.array([1.0 - 1.0 / L for L in levs]),
               "short": np.array([1.0 + 1.0 / L for L in levs])}
+    mean_unlev = 0.5 * (unlev["long"] + unlev["short"])
 
     atr = (df["high"] - df["low"]).rolling(14, min_periods=1).mean()
     vol = df["volume"] if "volume" in df.columns else pd.Series(1.0, index=df.index)
@@ -158,7 +178,9 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
             for k, sh in enumerate(shifts[s]):
                 hit = (grid * sh >= lo_b) & (grid * sh <= hi_b)
                 if hit.any():
-                    burned[s] += float(book[s][k][hit].sum())
+                    q = float(book[s][k][hit].sum())
+                    burned[s] += q
+                    burn_ts[s][i] += q
                     book[s][k][hit] = 0.0
 
         positions = book["long"].sum(axis=0) + book["short"].sum(axis=0) + safe
@@ -201,8 +223,10 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
                 if part <= 0:
                     continue
                 for k, L_ in enumerate(levs):
-                    book[s][k] += add * part * tiers[L_]
-            safe += add * unlev
+                    w_ = by_side[s].get(L_, 0.0)
+                    if w_:
+                        book[s][k] += add * part * w_
+                safe += add * part * unlev[s]
 
         age = np.where((book["long"].sum(axis=0) + book["short"].sum(axis=0) + safe) > 0,
                        age + 1.0, 0.0)
@@ -220,6 +244,8 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
             "positions": book["long"].sum(axis=0) + book["short"].sum(axis=0) + safe,
             "liq_long": liq["long"], "liq_short": liq["short"],
             "burned_long": burned["long"], "burned_short": burned["short"],
+            "burn_long_ts": pd.Series(burn_ts["long"], index=df.index),
+            "burn_short_ts": pd.Series(burn_ts["short"], index=df.index),
             "price": float(df["close"].iloc[-1]), "asof": df.index[-1]}
 
 

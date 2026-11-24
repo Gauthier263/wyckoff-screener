@@ -12,6 +12,7 @@ import pandas as pd
 
 from .. import data as D
 from ..clock import fmt
+from . import calibrate as C
 from . import liqmap as L
 
 # Relevés lus sur les captures Hyblock publiées par CrypNuevo (cf. research/crypnuevo_tweets.md).
@@ -75,10 +76,24 @@ def load_frozen(asof, lookback_days: int = 30, timeframe: str = "1h",
     return df, oi, delta
 
 
-def replay(asof, lookback_days: int = 30, timeframe: str = "1h", **kw) -> dict:
+def replay(asof, lookback_days: int = 30, timeframe: str = "1h",
+           calibrated: bool = True, **kw) -> dict:
+    """Carte figée à `asof`. Avec `calibrated`, les paliers de levier sont ajustés sur les
+    liquidations réellement exécutées de la fenêtre au lieu d'être postulés."""
     df, oi, delta = load_frozen(asof, lookback_days, timeframe)
     if df.empty or oi is None or len(oi) == 0:
         raise RuntimeError(f"données indisponibles pour {asof}")
+    if calibrated and "leverage_tiers" not in kw:
+        end = pd.Timestamp(asof, tz="UTC")
+        obs = C.observed_liquidations("BTC/USDT", timeframe,
+                                      end - pd.Timedelta(days=lookback_days), end, df.index)
+        if obs is not None:
+            fitted = C.fit_leverage_tiers(df, oi, delta, obs, step_pct=0.002)
+            kw["leverage_tiers"] = fitted["tiers"]
+            kw["unlevered_frac"] = fitted["unlevered_frac"]
+            m = L.build_map(df, oi, delta, **kw)
+            m["calibration"] = fitted
+            return m
     return L.build_map(df, oi, delta, **kw)
 
 

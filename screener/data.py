@@ -483,9 +483,13 @@ def fetch_long_short_ratio(symbol: str = "BTC/USDT", timeframe: str = "15m", lim
 
 def fetch_liquidations(symbol: str = "BTC/USDT", timeframe: str = "15m", limit: int = 120,
                        start=None, end=None, exch: str = "A") -> "pd.DataFrame | None":
-    """Liquidations (USD, Binance via Coinalyze) → DataFrame [long_liq, short_liq] indexé ts
-    UTC, ou None. **long_liq** élevé = cascade de longs liquidés (chute) ; **short_liq** =
-    short squeeze. ≈0 = mouvement ordonné (pas de panique forcée)."""
+    """Liquidations (Binance via Coinalyze) → DataFrame [long_liq, short_liq] indexé ts UTC,
+    ou None. **Unité : le COIN (BTC), pas l'USD** — Coinalyze renvoie la devise de base tant
+    que `convert_to_usd` n'est pas demandé (vérifié : ~22 600 BTC de longs liquidés sur les
+    30 jours au 22/11/2026 ; en dollars ce chiffre n'aurait aucun sens). Ne jamais diviser
+    par le prix pour « convertir » : la valeur est déjà en coin.
+    **long_liq** élevé = cascade de longs liquidés (chute) ; **short_liq** = short squeeze.
+    ≈0 = mouvement ordonné (pas de panique forcée)."""
     h = _coinalyze_history("liquidation-history", symbol, timeframe, limit, start, end, exch)
     if not h:
         return None
