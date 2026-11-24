@@ -40,7 +40,7 @@ def tap_trades(df: pd.DataFrame, pivot: int = 5, touch_atr: float = 0.5,
                bounce_atr: float = 2.0, min_height_atr: float = 4.0,
                break_atr: float = 1.0, dev_atr: float = 0.25, stop_atr: float = 0.25,
                max_span: int = 200, horizon: int = 200, max_taps: int = 4,
-               lookback: int = 60) -> pd.DataFrame:
+               lookback: int = 60, stop_mode: str = "meche") -> pd.DataFrame:
     """Trades « achat à la touche k » sur toutes les séquences de touches d'un plancher (pur).
 
     - **Touche 1** : un plus bas pivot (`pivot` bougies de chaque côté). Comme un pivot n'est
@@ -112,19 +112,31 @@ def tap_trades(df: pd.DataFrame, pivot: int = 5, touch_atr: float = 0.5,
         busy_until = j
 
         def outcome(entry_i, entry, stop, target):
+            """Issue et résultat en R. `stop_mode="meche"` : stop touché par une mèche,
+            perte de 1 R. `stop_mode="acceptance"` : sa méthode, sortie seulement après
+            deux clôtures consécutives sous le stop, au prix de la seconde — la perte
+            peut alors dépasser 1 R, mais une mèche de chasse aux stops ne fait pas sortir."""
             fut_hi = hi[entry_i + 1:entry_i + 1 + horizon]
             fut_lo = lo[entry_i + 1:entry_i + 1 + horizon]
+            fut_cl = cl[entry_i + 1:entry_i + 1 + horizon]
+            risk = entry - stop
             hit_t = np.flatnonzero(fut_hi >= target)
-            hit_s = np.flatnonzero(fut_lo <= stop)
             ft = hit_t[0] if len(hit_t) else None
-            fs = hit_s[0] if len(hit_s) else None
+            if stop_mode == "acceptance":
+                below = fut_cl < stop
+                fs = next((x for x in range(1, len(below)) if below[x] and below[x - 1]), None)
+                exit_px = fut_cl[fs] if fs is not None else None
+            else:
+                hit_s = np.flatnonzero(fut_lo <= stop)
+                fs = hit_s[0] if len(hit_s) else None
+                exit_px = stop
             if ft is None and fs is None:
-                return "ouvert", None
+                return "ouvert", None, (fut_cl[-1] - entry) / risk if len(fut_cl) else 0.0
             if fs is None or (ft is not None and ft < fs):
-                return "cible", int(ft) + 1
+                return "cible", int(ft) + 1, (target - entry) / risk
             if ft is None or fs < ft:
-                return "stop", int(fs) + 1
-            return "indéterminé", None
+                return "stop", int(fs) + 1, (exit_px - entry) / risk
+            return "indéterminé", None, None
 
         for k, t in enumerate(taps, start=1):
             gaps = [taps[x] - taps[x - 1] for x in range(1, k)]
@@ -153,12 +165,13 @@ def tap_trades(df: pd.DataFrame, pivot: int = 5, touch_atr: float = 0.5,
                     stop = lo[i0:entry_i + 1].min() - stop_atr * at_
                     target = level + 0.5 * (seg_hi - level)
                     if stop < entry < target:
-                        issue, bars = outcome(entry_i, entry, stop, target)
+                        issue, bars, res = outcome(entry_i, entry, stop, target)
                         rows.append({**base, "protocole": "contact", "at": df.index[entry_i],
                                      "entry": float(entry), "stop": float(stop),
                                      "target": float(target),
                                      "r": float((target - entry) / (entry - stop)),
-                                     "issue": issue, "bars": bars, "deviation": False})
+                                     "issue": issue, "bars": bars, "result_r": res,
+                                     "deviation": False})
 
             # --- protocole « reprise » (sa méthode) : la touche passe sous le niveau de plus
             # de dev_atr ATR (chasse aux stops), puis une bougie clôture de nouveau au-dessus
@@ -181,7 +194,8 @@ def tap_trades(df: pd.DataFrame, pivot: int = 5, touch_atr: float = 0.5,
             if rec is None:
                 rows.append({**base, "protocole": "reprise", "at": df.index[dev_i],
                              "entry": None, "stop": None, "target": None, "r": None,
-                             "issue": "pas de reprise", "bars": None, "deviation": True})
+                             "issue": "pas de reprise", "bars": None, "result_r": None,
+                             "deviation": True})
                 continue
             at_ = a[rec] if np.isfinite(a[rec]) else a[t]
             seg_hi = hi[max(0, i0 - lookback):rec + 1].max()
@@ -192,11 +206,11 @@ def tap_trades(df: pd.DataFrame, pivot: int = 5, touch_atr: float = 0.5,
             target = level + 0.5 * (seg_hi - level)
             if not (stop < entry < target):
                 continue
-            issue, bars = outcome(rec, entry, stop, target)
+            issue, bars, res = outcome(rec, entry, stop, target)
             rows.append({**base, "protocole": "reprise", "at": df.index[rec],
                          "entry": float(entry), "stop": float(stop), "target": float(target),
                          "r": float((target - entry) / (entry - stop)),
-                         "issue": issue, "bars": bars, "deviation": True})
+                         "issue": issue, "bars": bars, "result_r": res, "deviation": True})
     return pd.DataFrame(rows)
 
 
@@ -214,8 +228,14 @@ def both_sides(df: pd.DataFrame, **kw) -> pd.DataFrame:
 
 
 def expectancy(g: pd.DataFrame) -> float:
-    """Espérance en R des trades tranchés : +R si la cible est atteinte, −1 sinon (pur)."""
+    """Espérance en R des trades tranchés (pur).
+
+    Utilise `result_r` quand il existe (perte réelle, qui peut dépasser 1 R avec un stop
+    en clôture) ; sinon +R si la cible est atteinte, −1 sinon.
+    """
     t = g[g["issue"].isin(("cible", "stop"))]
     if t.empty:
         return float("nan")
+    if "result_r" in t and t["result_r"].notna().all():
+        return float(t["result_r"].mean())
     return float(np.where(t["issue"] == "cible", t["r"], -1.0).mean())

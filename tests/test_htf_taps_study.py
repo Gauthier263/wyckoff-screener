@@ -68,3 +68,20 @@ def test_expectancy():
     g = pd.DataFrame({"issue": ["cible", "stop", "ouvert", "pas de reprise"],
                       "r": [2.0, 1.0, 5.0, None]})
     assert T.expectancy(g) == 0.5                # (+2 − 1) / 2, le trade ouvert exclu
+
+
+def test_stop_en_acceptance_ne_sort_pas_sur_une_meche():
+    """Sa méthode : l'invalidation est l'acceptance sous le niveau, pas une mèche. Une
+    mèche isolée sous le stop ne fait pas sortir ; deux clôtures dessous, si."""
+    pts = PRE + [110, 100, 118, 100.3, 100.3, 112, 121]
+    df = _path(pts, per=6)
+    # juste après l'entrée au contact de la 2e touche, une mèche plonge sous le stop
+    base = T.tap_trades(df, pivot=3, min_height_atr=2.0, horizon=60)
+    t2 = base[(base["protocole"] == "contact") & (base["k"] == 2)].iloc[0]
+    i_entry = df.index.get_loc(t2["at"])
+    df.iloc[i_entry + 1, df.columns.get_loc("low")] = 95.0
+    meche = T.tap_trades(df, pivot=3, min_height_atr=2.0, horizon=60)
+    accep = T.tap_trades(df, pivot=3, min_height_atr=2.0, horizon=60, stop_mode="acceptance")
+    m2 = meche[(meche["protocole"] == "contact") & (meche["k"] == 2)].iloc[0]
+    a2 = accep[(accep["protocole"] == "contact") & (accep["k"] == 2)].iloc[0]
+    assert m2["issue"] == "stop" and a2["issue"] == "cible"
