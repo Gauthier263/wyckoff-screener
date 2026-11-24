@@ -48,7 +48,7 @@ def evaluate_one(ref: dict, lookback_days: int = 30, timeframe: str = "4h",
             end = pd.Timestamp(ref["asof"], tz="UTC")
             obs = C.observed_liquidations("BTC/USDT", timeframe,
                                           end - pd.Timedelta(days=lookback_days), end,
-                                          df.index)
+                                          df.index, venues=vs)
             if obs is not None:
                 fit = C.fit_leverage_tiers(df, oi, delta, obs, step_pct=0.002)
                 kw["leverage_tiers"] = fit["tiers"]

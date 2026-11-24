@@ -100,16 +100,17 @@ def load_frozen(asof, lookback_days: int = 30, timeframe: str = "1h",
 
 
 def replay(asof, lookback_days: int = 30, timeframe: str = "1h",
-           calibrated: bool = True, **kw) -> dict:
+           calibrated: bool = True, venues=("binance",), **kw) -> dict:
     """Carte figée à `asof`. Avec `calibrated`, les paliers de levier sont ajustés sur les
     liquidations réellement exécutées de la fenêtre au lieu d'être postulés."""
-    df, oi, delta = load_frozen(asof, lookback_days, timeframe)
+    df, oi, delta = load_frozen(asof, lookback_days, timeframe, venues=venues)
     if df.empty or oi is None or len(oi) == 0:
         raise RuntimeError(f"données indisponibles pour {asof}")
     if calibrated and "leverage_tiers" not in kw:
         end = pd.Timestamp(asof, tz="UTC")
         obs = C.observed_liquidations("BTC/USDT", timeframe,
-                                      end - pd.Timedelta(days=lookback_days), end, df.index)
+                                      end - pd.Timedelta(days=lookback_days), end,
+                                      df.index, venues=venues)
         if obs is not None:
             fitted = C.fit_leverage_tiers(df, oi, delta, obs, step_pct=0.002)
             kw["leverage_tiers"] = fitted["tiers"]

@@ -40,17 +40,29 @@ CANDIDATE_LEVERAGES = (5, 10, 20, 25, 50, 100)
 
 
 def observed_liquidations(symbol: str, timeframe: str, start, end,
-                          index: pd.Index) -> "pd.DataFrame | None":
+                          index: pd.Index, venues=("binance",)) -> "pd.DataFrame | None":
     """Liquidations exécutées, en **coin**, réalignées sur `index`.
 
     `fetch_liquidations` renvoie déjà des BTC (et non des dollars, contrairement à ce que
     disait sa docstring) : aucune conversion par le prix ne doit être faite ici.
+
+    `venues` doit couvrir **les mêmes bourses que l'OI** passé à la calibration. Calibrer
+    des paliers de levier sur les liquidations de Binance seule, puis les appliquer à un OI
+    agrégé Binance + Bybit, revient à prêter aux positions Bybit le comportement de celles
+    de Binance : mesuré, cela fait chuter la précision de placement de 30 % à 5 %.
     """
-    df = D.fetch_liquidations(symbol, timeframe, start=start, end=end)
-    if df is None or df.empty:
+    from .replay import VENUES
+
+    frames = []
+    for v in venues:
+        df = D.fetch_liquidations(symbol, timeframe, start=start, end=end,
+                                  exch=VENUES.get(v, v))
+        if df is not None and not df.empty:
+            frames.append(df.reindex(index).fillna(0.0))
+    if not frames:
         return None
-    df = df.reindex(index).fillna(0.0)
-    return pd.DataFrame({"long": df["long_liq"], "short": df["short_liq"]})
+    tot = sum(frames)
+    return pd.DataFrame({"long": tot["long_liq"], "short": tot["short_liq"]})
 
 
 def predicted_burn(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None",
