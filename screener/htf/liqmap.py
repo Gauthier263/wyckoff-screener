@@ -60,17 +60,31 @@ def _bucket(grid: np.ndarray, price: float) -> int:
     return int(np.clip(np.searchsorted(grid, price) - 1, 0, len(grid) - 1))
 
 
-def side_split(delta: float, volume: float, sensitivity: float = 2.0) -> float:
-    """Part des nouvelles positions dont l'**initiateur** est long, dans [0, 1] (pur).
+def side_split(delta: float, volume: float, sensitivity: float = 2.0,
+               mode: str = "contrarian") -> float:
+    """Part des nouvelles positions **liquidables** qui sont longues, dans [0, 1] (pur).
 
-    Depuis le delta agressif de la barre (taker achat − taker vente) rapporté au volume :
-    un flux acheteur dominant sur une barre où l'OI monte = des longs qui ouvrent au marché.
+    Le delta agressif de la barre (taker achat − taker vente) dit **qui frappe au marché**,
+    pas qui ouvre la position à levier qui sera liquidée plus tard. Pendant une chute, les
+    ventes agressives sont surtout des longs qui sortent ou qui sont liquidés ; la position
+    neuve à fort levier est prise en face, par celui qui achète le creux. C'est la même
+    nuance que la grille delta perp × OI de la doctrine : un delta ne nomme pas un ouvreur.
+
+    - `mode="contrarian"` (défaut) : la position neuve liquidable est **opposée** à
+      l'agresseur. Mesuré sur 23 cartes Hyblock de 2026, ce choix donne le bon côté
+      74 % du temps, contre 26 % pour l'autre — voir `research/liqmap_validation.md`.
+    - `mode="aggressor"` : l'agresseur est l'ouvreur. Conservé pour pouvoir rejouer la
+      comparaison, jamais comme réglage par défaut.
+
     Un flux nul, un volume nul ou une valeur illisible donnent 0.5, c'est-à-dire « on ne
     tranche pas » — jamais une direction inventée.
     """
     if not volume or volume <= 0 or delta is None or not np.isfinite(delta):
         return 0.5
-    return 0.5 + 0.5 * float(np.clip(sensitivity * delta / volume, -1.0, 1.0))
+    r = float(np.clip(sensitivity * delta / volume, -1.0, 1.0))
+    if mode == "contrarian":
+        r = -r
+    return 0.5 + 0.5 * r
 
 
 def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
@@ -78,6 +92,7 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
               close_proximity_atr: float = 1.5, churn_frac: float = 0.01,
               drift_frac: float = 0.05, unlevered_frac: float = 0.45,
               seed_bars: int = 0, profit_pull: float = 3.0, profit_scale: float = 0.10,
+              side_mode: str = "contrarian",
               leverage_tiers: "dict | None" = None) -> dict:
     """Carte des positions ouvertes et des liquidations estimées.
 
@@ -101,6 +116,8 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
     Sans amorçage, on ne reconstruit que le *flux* de la fenêtre et non le *stock* : la
     masse du profil tombe alors à quelques milliers de BTC pour un OI réel de 92 000, et
     les amas lus ne sont plus que du bruit.
+    `side_mode` : voir `side_split` — qui, de l'agresseur ou de sa contrepartie, porte la
+    position liquidable. Le défaut `contrarian` est celui que mesure le banc de validation.
     `profit_pull` / `profit_scale` : force et échelle de la prise de profit. Une position
     en gain de `profit_scale` (10 % par défaut) est `1 + profit_pull` fois plus susceptible
     d'être soldée qu'une position à l'équilibre. Sans ce terme, les shorts ouverts très haut
@@ -272,7 +289,7 @@ def build_map(df: pd.DataFrame, oi: pd.Series, delta: "pd.Series | None" = None,
             with np.errstate(invalid="ignore", divide="ignore"):
                 age = np.where(tot > 0, age * positions / np.maximum(tot, 1e-12), 0.0)
             d_i = float(delta.iloc[i]) if delta is not None else float("nan")
-            p_long = side_split(d_i, float(vol.iloc[i]))
+            p_long = side_split(d_i, float(vol.iloc[i]), mode=side_mode)
             for s, part in (("long", p_long), ("short", 1.0 - p_long)):
                 if part <= 0:
                     continue

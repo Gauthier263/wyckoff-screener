@@ -21,11 +21,19 @@ def test_price_grid_geometrique():
 
 
 def test_side_split_sans_flux_ne_tranche_pas():
-    assert L.side_split(0.0, 100.0) == 0.5
-    assert L.side_split(50.0, 0.0) == 0.5          # volume nul
-    assert L.side_split(float("nan"), 100.0) == 0.5
-    assert L.side_split(100.0, 100.0) == 1.0       # flux 100 % acheteur -> longs
-    assert L.side_split(-100.0, 100.0) == 0.0
+    for mode in ("contrarian", "aggressor"):
+        assert L.side_split(0.0, 100.0, mode=mode) == 0.5
+        assert L.side_split(50.0, 0.0, mode=mode) == 0.5           # volume nul
+        assert L.side_split(float("nan"), 100.0, mode=mode) == 0.5
+
+
+def test_side_split_les_deux_modes_sont_opposes():
+    """Le delta dit qui frappe, pas qui ouvre la position liquidable : en mode
+    contrarian (défaut), la position neuve est en face de l'agresseur."""
+    assert L.side_split(100.0, 100.0, mode="aggressor") == 1.0     # achat agressif -> longs
+    assert L.side_split(100.0, 100.0, mode="contrarian") == 0.0    # ... la contrepartie shorte
+    assert L.side_split(-100.0, 100.0, mode="aggressor") == 0.0
+    assert L.side_split(-100.0, 100.0, mode="contrarian") == 1.0
 
 
 def test_positions_se_deposent_au_prix_douverture():
@@ -53,14 +61,16 @@ def test_liquidations_longues_sous_le_prix_et_courtes_au_dessus():
     df = _bars([60000] * 10)
     oi = pd.Series(np.linspace(1000, 1100, 10), index=df.index)
     delta = pd.Series(np.ones(10), index=df.index)      # flux 100 % acheteur -> longs
-    m = L.build_map(df, oi, delta, step_pct=0.002, leverage_tiers={10: 1.0})
+    m = L.build_map(df, oi, delta, step_pct=0.002, side_mode="aggressor",
+                    leverage_tiers={10: 1.0})
     g = m["grid"]
     assert m["liq_long"].sum() > 0
     assert m["liq_short"].sum() == 0                    # aucun short initiateur
     peak = g[int(np.argmax(m["liq_long"]))]
     assert abs(peak / (60000 * 0.9) - 1) < 0.01         # levier 10 -> -10 %
 
-    m2 = L.build_map(df, oi, -delta, step_pct=0.002, leverage_tiers={10: 1.0})
+    m2 = L.build_map(df, oi, -delta, step_pct=0.002, side_mode="aggressor",
+                     leverage_tiers={10: 1.0})
     peak2 = m2["grid"][int(np.argmax(m2["liq_short"]))]
     assert abs(peak2 / (60000 * 1.1) - 1) < 0.01        # shorts -> +10 %
     assert m2["liq_long"].sum() == 0
@@ -72,14 +82,16 @@ def test_carburant_consomme_quand_le_prix_le_traverse():
     df_a = _bars(monte)
     oi_a = pd.Series(np.linspace(1000, 1100, 10), index=df_a.index)
     delta_a = pd.Series(-np.ones(10), index=df_a.index)   # shorts -> liquidations à 66 000
-    m_a = L.build_map(df_a, oi_a, delta_a, step_pct=0.002, leverage_tiers={10: 1.0})
+    m_a = L.build_map(df_a, oi_a, delta_a, step_pct=0.002, side_mode="aggressor",
+                      leverage_tiers={10: 1.0})
     assert m_a["liq_short"].sum() > 0
 
     # même séquence, puis le prix va chercher 66 000 : le carburant doit y brûler
     df_b = _bars(monte + [62000, 64000, 66000, 65000])
     oi_b = pd.Series(np.r_[np.linspace(1000, 1100, 10), [1100.0] * 4], index=df_b.index)
     delta_b = pd.Series(np.r_[-np.ones(10), np.zeros(4)], index=df_b.index)
-    m_b = L.build_map(df_b, oi_b, delta_b, step_pct=0.002, leverage_tiers={10: 1.0})
+    m_b = L.build_map(df_b, oi_b, delta_b, step_pct=0.002, side_mode="aggressor",
+                      leverage_tiers={10: 1.0})
     g = m_b["grid"]
     around = (g >= 65800) & (g <= 66200)
     assert m_b["liq_short"][around].sum() == 0
@@ -124,21 +136,21 @@ def test_les_longs_hauts_sont_liquides_quand_le_prix_seffondre():
     oi = pd.Series(np.r_[np.linspace(1000, 2000, 30), np.full(30, 2000.0)], index=df.index)
     delta = pd.Series(np.r_[np.full(30, 100.0), np.zeros(30)], index=df.index)  # longs
 
-    m = L.build_map(df, oi, delta, step_pct=0.002, churn_frac=0.0,
+    m = L.build_map(df, oi, delta, step_pct=0.002, churn_frac=0.0, side_mode="aggressor",
                     unlevered_frac=0.0, leverage_tiers={10: 1.0})
     g, pos = m["grid"], m["positions"]
     assert m["burned_long"] > 0                     # des longs liquidés en route
     assert pos[g >= 74000].sum() < 1e-6             # plus rien n'est resté ouvert en haut
 
     # à l'inverse, des SHORTS ouverts à 76k survivent à la chute : ils sont en gain
-    m2 = L.build_map(df, oi, -delta, step_pct=0.002, churn_frac=0.0,
+    m2 = L.build_map(df, oi, -delta, step_pct=0.002, churn_frac=0.0, side_mode="aggressor",
                      unlevered_frac=0.0, leverage_tiers={10: 1.0})
     assert m2["burned_short"] == 0
     assert m2["positions"][m2["grid"] >= 74000].sum() > 0
 
     # avec un palier non liquidable, une part des longs hauts survit : c'est ce que
     # montrent les positions réelles Hyperliquid (cross très collatéralisé)
-    m3 = L.build_map(df, oi, delta, step_pct=0.002, churn_frac=0.0,
+    m3 = L.build_map(df, oi, delta, step_pct=0.002, churn_frac=0.0, side_mode="aggressor",
                      unlevered_frac=0.5, leverage_tiers={10: 1.0})
     assert m3["positions"][m3["grid"] >= 74000].sum() > 0
 
