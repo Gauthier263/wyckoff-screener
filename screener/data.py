@@ -366,10 +366,18 @@ def _coinalyze_key() -> "str | None":
     return None
 
 
+# Coinalyze ne nomme pas les perpétuels de la même façon selon la bourse : Binance (.A) et
+# OKX (.3) utilisent le suffixe `_PERP`, Bybit (.6) non (`BTCUSDT.6`). Sans cette table, une
+# requête Bybit renvoie simplement « pas de données » — en silence, ce qui laisse croire que
+# la bourse n'est pas couverte. Codes : A Binance, 6 Bybit, 3 OKX, 2 Deribit, H Hyperliquid.
+_COINALYZE_NO_PERP_SUFFIX = {"6"}
+
+
 def _coinalyze_symbol(symbol: str, exch: str = "A") -> str:
-    """BTC/USDT -> 'BTCUSDT_PERP.A' (suffixe .A = Binance chez Coinalyze)."""
+    """BTC/USDT -> 'BTCUSDT_PERP.A' (Binance), 'BTCUSDT.6' (Bybit)."""
     base, quote = symbol.split("/")
-    return f"{base}{quote}_PERP.{exch}"
+    suffix = "" if exch in _COINALYZE_NO_PERP_SUFFIX else "_PERP"
+    return f"{base}{quote}{suffix}.{exch}"
 
 
 def fetch_coinalyze_oi(symbol: str = "BTC/USDT", timeframe: str = "5m", limit: int = 300,
