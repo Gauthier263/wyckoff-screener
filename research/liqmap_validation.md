@@ -16,16 +16,49 @@ mesurer un **placement**, pas à recopier un chiffre.
 
 ## Résultat
 
-| Mesure | Score | Lecture |
-|---|---|---|
-| **Murs de positions** placés à ±1,5 % | **100 %** (2 / 2) | 76 600 → 75 912 (0,50 %) ; 58 600 → 59 397 (0,35 %) |
-| **Bon côté** du prix pour l'amas le plus dense | **65 %** (15 / 23) | deux fois sur trois |
-| Erreur **médiane** de placement des amas | **2,4 %** | |
-| Amas placés à ±1,5 % | 30 % (7 / 23) | |
-| Amas tombant dans sa bande annoncée | 22 % (5 / 23) | |
-| Sens du comptage de niveaux | 50 % (2 / 4) | |
+Cinq configurations mesurées sur le même jeu de points :
 
-## La découverte qui a tout changé : le côté était inversé
+| Configuration | Bon côté | Amas à ±1,5 % | Erreur médiane | Murs |
+|---|---|---|---|---|
+| Agresseur, Binance | 26 % | 26 % | 3,58 % | 2/2 |
+| Contrarian, Binance | 65 % | 30 % | 2,38 % | 2/2 |
+| **+ horodatages exacts des captures (défaut)** | 61 % | **30 %** | **2,04 %** | 2/2 |
+| + Binance et Bybit | **73 %** | 5 % | 2,71 % | 2/2 |
+| + calibration sur les mêmes bourses | 68 % | 9 % | 2,47 % | 2/2 |
+
+Lecture :
+
+- **Les murs de positions tiennent partout** : 2 sur 2, à 0,35 % et 0,50 % (76 600 → 75 912,
+  58 600 → 59 397). Seule brique solide — mais seulement **deux points de contrôle**, les
+  deux seules captures « Open Positions » disponibles.
+- **Le côté du carburant est fiable aux deux tiers**, et l'ajout de Bybit l'améliore
+  (61 % → 73 %) : plus de couverture, meilleure vue d'ensemble.
+- **Le placement précis des amas est mauvais dans toutes les configurations.** Au mieux
+  30 % à ±1,5 %, erreur médiane 2 %. Aucun réglage essayé ne renverse cela.
+
+On pourrait retenir une configuration par métrique — multi-bourses pour le côté, Binance
+pour le placement. Sur 22 points, ce serait du sur-ajustement déguisé. Le défaut reste donc
+**Binance seul**, qui a la plus faible erreur médiane ; `--match-venues` reste disponible
+pour qui veut privilégier le côté.
+
+## Quatre corrections, dont trois venues des points de contrôle
+
+1. **Le côté était inversé** (détail ci-dessous) : 26 % → 65 %.
+2. **Les horodatages étaient ceux des tweets**, pas des cartes (« Last Updated ») : écarts
+   de 1 à 5 heures. Erreur médiane 2,38 % → 2,04 %.
+3. **Les couvertures diffèrent** : les heatmaps agrègent Binance + Bybit + Bitmex, les
+   Liquidation Levels et Open Positions sont Binance seul. Une part de l'écart ne venait
+   pas du modèle. Coinalyze n'expose pas Bitmex : le rapprochement reste partiel.
+4. **Calibrer sur les mêmes bourses que l'OI** : prêter aux positions Bybit les paliers de
+   levier de Binance faisait tomber le placement à 5 %. Corrigé, il remonte à 9 %.
+
+Deux bugs du dépôt, sans rapport direct avec ce chantier, sont tombés en chemin :
+`fetch_liquidations` renvoyait des BTC et non des dollars, et **toutes les requêtes Bybit
+revenaient vides en silence** (symbole `BTCUSDT.6` et non `BTCUSDT_PERP.6`), soit 58 % du
+volume de Binance absent de l'OI, des liquidations, du delta perp, du funding et du ratio
+long/short.
+
+## La découverte principale : le côté était inversé
 
 Premier passage : les amas tombaient du bon côté **26 %** du temps. Le hasard donnerait
 50 %. Une erreur aussi régulière n'est pas du bruit, c'est un signe inversé.
