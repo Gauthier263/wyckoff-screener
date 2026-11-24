@@ -104,3 +104,32 @@ def test_first_hit_et_score_des_previsions():
     s = F.score(X)
     assert s["lui"] == (2, 3) and s["outil"] == (1, 2)
     assert s["lui_quand_outil_neutre"] == (0, 1)
+
+
+def test_notes_de_la_page_viennent_du_rapport():
+    from screener.htf import report as RPT
+    c = [70000] * 40 + [62000, 58000, 56000, 59500, 60800, 61000]
+    lo = list(np.array(c) * 0.995)
+    lo[-4] = 55130
+    d1 = _d(c, lows=lo)
+    r = B.assess(d1, _d([61000] * 60, freq="4h"), bounds_1d=RANGE,
+                 bounds_4h=B.Bounds(55000, 66000))
+    n = RPT.notes_from_report(r, d1, view_days=30)
+    assert n["page_title"] == "Biais HTF BTC"
+    assert {lv["price"] for lv in n["levels"]} >= {60000.0, 70000.0, 80000.0, 55130.0}
+    assert all(lv["reason"] for lv in n["levels"])          # chaque niveau est justifié
+    assert {z["id"] for z in n["zones"]} == {"M1", "M2"}
+    assert "[[levels]]" in n["text"] and "### Scénarios" in n["text"]
+    assert "🟢" not in n["text"] and "🔴" not in n["text"]   # pas de pastille dans le texte
+
+
+def test_cadre_manquant_est_signale():
+    d1 = _d([70000] * 46)
+    r = B.assess(d1, _d([70000] * 20, freq="4h"), bounds_1d=RANGE)
+    assert any(a.startswith("4h : aucun sous-range") for a in r.alerts)
+
+
+def test_format_francais_des_nombres():
+    from screener.htf.report import _fr
+    assert _fr("au-dessus de 60,600 puis 81,341") == "au-dessus de 60 600 puis 81 341"
+    assert _fr("score +2, conviction") == "score +2, conviction"     # virgule de phrase intacte

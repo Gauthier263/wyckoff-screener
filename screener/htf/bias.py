@@ -266,6 +266,12 @@ def assess(d1: pd.DataFrame, h4: pd.DataFrame, h1: "pd.DataFrame | None" = None,
         frames.append(read_frame(d1, b1, "1D", lookback=30))
     if b4:
         frames.append(read_frame(h4, b4, "4h", lookback=60))
+    missing = []
+    if not b1:
+        missing.append("1D : aucun range horizontal détecté — fournir les bornes tracées")
+    if not b4:
+        missing.append("4h : aucun sous-range horizontal détecté (marché en tendance sur la "
+                       "fenêtre) — seul le cadre 1D porte le biais")
     score = int(sum(f["score"] for f in frames))
     bias = "haussier" if score >= 2 else "baissier" if score <= -2 else "neutre"
 
@@ -326,6 +332,7 @@ def assess(d1: pd.DataFrame, h4: pd.DataFrame, h1: "pd.DataFrame | None" = None,
         if f["déviation"] and f["déviation"]["côté"] == "au-dessus du plafond":
             alerts.append(f"{f['cadre']} : déviation au-dessus du plafond en cours — ne pas acheter "
                           f"la cassure sans acceptance au-dessus de {f['bornes'].ceiling_zone[1]:,.0f}")
+    alerts += missing
     if any(b and b.source == "automatique" for b in (b1, b4)):
         alerts.append("bornes détectées automatiquement : à confronter aux bornes tracées "
                       "(la détection ne retrouve celles de CrypNuevo que 2 fois sur 7)")
