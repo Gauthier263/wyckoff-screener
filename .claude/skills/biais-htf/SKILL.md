@@ -66,6 +66,20 @@ mèche comme cible, ni un décompte de touches comme un signal.
 - Trois de ses quatre erreurs viennent des extrêmes de range (zone de réaction, pas signal).
 - Liquidations quotidiennes : elles qualifient la journée de la mèche, pas la mèche.
 
+## Alertes sur événement
+
+`python -m screener.htf.alerts` (un passage, après chaque clôture 4h) compare l'état du moteur
+à la clôture qui tombe et à la précédente, et ne signale que les **changements** : déviation
+reprise (ou qui s'étend), acceptance du déclencheur acquise / perdue, déviation accomplie ou
+annulée, cassure acceptée, mèche de liquidation 1h/4h qualifiée et non retestée, biais qui
+change. Bornes lues dans `config/htf_bounds.json` : **les mettre à jour quand Gauthier trace
+un nouveau range**. Garde-fous anti-bruit : pas d'alerte de structure sur un cadre aux bornes
+automatiques ; acceptance perdue = 2 clôtures 4h repassées ; biais = tenu 2 clôtures 4h sauf
+événement 1D. Rejeu : `--replay "2026-10-01 00:00" "2026-11-24 17:00"` (13 passages avec
+alerte en 8 semaines, dont le 22/11 à 01h CET : « ne pas vendre la cassure »).
+Telegram si `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`, sinon sortie écran ; déduplication et
+mémoire des états confirmés dans `.cache/htf_alerts_state.json`.
+
 ## Vérifier l'outillage
 
 `python -m screener.htf.health` dit quelle source répond (OHLCV, OI, delta perp,
