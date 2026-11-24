@@ -47,6 +47,9 @@ FOOTER = "[aide à la décision, pas un ordre]"
 BAR = pd.Timedelta("4h")
 MAX_CATCHUP = 6                       # au plus 24 h rattrapées si le cron a sauté des passages
 WICK_RECENT = {"4h": 13, "1h": 30}    # 1h : la mèche n'est qualifiée qu'à la clôture du jour
+# Profondeur chargée : le 1D sert aux bornes automatiques et à l'EMA, les mèches n'ont
+# besoin que des 200 dernières bougies (ATR compris). Garde un premier passage léger en CI.
+HISTORY = {"1d": "2020-01-01", "4h": "2024-01-01", "1h": "2025-06-01"}
 
 
 # ===================================================================== bornes et données
@@ -66,7 +69,7 @@ def load_bounds(path: str = BOUNDS_PATH) -> "B.Bounds | None":
 def load_data(symbol: str = "BTC/USDT", end=None) -> dict:
     """Charge une fois tout l'historique nécessaire ; `freeze` le découpe ensuite."""
     from .. import data as D
-    out = {tf: WS.load(symbol, tf, "2020-01-01") for tf in ("1d", "4h", "1h")}
+    out = {tf: WS.load(symbol, tf, HISTORY[tf]) for tf in ("1d", "4h", "1h")}
     end = pd.Timestamp.now(tz="UTC") if end is None else pd.Timestamp(end)
     try:
         out["liq"] = D.fetch_liquidations(symbol, "1d",
@@ -317,8 +320,9 @@ def compose(r: B.Report, cur: dict, items: list, symbol: str = "BTC/USDT") -> st
     head = (f"{symbol.split('/')[0]} HTF — clôture 4h du {fmt(r.asof, '%d/%m %Hh%M')} "
             f"{label(r.asof)} — prix {_k(r.price)}")
     lines = [head, ""]
-    lines += [f"- {it['texte']}" for it in items]
-    lines += ["", f"Biais : {r.bias} (score {r.score:+d}, conviction {r.conviction})."]
+    if items:
+        lines += [f"- {it['texte']}" for it in items] + [""]
+    lines += [f"Biais : {r.bias} (score {r.score:+d}, conviction {r.conviction})."]
     # biais tranché : le scénario principal ; neutre : les deux, aucun n'a l'avantage
     for s in (r.scenarios if r.bias == "neutre" else r.scenarios[:1]):
         cib = (" puis ".join(_cible(c, reasons) for c in s["cibles"])
@@ -390,6 +394,17 @@ def run_once(symbol: str = "BTC/USDT", bounds_path: str = BOUNDS_PATH,
     return sent
 
 
+def run_test(symbol: str = "BTC/USDT", bounds_path: str = BOUNDS_PATH) -> str:
+    """Message de test : l'état actuel, envoyé par le même canal (vérifie le bout-en-bout)."""
+    from ..alerts import _notify
+    now = pd.Timestamp.now(tz="UTC")
+    data = load_data(symbol, end=now)
+    r, s = evaluate_at(data, last_close(now), load_bounds(bounds_path))
+    msg = "TEST alertes HTF (à ignorer) — état actuel\n" + compose(r, s, [], symbol)
+    _notify(msg)
+    return msg
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Alertes sur événement du biais HTF (1D/4h).")
     p.add_argument("--symbol", default="BTC/USDT")
@@ -397,7 +412,12 @@ def main(argv=None):
     p.add_argument("--state", default=STATE_PATH)
     p.add_argument("--replay", nargs=2, metavar=("DEBUT", "FIN"),
                    help="rejouer les alertes entre deux dates (heure de Paris), sans notifier")
+    p.add_argument("--test", action="store_true",
+                   help="envoyer l'état actuel comme message de test, puis sortir")
     a = p.parse_args(argv)
+    if a.test:
+        run_test(a.symbol, a.bounds)
+        return
     if a.replay:
         year = pd.Timestamp.now().year
         t0, t1 = (last_close(parse(x, year)) for x in a.replay)
