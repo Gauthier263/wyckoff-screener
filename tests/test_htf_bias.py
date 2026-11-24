@@ -76,3 +76,31 @@ def test_bounds_zones_par_defaut():
     b = B.Bounds(60000, 80000)
     assert b.floor_zone == (60000, 60000) and b.mid == 70000
     assert abs(b.position(70000) - 0.5) < 1e-9
+
+
+def test_une_deviation_dont_la_cible_est_atteinte_est_accomplie():
+    """15/11 : la sortie au-dessus du plafond de fin octobre ne doit plus compter quand le
+    prix a depuis traversé le milieu du range (cible de la déviation)."""
+    c = [79000, 81500, 79000, 75000, 70000, 66000, 64000] + [65000] * 10
+    hi = list(np.array(c) * 1.005)
+    hi[1] = 82061
+    f = B.read_frame(_d(c, highs=hi), RANGE, "1D", lookback=30)
+    assert f["déviation"] is None and f.get("déviation_accomplie") == "haut"
+    assert f["score"] == 0                     # 25 % du range : milieu, pas de signal
+
+
+def test_first_hit_et_score_des_previsions():
+    from screener.htf import forecasts as F
+    idx = pd.date_range("2026-01-01", periods=48, freq="1h", tz="UTC")
+    c = np.r_[np.full(10, 100.0), np.linspace(100, 110, 38)]
+    h1 = pd.DataFrame({"open": c, "high": c + 0.2, "low": c - 0.2, "close": c,
+                       "volume": 1.0}, index=idx)
+    assert F.first_hit(h1, idx[5], 106, 95, 3)[0] == "haut"
+    fc = {"asof": str(idx[5]), "dir": 1, "cible": 106, "inval": 95, "h": 3}
+    o = F.outcomes(h1, fc)
+    assert o["issue_cible"] == "cible" and o["marché"] == 1
+    X = pd.DataFrame({"lui": [1, -1, 1], "outil": [1, 0, -1], "outil_auto": [0, 0, 1],
+                      "marché": [1, 1, 1]})
+    s = F.score(X)
+    assert s["lui"] == (2, 3) and s["outil"] == (1, 2)
+    assert s["lui_quand_outil_neutre"] == (0, 1)

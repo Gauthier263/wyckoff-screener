@@ -140,6 +140,19 @@ def read_frame(df: pd.DataFrame, b: Bounds, label: str, lookback: int = 30,
     if episodes:
         last, side, edge, ext_col, start = max(episodes, key=lambda e: e[0])
         seg = tail.iloc[start:]
+        # Une déviation dont la cible (le milieu du range) a déjà été atteinte après
+        # l'extrême est ACCOMPLIE : ce n'est plus un signal. Sans ce garde-fou, la sortie
+        # au-dessus du plafond de fin octobre restait « active » le 15/11, alors que le
+        # prix était descendu de 82k à 62k en traversant le milieu.
+        after = seg.iloc[int(np.argmin(seg[ext_col].to_numpy()) if side == "bas"
+                             else np.argmax(seg[ext_col].to_numpy())):]
+        reached_mid = bool((after["high"] >= b.mid).any() if side == "bas"
+                           else (after["low"] <= b.mid).any())
+        if reached_mid and not (side == "bas" and price < edge) \
+                and not (side == "haut" and price > edge):
+            out["déviation_accomplie"] = side
+            episodes = []
+    if episodes:
         ext = float(seg[ext_col].min() if side == "bas" else seg[ext_col].max())
         if side == "bas":
             broke = S.acceptance(seg, edge, "below", min_closes=min_closes, lookback=len(seg))
