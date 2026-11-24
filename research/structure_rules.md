@@ -76,13 +76,23 @@ va continuer dans ce sens ». Le rendement médian après une acceptance au-dess
 plafond est **négatif** sur BTC (−1,52 % et −0,67 %). C'est un filtre de validité de
 cassure, pas un signal directionnel.
 
+## 4. Three Taps — voir `research/three_taps.md`
+
+Mesuré comme un trade sur quatre actifs et trois timeframes, avec deux protocoles d'entrée et
+deux stops (dont le sien, en acceptance). Les touches d'un extrême de range battent toujours
+un point pris au hasard, mais **la troisième n'a rien de particulier**, et le trade type
+(stop sous la touche, cible au mid-range) **n'est rentable dans aucune configuration**. Son
+règle de timing tient pour une entrée au contact, pas sur reprise.
+
 ## Ce que ces mesures changent pour le skill
 
 1. **Acceptance** : critère de confirmation de premier rang, le mieux établi. Présenté
    comme filtre de validité, jamais comme direction.
 2. **Déviation** : critère de premier rang, avec sa statistique et sa réserve affichées
    (instable sur BTC 2020–2023).
-3. **Mèches** : seulement les mèches de liquidation, avec leur taux (environ 6 sur 10
+3. **Three Taps** : un extrême de range est une zone de réaction, pas un signal ; le décompte
+   des touches n'est pas affiché comme information. Voir `research/three_taps.md`.
+4. **Mèches** : seulement les mèches de liquidation, avec leur taux (environ 6 sur 10
    contre 4) et leur fenêtre (8 à 13 bougies) ; le 50 %, jamais le 100 % ; une mèche
    ordinaire est un simple repère graphique. Voir `research/wick_rule.md`.
 
