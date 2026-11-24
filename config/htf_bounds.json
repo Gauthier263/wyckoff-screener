@@ -1,0 +1,9 @@
+{
+  "_comment": "Bornes du range 1D tracées par l'analyste (prioritaires sur la détection automatique). Prix en USDT. Mettre à jour quand le range change ; les alertes HTF les lisent à chaque passage.",
+  "floor": 60000,
+  "ceiling": 81341,
+  "floor_zone": [59000, 60600],
+  "ceiling_zone": [81000, 81500],
+  "source": "CrypNuevo, tweet du 22/11/2026",
+  "updated": "2026-11-22"
+}

@@ -366,10 +366,18 @@ def _coinalyze_key() -> "str | None":
     return None
 
 
+# Coinalyze ne nomme pas les perpétuels de la même façon selon la bourse : Binance (.A) et
+# OKX (.3) utilisent le suffixe `_PERP`, Bybit (.6) non (`BTCUSDT.6`). Sans cette table, une
+# requête Bybit renvoie simplement « pas de données » — en silence, ce qui laisse croire que
+# la bourse n'est pas couverte. Codes : A Binance, 6 Bybit, 3 OKX, 2 Deribit, H Hyperliquid.
+_COINALYZE_NO_PERP_SUFFIX = {"6"}
+
+
 def _coinalyze_symbol(symbol: str, exch: str = "A") -> str:
-    """BTC/USDT -> 'BTCUSDT_PERP.A' (suffixe .A = Binance chez Coinalyze)."""
+    """BTC/USDT -> 'BTCUSDT_PERP.A' (Binance), 'BTCUSDT.6' (Bybit)."""
     base, quote = symbol.split("/")
-    return f"{base}{quote}_PERP.{exch}"
+    suffix = "" if exch in _COINALYZE_NO_PERP_SUFFIX else "_PERP"
+    return f"{base}{quote}{suffix}.{exch}"
 
 
 def fetch_coinalyze_oi(symbol: str = "BTC/USDT", timeframe: str = "5m", limit: int = 300,
@@ -483,9 +491,13 @@ def fetch_long_short_ratio(symbol: str = "BTC/USDT", timeframe: str = "15m", lim
 
 def fetch_liquidations(symbol: str = "BTC/USDT", timeframe: str = "15m", limit: int = 120,
                        start=None, end=None, exch: str = "A") -> "pd.DataFrame | None":
-    """Liquidations (USD, Binance via Coinalyze) → DataFrame [long_liq, short_liq] indexé ts
-    UTC, ou None. **long_liq** élevé = cascade de longs liquidés (chute) ; **short_liq** =
-    short squeeze. ≈0 = mouvement ordonné (pas de panique forcée)."""
+    """Liquidations (Binance via Coinalyze) → DataFrame [long_liq, short_liq] indexé ts UTC,
+    ou None. **Unité : le COIN (BTC), pas l'USD** — Coinalyze renvoie la devise de base tant
+    que `convert_to_usd` n'est pas demandé (vérifié : ~22 600 BTC de longs liquidés sur les
+    30 jours au 22/11/2026 ; en dollars ce chiffre n'aurait aucun sens). Ne jamais diviser
+    par le prix pour « convertir » : la valeur est déjà en coin.
+    **long_liq** élevé = cascade de longs liquidés (chute) ; **short_liq** = short squeeze.
+    ≈0 = mouvement ordonné (pas de panique forcée)."""
     h = _coinalyze_history("liquidation-history", symbol, timeframe, limit, start, end, exch)
     if not h:
         return None

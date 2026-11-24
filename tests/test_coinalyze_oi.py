@@ -165,3 +165,13 @@ def test_perp_taker_delta_parsing(monkeypatch):
 def test_perp_taker_delta_no_key(monkeypatch):
     monkeypatch.setattr(D, "_coinalyze_key", lambda: None)
     assert D.fetch_perp_taker_delta("BTC/USDT", "1h") is None
+
+
+def test_coinalyze_symbol_par_bourse():
+    """Bybit ne met pas le suffixe `_PERP` : sans cette distinction, toute requête Bybit
+    revenait vide en silence, et l'on croyait la bourse non couverte."""
+    from screener.data import _coinalyze_symbol
+    assert _coinalyze_symbol("BTC/USDT", "A") == "BTCUSDT_PERP.A"   # Binance
+    assert _coinalyze_symbol("BTC/USDT", "6") == "BTCUSDT.6"        # Bybit
+    assert _coinalyze_symbol("BTC/USDT", "3") == "BTCUSDT_PERP.3"   # OKX
+    assert _coinalyze_symbol("ETH/USDT", "6") == "ETHUSDT.6"

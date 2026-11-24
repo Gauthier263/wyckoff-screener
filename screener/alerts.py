@@ -177,8 +177,13 @@ def _notify(msg: str) -> None:
     """Envoie sur Telegram si les secrets sont présents, sinon stdout (logs CI / local)."""
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
     if token and chat:
-        send_telegram(token, chat, msg)
+        if send_telegram(token, chat, msg):
+            print("[telegram] message envoyé")
+        else:                                  # visible dans les logs Actions
+            print("[telegram] ÉCHEC d'envoi (token, chat_id ou bot bloqué ?) — message :")
+            print(msg)
     else:
+        print("[telegram] secrets absents (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID) — message :")
         print(msg)
 
 

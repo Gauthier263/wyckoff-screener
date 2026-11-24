@@ -1,0 +1,53 @@
+name: HTF bias alerts
+
+# Alertes sur changement d'état du biais HTF BTC (screener/htf/alerts.py) : un passage
+# 5 min après chaque clôture 4h (00h, 04h… UTC). Ne signale que les changements :
+# déviation, acceptance acquise/perdue, cassure, mèche de liquidation, biais.
+# Telegram (mêmes secrets que btc-alerts.yml) ; sans secrets, sortie dans les logs.
+# Bornes du range 1D : config/htf_bounds.json — à mettre à jour quand le range change.
+# Rappel GitHub : un `schedule` ne tourne que depuis la branche par défaut (main).
+
+on:
+  schedule:
+    - cron: "5 0,4,8,12,16,20 * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Envoyer l'état actuel comme message de TEST (true) au lieu d'un vrai passage"
+        default: "false"
+
+concurrency:
+  group: htf-alerts
+  cancel-in-progress: false
+
+jobs:
+  htf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      # État (dédup + états confirmés) et bougies en cache entre deux passages.
+      - name: Restore state and klines
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/htf_alerts_state.json
+            .cache/htf
+          key: htf-alerts-${{ github.run_id }}
+          restore-keys: htf-alerts-
+
+      - name: Run HTF alert pass
+        env:
+          COINALYZE_API_KEY: ${{ secrets.COINALYZE_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python -m screener.htf.alerts ${{ github.event.inputs.test == 'true' && '--test' || '' }}

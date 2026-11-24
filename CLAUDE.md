@@ -115,6 +115,18 @@ Aide à la décision discrétionnaire — **jamais** d'exécution d'ordres autom
   Données via `theory_rows(bias, th)` (seuils lus depuis `Thresholds`, jamais en dur).
   `run_window` le régénère à chaque analyse (`memo_theorie.html`).
 
+- `screener/htf/` — **biais HTF 1D/4h** (skill `.claude/skills/biais-htf`). `bias.py` (moteur :
+  n'assemble que des règles mesurées — déviation reprise, acceptance, extrême de range, mèche de
+  liquidation, murs d'OI ; EMA/sentiment en contexte, poids nul ; bornes fournies par l'analyste
+  prioritaires sur `auto_bounds`), `report.py` (CLI `python -m screener.htf.report`, page
+  interactive 1D), `structure.py` (ranges, déviation, acceptance, mèches, taps, EMA), `liqmap.py`
+  + `calibrate.py` (carte positions/liquidations, leviers calibrés), `sources.py` (Hyperliquid,
+  SmartMoney, Deribit, macro, Yahoo, F&G), `wick_study.py` / `taps_study.py` / `rules_study.py`
+  (études rejouables), `forecasts.py` (rejeu sur les prévisions datées de CrypNuevo),
+  `health.py` (diagnostic des sources), `alerts.py` (alertes sur **changement d'état** à chaque
+  clôture 4h : déviation, acceptance acquise/perdue, cassure, mèche de liquidation, biais ;
+  bornes analyste dans `config/htf_bounds.json`). Résultats et limites : `research/*.md`.
+
 ## Conventions
 - Gauthier préfère une sortie tabulaire stricte, sans prose superflue.
 - Heuristiques transparentes et ajustables, jamais de boîte noire.
