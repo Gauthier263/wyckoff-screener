@@ -90,3 +90,24 @@ def test_precedence_ordre_retest_puis_mouvement():
     w = w[w["direction"] == "basse"]
     p = W.precedence(df, w, target_atr=2.0, horizon=35, control_offset=60)
     assert p.iloc[0]["verdict"] == "retest d'abord"
+
+
+def test_liq_rel_rapporte_le_jour_a_sa_mediane():
+    idx = pd.date_range("2026-01-01", periods=40, freq="1D", tz="UTC")
+    liq = pd.DataFrame({"long_liq": np.r_[np.full(39, 100.0), 500.0],
+                        "short_liq": np.full(40, 50.0)}, index=idx)
+    at = idx[-1] + pd.Timedelta(hours=9)
+    assert W.liq_rel(liq, at, "basse") == 5.0       # longs liquidés : 500 contre 100
+    assert W.liq_rel(liq, at, "haute") == 1.0       # shorts : jour ordinaire
+    assert np.isnan(W.liq_rel(liq, idx[3], "basse"))   # pas assez d'historique
+
+
+def test_classify_wick_suit_la_regle_validee():
+    assert W.classify_wick(1.2, 5.0, "basse")["attendu"] is None          # trop petite
+    sans = W.classify_wick(2.0, 1.0, "basse")
+    assert sans["attendu"] is None and "aucun avantage" in sans["note"]
+    liq = W.classify_wick(2.0, 3.0, "basse")
+    assert liq["type"] == "mèche de liquidation"
+    assert liq["taux"] > liq["témoin"]
+    assert "100 %" in liq["note"]
+    assert W.classify_wick(2.0, float("nan"), "haute")["attendu"] is None

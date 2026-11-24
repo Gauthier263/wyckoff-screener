@@ -345,3 +345,132 @@ def rate(mask) -> str:
         return "-"
     lo, hi = wilson(k, n)
     return f"{k / n:.2f} [{lo:.2f}-{hi:.2f}]"
+
+
+# ============================================================ règle validée
+
+# Seuils FIGÉS sur l'apprentissage BTC/ETH 2020-2024, puis contrôlés sans retouche sur
+# BTC/ETH 2025-2026 et sur SOL/XRP (jamais vus). Voir research/wick_rule.md.
+RULE_MIN_ATR = 1.5          # longue mèche : au moins 1,5 ATR
+RULE_LIQ_REL = 2.6          # journée de liquidations du côté de la mèche >= 2,6x la médiane 30 j
+RULE_WINDOW = 8             # l'avance de la mèche se concentre dans les 8 premières bougies
+
+# Taux mesurés (retest du 50 % AVANT un mouvement de 2 ATR dans le sens du scénario),
+# sur 736 mèches de liquidation, 4 actifs, 1h et 4h, à citer tels quels dans une analyse.
+RULE_STATS = {
+    "accumulation": {"taux": 0.62, "ic": (0.57, 0.67), "témoin": 0.44},
+    "distribution": {"taux": 0.54, "ic": (0.46, 0.62), "témoin": 0.40},
+    "sans liquidation": {"taux": 0.53, "témoin": 0.54},
+    "délai médian": 4, "délai 75 %": 16,
+}
+
+
+def liq_rel(liq_daily: pd.DataFrame, at: pd.Timestamp, direction: str,
+            window: int = 30) -> float:
+    """Intensité des liquidations du jour de la mèche, du côté de la mèche (pur).
+
+    Mèche basse → liquidations de longs ; mèche haute → liquidations de shorts. Rapportée à
+    la médiane des `window` jours précédents. `liq_daily` : sortie de
+    `data.fetch_liquidations(..., "1d")`, en coin.
+    """
+    col = "long_liq" if direction == "basse" else "short_liq"
+    if liq_daily is None or col not in liq_daily:
+        return float("nan")
+    s = liq_daily[col].sort_index()
+    day = pd.Timestamp(at).floor("1D")
+    if day not in s.index:
+        return float("nan")
+    hist = s[s.index < day].tail(window)
+    med = float(hist.median()) if len(hist) >= 10 else float("nan")
+    return float(s.at[day] / med) if med and med > 0 else float("nan")
+
+
+def classify_wick(size_atr: float, liq_relative: float, direction: str) -> dict:
+    """Qualifie une mèche selon la règle validée (pur).
+
+    Renvoie `{"type", "attendu", "taux", "témoin", "délai", "note"}`, prêt à citer. Une
+    mèche qui ne remplit pas les conditions n'a **aucun avantage mesuré** : le dire,
+    plutôt que d'annoncer un retest probable.
+    """
+    scen = "accumulation" if direction == "basse" else "distribution"
+    if not np.isfinite(size_atr) or size_atr < RULE_MIN_ATR:
+        return {"type": "mèche ordinaire", "attendu": None,
+                "note": f"moins de {RULE_MIN_ATR} ATR : pas une longue mèche"}
+    if not np.isfinite(liq_relative):
+        return {"type": "longue mèche, liquidations inconnues", "attendu": None,
+                "note": "sans les liquidations du jour, la règle ne s'applique pas"}
+    if liq_relative < RULE_LIQ_REL:
+        st = RULE_STATS["sans liquidation"]
+        return {"type": "longue mèche sans liquidations", "attendu": None,
+                "taux": st["taux"], "témoin": st["témoin"],
+                "note": ("aucun avantage mesuré : le 50 % n'est pas retesté avant le "
+                         "mouvement plus souvent qu'un niveau quelconque")}
+    st = RULE_STATS[scen]
+    sens = "monter" if scen == "accumulation" else "baisser"
+    return {"type": "mèche de liquidation", "attendu": "retest du 50 % d'abord",
+            "taux": st["taux"], "ic": st["ic"], "témoin": st["témoin"],
+            "délai": (RULE_STATS["délai médian"], RULE_STATS["délai 75 %"]),
+            "note": (f"si le prix doit {sens}, il retesterait d'abord le 50 % de la mèche "
+                     f"dans {st['taux']:.0%} des cas (niveau quelconque : {st['témoin']:.0%}), "
+                     f"médiane {RULE_STATS['délai médian']} bougies ; passé "
+                     f"{RULE_WINDOW} à 13 bougies sans retest, l'avance disparaît. "
+                     "Le 100 % n'a aucun avantage mesuré.")}
+
+
+# ============================================================ étude rejouable
+
+def build_dataset(symbols=("BTC/USDT", "ETH/USDT"), timeframes=("1h", "4h"),
+                  start="2020-01-01", min_atr: float = RULE_MIN_ATR) -> pd.DataFrame:
+    """Toutes les mesures, une ligne par mèche : radiographie fine, ordre, délai, liquidations.
+
+    Réseau requis (klines, bougies fines, liquidations quotidiennes Coinalyze) ; le reste
+    est pur. Les seuils de la règle ne sont PAS appris ici : on rejoue la mesure.
+    """
+    from .. import data as D
+
+    horizons = {"1h": 500, "4h": 300, "1d": 120}
+    rows = []
+    for sym in symbols:
+        liq = D.fetch_liquidations(sym, "1d", start=pd.Timestamp(start, tz="UTC"),
+                                   end=pd.Timestamp.now(tz="UTC"))
+        for tf in timeframes:
+            df = load(sym, tf, start)
+            ltf = load(sym, LTF_FOR[tf], start)
+            wk = annotate_imbalance(detect_wicks(df, min_atr=min_atr), ltf, tf)
+            if wk.empty:
+                continue
+            p = precedence(df, wk, target_atr=2.0, horizon=120)
+            d = delays(df, wk, horizon=horizons[tf])
+            m = wk.merge(p, on=["at", "direction"]).merge(
+                d[["at", "direction", "d50", "d100", "t50", "t100"]], on=["at", "direction"])
+            m["liq_rel"] = [liq_rel(liq, a, dr) for a, dr in zip(m["at"], m["direction"])]
+            m["sym"], m["tf"] = sym.split("/")[0], tf
+            rows.append(m)
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
+def report(X: pd.DataFrame) -> pd.DataFrame:
+    """Taux « retest du 50 % d'abord » contre témoin, avec et sans liquidations (pur)."""
+    RA, T = "retest d'abord", {"retest d'abord", "mouvement d'abord"}
+    out = []
+    groups = [("toutes", X), ("liquidations >= seuil", X[X["liq_rel"] >= RULE_LIQ_REL]),
+              ("sans liquidations", X[X["liq_rel"] < RULE_LIQ_REL])]
+    for name, g in groups:
+        pr = g[g["verdict"].isin(T)]
+        pt = g[g["témoin"].isin(T)]
+        out.append({"mèches": name, "n": len(g), "retest d'abord": rate(pr["verdict"] == RA),
+                    "témoin": round(float((pt["témoin"] == RA).mean()), 2) if len(pt) else None,
+                    "délai médian": (float(g["d50"].median()) if len(g) else None)})
+    return pd.DataFrame(out)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Rejoue l'étude de la règle des mèches.")
+    ap.add_argument("--symbols", default="BTC/USDT,ETH/USDT")
+    ap.add_argument("--timeframes", default="1h,4h")
+    ap.add_argument("--start", default="2020-01-01")
+    a = ap.parse_args()
+    X = build_dataset(a.symbols.split(","), a.timeframes.split(","), a.start)
+    print(report(X).to_string(index=False))
