@@ -62,17 +62,40 @@ def fetch_ohlcv_range(ex, symbol: str, timeframe: str, start, end) -> pd.DataFra
     return df.drop_duplicates("ts").set_index("ts").sort_index()
 
 
+# Codes Coinalyze : A Binance, 6 Bybit, 3 OKX. Les heatmaps Hyblock agrègent plusieurs
+# bourses (Binance + Bybit + Bitmex) ; comparer notre Binance seul à une de ces cartes
+# mélange l'erreur de notre modèle et un écart de couverture.
+VENUES = {"binance": "A", "bybit": "6", "okx": "3"}
+
+
 def load_frozen(asof, lookback_days: int = 30, timeframe: str = "1h",
-                symbol: str = "BTC/USDT"):
-    """OHLCV, OI coin et delta perp figés à `asof` (rien après n'est chargé)."""
+                symbol: str = "BTC/USDT", venues=("binance",)):
+    """OHLCV, OI coin et delta perp figés à `asof` (rien après n'est chargé).
+
+    `venues` somme l'OI et le delta agressif de plusieurs bourses, pour se comparer à une
+    carte multi-exchange. Une bourse qui ne répond pas est simplement ignorée.
+    """
     end = pd.Timestamp(asof, tz="UTC")
     start = end - pd.Timedelta(days=lookback_days)
     ex = D.get_exchange("binance")
     df = fetch_ohlcv_range(ex, symbol, timeframe, start, end)
-    oi = D.fetch_coinalyze_oi(symbol, timeframe, start=start, end=end, usd=False)
-    delta = D.fetch_perp_taker_delta(symbol, timeframe, start=start, end=end)
-    if isinstance(oi, pd.DataFrame):
-        oi = oi.iloc[:, 0]
+
+    ois, deltas = [], []
+    for v in venues:
+        code = VENUES.get(v, v)
+        o = D.fetch_coinalyze_oi(symbol, timeframe, start=start, end=end, usd=False,
+                                 exch=code)
+        if isinstance(o, pd.DataFrame):
+            o = o.iloc[:, 0]
+        if o is not None and len(o):
+            ois.append(o)
+        d = D.fetch_perp_taker_delta(symbol, timeframe, start=start, end=end, exch=code)
+        if d is not None and len(d):
+            deltas.append(d)
+    oi = (pd.concat(ois, axis=1).sum(axis=1, min_count=1).sort_index()
+          if ois else None)
+    delta = (pd.concat(deltas, axis=1).sum(axis=1, min_count=1).sort_index()
+             if deltas else None)
     return df, oi, delta
 
 

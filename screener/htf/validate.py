@@ -29,11 +29,18 @@ def _mid(c: dict) -> float:
 
 
 def evaluate_one(ref: dict, lookback_days: int = 30, timeframe: str = "4h",
-                 calibrated: bool = True, tol_pct: float = 0.015, **kw) -> dict:
+                 calibrated: bool = True, tol_pct: float = 0.015,
+                 match_venues: bool = False, venues=("binance",), **kw) -> dict:
     """Confronte notre carte à un relevé. Renvoie un dict de mesures, jamais d'exception."""
     out = {"asof": ref["asof"][:16], "kind": ref["kind"], "note": ref["note"][:46]}
     try:
-        df, oi, delta = RP.load_frozen(ref["asof"], lookback_days, timeframe)
+        vs = venues
+        if match_venues and ref.get("venues"):
+            # on charge les bourses que la capture agrège, moins celles que Coinalyze
+            # n'expose pas (Bitmex), pour ne pas comparer deux couvertures différentes
+            vs = tuple(v for v in ref["venues"] if v in RP.VENUES) or venues
+        out["venues"] = "+".join(vs)
+        df, oi, delta = RP.load_frozen(ref["asof"], lookback_days, timeframe, venues=vs)
         if df.empty or oi is None or len(oi.dropna()) == 0:
             out["status"] = "données indisponibles"
             return out
@@ -128,10 +135,13 @@ def main():
     ap.add_argument("--tol", type=float, default=0.015)
     ap.add_argument("--no-calib", action="store_true")
     ap.add_argument("--seed-bars", type=int, default=0)
+    ap.add_argument("--match-venues", action="store_true",
+                    help="charger les bourses que chaque capture agrège")
     args = ap.parse_args()
     df = run(lookback_days=args.lookback, timeframe=args.timeframe, tol_pct=args.tol,
-             calibrated=not args.no_calib, seed_bars=args.seed_bars)
-    cols = [c for c in ("asof", "kind", "price", "price_ref", "clust_side", "clust_ref",
+             calibrated=not args.no_calib, seed_bars=args.seed_bars,
+             match_venues=args.match_venues)
+    cols = [c for c in ("asof", "kind", "venues", "price", "price_ref", "clust_side", "clust_ref",
                         "clust_ours", "clust_err", "clust_any", "side_ok", "wall_ref",
                         "wall_ours", "wall_err", "counts_ref", "counts_ours", "status")
             if c in df.columns]
